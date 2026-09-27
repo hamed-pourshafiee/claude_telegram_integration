@@ -1,0 +1,7 @@
+.env
+.env.*
+.git/
+.state/
+sandbox/
+node_modules/
+dist/

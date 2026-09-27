@@ -1,0 +1,16 @@
+# Secrets: the bot token lives only in .env (design §5). The template is committed.
+.env
+.env.*
+!.env.example
+
+# Runtime state: SQLite, broker socket, logs, settings backups
+.state/
+
+# Test area for sessions the hooks act on while building (implementation-plan §1)
+sandbox/
+
+node_modules/
+dist/
+CLAUDE.local.md
+.claude/settings.local.json
+.DS_Store
