@@ -4,10 +4,11 @@
 import type { Database } from "bun:sqlite";
 import { rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { loadConfig } from "../shared/config.ts";
 import { loadBotToken } from "../shared/env.ts";
 import { messageOf } from "../shared/errors.ts";
 import { fileLog } from "../shared/file-log.ts";
-import { ENV_FILE, STATE } from "../shared/paths.ts";
+import { CONFIG_FILE, ENV_FILE, HOME_DIR, REPO_ROOT, STATE } from "../shared/paths.ts";
 import { ensureStateDir, isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
 import { createApp } from "./app.ts";
@@ -38,10 +39,11 @@ function main(): void {
     return;
   }
   refuseVerboseFetch(process.env);
+  const config = loadConfig(CONFIG_FILE, { repoRoot: REPO_ROOT, home: HOME_DIR });
   const token = loadBotToken(ENV_FILE);
   const db = BrokerDb.open(STATE.db);
   const shutdown = new AbortController();
-  const { routes } = createApp({ token, db, log, signal: shutdown.signal });
+  const { routes } = createApp({ token, db, log, config, signal: shutdown.signal });
   const server = startServer(STATE.socket, routes);
   writeFileSync(STATE.pid, `${process.pid}\n`);
   log("broker.started", { schema: db.schemaVersion });

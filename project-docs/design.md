@@ -1,7 +1,8 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 6, O1 decided as D8 (rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3;
-rev. 3: F14; rev. 2: Codex review) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 7, F17 the screen lock (rev. 6: O1 decided as D8; rev. 5: Codex review of the spike
+changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-28 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -44,6 +45,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F14 | Bun also loads `bunfig.toml` from the current directory and runs its `preload` scripts, even with `--no-env-file`. `--config=<file>` loads that file instead; a missing file stops Bun with exit 1. | tested 2026-09-28 (plan 1.2) |
 | F15 | `CLAUDE_PROJECT_DIR` is the directory the session started in and stays there after a `cd`; the input's `cwd` follows the `cd`. | S3 |
 | F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` also holds non-blocking errors, so it is not the signal. Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28 |
+| F17 | `ioreg -n Root -d 1`: the kernel's `IOConsoleLocked` is `Yes` while the screen is locked (also at the login window and on the way to sleep), and the console session in `IOConsoleUsers` then carries `CGSSessionScreenIsLocked`=Yes and `CGSSessionScreenLockedTime`. Unlocked, the flag is `No` and both keys are gone. This Mac locks itself after 30 minutes without input. | observed 2026-09-28 (plan 2.6) |
 
 ## 3. Architecture
 
@@ -141,9 +143,9 @@ Taken (say so before the step if you disagree):
 - **D3 Hooks start the broker on demand** from `<repo>`, with a minimal environment, so inherited
   variables such as `BUN_CONFIG_VERBOSE_FETCH` can't log token-bearing URLs. No launchd plist. A
   persistent "disabled" flag stops every hook, waiter and restart.
-- **D4 Presence** as in flow 3: active < 30 s since your last input; away after 3 min, when the screen is
-  locked, or on `/away`. An unreadable idle value counts as present, and `/status` shows it. Commands:
-  `/away`, `/auto`, `/off` (mute), `/status`.
+- **D4 Presence** as in flow 3: active < 30 s since your last input (F12); away after 3 min, when the
+  screen is locked (F17), or on `/away`. An unreadable idle value counts as present, and `/status` shows
+  it. Commands: `/away`, `/auto`, `/off` (mute), `/status`.
 - **D5 Fail safe.** On any error the hook logs it and exits with no decision, so Claude behaves as if the
   hook were not there. Nothing is ever approved or answered because of an error.
 - **D6 The Mac stays awake while you're away.** The display may sleep, the system may not; with the lid

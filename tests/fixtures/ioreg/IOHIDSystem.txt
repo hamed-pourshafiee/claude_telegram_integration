@@ -1,0 +1,36 @@
++-o IOHIDSystem  <class IOHIDSystem, id 0x100000986, registered, matched, active, busy 0 (260 ms), retain 12>
+    {
+      "IOClass" = "IOHIDSystem"
+      "HIDScrollCountMaxTimeDeltaBetween" = 600
+      "IOPersonalityPublisher" = "com.apple.iokit.IOHIDFamily"
+      "IOResourceMatch" = "IOBSD"
+      "IOMatchedAtBoot" = Yes
+      "HIDServiceGlobalModifiersUsage" = 1
+      "IOProviderClass" = "IOResources"
+      "IOReportLegendPublic" = Yes
+      "IOProbeScore" = 0
+      "HIDIdleTime" = 155578961500
+      "HIDScrollCountIgnoreMomentumScrolls" = Yes
+      "HIDScrollCountAccelerationFactor" = 163840
+      "HIDServiceSupport" = Yes
+      "HIDScrollCountMouseCanReset" = Yes
+      "IOCFPlugInTypes" = {"0516B563-B15B-11DA-96EB-0014519758EF"="IOHIDFamily.kext/Contents/PlugIns/IOHIDNXEventRouter.plugin"}
+      "VendorID" = 1452
+      "CFBundleIdentifierKernel" = "com.apple.iokit.IOHIDFamily"
+      "HIDScrollCountMinDeltaToSustain" = 20
+      "IOMatchCategory" = "IOHID"
+      "CFBundleIdentifier" = "com.apple.iokit.IOHIDFamily"
+      "HIDScrollCountBootDefault" = {"HIDScrollCountMinDeltaToStart"=30,"HIDScrollCountAccelerationFactor"=163840,"HIDScrollCountMouseCanReset"=Yes,"HIDScrollCountIgnoreMomentumScrolls"=Yes,"HIDScrollCountMinDeltaToSustain"=20,"HIDScrollCountMax"=2000,"HIDScrollCountMaxTimeDeltaBetween"=600,"HIDScrollCountMaxTimeDeltaToSustain"=250}
+      "PrimaryUsage" = 23
+      "CursorState" = {}
+      "HIDPowerOnDelayNS" = 500000000
+      "IOGeneralInterest" = "IOCommand is not serializable"
+      "PrimaryUsagePage" = 65280
+      "HIDScrollCountMinDeltaToStart" = 30
+      "HIDScrollCountMaxTimeDeltaToSustain" = 250
+      "IOReportLegend" = ({"IOReportGroupName"="Cursor","IOReportChannels"=((4860917212932887663,64426082307,"Cursor Total Latency")),"IOReportChannelInfo"={"IOReportChannelConfig"=<6400000000000000000000000a000000204e0000000000000100000005000000>,"IOReportChannelUnit"=72058113728970752},"IOReportSubGroupName"="Total"},{"IOReportGroupName"="Cursor","IOReportChannels"=((4860917212932884338,64426082307,"Cursor Graphics Latency")),"IOReportChannelInfo"={"IOReportChannelConfig"=<6400000000000000000000000a000000204e0000000000000100000005000000>,"IOReportChannelUnit"=72058113728970752},"IOReportSubGroupName"="Graphics"})
+      "HIDParameters" = {"HIDMouseKeysOptionToggles"=0,"JitterNoClick"=1,"ActuateDetents"=1,"Dragging"=0,"HIDSlowKeysDelay"=0,"JitterNoMove"=1,"TrackpadThreeFingerHorizSwipeGesture"=2,"HIDInitialKeyRepeat"=500000000,"TrackpadThreeFingerDrag"=No,"HIDPointerAcceleration"=45056,"UserPreferences"=Yes,"HIDDefaultParameters"=Yes,"TrackpadHorizScroll"=1,"HIDF12EjectDelay"=250,"TrackpadFourFingerVertSwipeGesture"=2,"TrackpadTwoFingerFromRightEdgeSwipeGesture"=3,"USBMouseStopsTrackpad"=0,"TrackpadThreeFingerTapGesture"=0,"MouseOneFingerDoubleTapGesture"=0,"HIDScrollZoomModifierMask"=0,"TrackpadScroll"=Yes,"HIDUseLinearScalingMouseAcceleration"=0,"Trackpad Jitter Milliseconds"=192,"HIDPointerButtonMode"=2,"HIDKeyboardModifierMappingPairs"=(),"TrackpadFourFingerHorizSwipeGesture"=2,"DragLock"=0,"TwofingerNoAction"=1,"MouseTwoFingerDoubleTapGesture"=3,"HIDClickTime"=500000000,"SecondClickThreshold"=1,"HIDStickyKeysShiftToggles"=0,"TrackpadHandResting"=Yes,"TrackpadFourFingerPinchGesture"=2,"MouseMomentumScroll"=Yes,"TrackpadFiveFingerPinchGesture"=2,"PalmNoAction Permanent"=1,"MouseButtonMode"="OneButton","TrackpadThreeFingerVertSwipeGesture"=2,"OutsidezoneNoAction When Typing"=1,"ForceSuppressed"=No,"TrackpadCornerSecondaryClick"=0,"MouseButtonDivision"=55,"HIDStickyKeysOn"=0,"HIDStickyKeysDisabled"=0,"EjectDelay"=0,"TrackpadPinch"=1,"FirstClickThreshold"=1,"HIDClickSpace"=(0,0),"PalmNoAction When Typing"=1,"MouseVerticalScroll"=Yes,"version"=1,"MouseHorizontalScroll"=Yes,"TrackpadMomentumScroll"=Yes,"MouseTwoFingerHorizSwipeGesture"=2,"HIDKeyRepeat"=83333333,"TrackpadTwoFingerDoubleTapGesture"=1,"Clicking"=Yes,"TrackpadRightClick"=Yes,"TrackpadRotate"=1,"Use Panther Settings for W"=0,"HIDScrollAcceleration"=20480,"HIDFKeyMode"=0}
+      "HIDScrollCountMax" = 2000
+    }
+    
+

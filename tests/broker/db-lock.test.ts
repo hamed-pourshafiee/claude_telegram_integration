@@ -42,13 +42,27 @@ describe("BrokerDb", () => {
   });
 });
 
+const LOCK_MODULE = JSON.stringify(join(REPO_ROOT, "src/broker/lock.ts"));
+
 /** Starts a process that takes the lock on `file` and holds it; resolves once it holds it. */
-async function holder(file: string) {
-  const lockModule = JSON.stringify(join(REPO_ROOT, "src/broker/lock.ts"));
-  const code = `import { acquireLock } from ${lockModule};
+function holder(file: string) {
+  return lockProcess(`import { acquireLock } from ${LOCK_MODULE};
     const held = acquireLock(${JSON.stringify(file)});
     console.log(held ? "held" : "busy");
-    await Bun.sleep(60_000);`;
+    await Bun.sleep(60_000);`);
+}
+
+/** Starts a process that waits for the clock to reach `start`, then tries to take the lock. */
+function racer(file: string, start: number) {
+  return lockProcess(`import { acquireLock } from ${LOCK_MODULE};
+    while (Date.now() < ${start});
+    const held = acquireLock(${JSON.stringify(file)});
+    console.log(held ? "held" : "busy");
+    await Bun.sleep(60_000);`);
+}
+
+/** Runs `code` in a new Bun process; resolves with what it printed first. */
+async function lockProcess(code: string) {
   const child = Bun.spawn([process.execPath, "-e", code], { stdout: "pipe", stderr: "ignore" });
   const reader = child.stdout.getReader();
   const first = await reader.read();
@@ -67,6 +81,19 @@ describe("the single-instance lock", () => {
     const lock = acquireLock(file);
     expect(lock).toBeDefined();
     lock?.close();
+  }, 20_000);
+
+  test("processes racing for a free lock at the same moment: exactly one gets it", async () => {
+    const start = Date.now() + 1500;
+    const files = Array.from({ length: 8 }, (_, index) => join(dir, `race-${index}.lock`));
+    const racers = await Promise.all(
+      files.flatMap((file) => [racer(file, start), racer(file, start)]),
+    );
+    for (const { child } of racers) child.kill("SIGKILL");
+    const pairs = files.map((_, index) => [racers[2 * index]?.said, racers[2 * index + 1]?.said]);
+    expect(pairs.map((pair) => pair.sort().join(" and "))).toEqual(
+      files.map(() => "busy and held"),
+    );
   }, 20_000);
 
   test("while this process holds it, another process is refused", async () => {

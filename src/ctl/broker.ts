@@ -1,5 +1,10 @@
 import { existsSync, readFileSync } from "node:fs";
-import { type BrokerLaunch, brokerHealth, ensureBroker } from "../shared/broker-client.ts";
+import {
+  type BrokerLaunch,
+  brokerHealth,
+  ensureBroker,
+  type PresenceHealth,
+} from "../shared/broker-client.ts";
 import { loadBotToken } from "../shared/env.ts";
 import { messageOf } from "../shared/errors.ts";
 import { asFields } from "../shared/json.ts";
@@ -57,12 +62,26 @@ export async function brokerStatus(paths: StatePaths, envFile: string, log: Log)
     lines.push(paired === null ? "not paired: run 'bun run ctl pair'" : `paired with ${paired}`);
     if (pairingUntil !== null)
       lines.push(`a pairing code is waiting, until ${clock(pairingUntil)}`);
+    if (health.presence !== undefined) lines.push(presenceLine(health.presence));
   } else {
     lines.push(
       disabled ? "not running" : "not running; the next hook or 'bun run ctl start' starts it",
     );
   }
   return { ok: disabled || health !== undefined, text: lines.join("\n") };
+}
+
+/** For example "presence: away (locked); idle 12 s, screen locked; mode auto". */
+export function presenceLine({
+  mode,
+  state,
+  because,
+  idleSeconds,
+  locked,
+}: PresenceHealth): string {
+  const idle = idleSeconds === null ? "unknown" : `${Math.floor(idleSeconds)} s`;
+  const screen = locked === null ? "unknown" : locked ? "locked" : "unlocked";
+  return `presence: ${state} (${because}); idle ${idle}, screen ${screen}; mode ${mode}`;
 }
 
 /** Sets the disabled flag first, so nothing restarts the broker, then stops it (design §6). */

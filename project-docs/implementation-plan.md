@@ -1,15 +1,19 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 7 (O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
-continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 8 (§1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6:
+Codex review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per
+waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F16), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F17), architecture and
 flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
 ## 1. How we work
 
-- One step at a time. Each step ends with a check you can see, and nothing starts until you say go.
+- One step at a time. Each step ends with a check you can see. Since step 2.6 (your call, 2026-09-28) a
+  step that passes is committed and the next one starts on its own; the work stops only where you have
+  to act: a live check at the Mac or on your phone, a change to `~/.claude/settings.json`, or a decision
+  that is yours.
 - After each step, `project-docs/progress.md` records the step, date, result, the evidence line and what
   we learned, so a new session can pick up from there.
 - Hooks in `~/.claude/settings.json` apply to every Claude session on this Mac. Until you widen it at the
@@ -19,7 +23,8 @@ flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and th
   every entry point; no silent catches (log with context).
 - A step is done only when `bun run typecheck`, `bun run lint` and `bun test` pass and its live check
   passes.
-- Codex review is offered after code steps.
+- Codex reviews are paused until the project is done; then you decide whether to run one (your call,
+  2026-09-28).
 
 ## 2. Steps
 

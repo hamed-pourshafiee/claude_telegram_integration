@@ -8,7 +8,7 @@ replies come back into the same session.
 
 Read these completely before doing anything in a new session:
 
-1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F16, architecture
+1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F17, architecture
    and flows 1–4, decisions D1–D8, open questions O2–O3, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
@@ -17,7 +17,10 @@ Read these completely before doing anything in a new session:
 
 ## How we work (implementation-plan.md §1)
 
-- One step at a time. Each step ends with a check you can see, and nothing starts until the user says go.
+- One step at a time, each ending with a check you can see. Since 2026-09-28 (step 2.6) the user wants
+  the work to go on by itself: commit a step once it passes and start the next. Stop only where the user
+  has to act (a live check at the Mac or on the phone, the settings.json OK below, a decision that is
+  theirs), and say exactly what to do.
 - After each step, `project-docs/progress.md` records the step, date, result, the evidence line and what
   we learned, so a new session can pick up from there.
 - Hooks in `~/.claude/settings.json` apply to every Claude session on this Mac. Until the user widens it
@@ -27,7 +30,8 @@ Read these completely before doing anything in a new session:
   every entry point; no silent catches (log with context).
 - A step is done only when `bun run typecheck`, `bun run lint` and `bun test` pass and its live check
   passes.
-- Codex review is offered after code steps: ask first, never run it automatically.
+- Codex reviews are paused until the project is done; then the user decides whether to run one. When
+  the Codex checkpoint hook fires, don't ask; never run Codex without the user's OK.
 
 ## Rules for this repo
 
@@ -43,7 +47,7 @@ Read these completely before doing anything in a new session:
   exact entries to be added or removed, and wait for their OK.
 - If a doc turns out wrong or a spike fails, stop and propose the change to the docs before working
   around it.
-- When a step passes and the user confirms, commit it locally. No git remote until the user chooses one
+- When a step passes, commit it locally (no confirmation needed). No git remote until the user chooses one
   (O3: local only for now).
 
 ## Commands
@@ -54,10 +58,13 @@ bun run typecheck      # tsc --noEmit
 bun run lint           # biome check; warnings fail too
 bun test               # bun:test, files in tests/
 bun run ctl doctor     # checks config.json, .env and the bot (getMe); never shows the token
-bun run ctl status     # is the broker running, with this repo's token? also: start | stop
+bun run ctl status     # broker running with this repo's token? paired? presence? also: start | stop
 bun run ctl disable    # sets the disabled flag and stops the broker, until `ctl enable` (design §6)
 bun run ctl pair       # a one-time code (10 min) to send the bot as `/pair <code>`
 ```
+
+In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/away` relays
+everything until `/auto`, `/auto` decides from the idle time and the screen lock, `/off` mutes.
 
 Tests that need a real broker, hook or ctl process run them in a throwaway copy of the repo
 (`tests/helpers/repo-copy.ts`), never against this repo's `.state/` or `.env`.

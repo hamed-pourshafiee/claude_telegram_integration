@@ -1,12 +1,15 @@
 import type { Log } from "../shared/log.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { Chat, Update, User } from "../shared/telegram/types.ts";
+import { type CommandName, parseCommand } from "./commands.ts";
 import type { Pairing, PairingResult } from "./pairing.ts";
 
 export interface GateDeps {
   readonly telegram: Pick<TelegramClient, "sendMessage">;
   readonly pairing: Pairing;
   readonly log: Log;
+  /** Carries out a command of the paired user (/status, /away…) and returns the answer. */
+  readonly command: (name: CommandName) => string;
 }
 
 const REPLIES = {
@@ -20,8 +23,8 @@ const REPLIES = {
 
 /**
  * Decides what happens to each update (design §5). `/pair <code>` in a private chat pairs its sender.
- * After that only the paired user, in a private chat, is heard; everything else is dropped and logged,
- * with ids only, never text.
+ * After that only the paired user, in a private chat, is heard, and their commands are answered;
+ * everything else is dropped and logged, with ids only, never text.
  */
 export async function handleUpdate(update: Update, deps: GateDeps): Promise<void> {
   if (update.kind === "other") return drop(update, deps, "not a message or a button press");
@@ -34,7 +37,14 @@ export async function handleUpdate(update: Update, deps: GateDeps): Promise<void
   const paired = deps.pairing.pairedUser();
   if (paired === undefined) return drop(update, deps, "not paired yet");
   if (paired.id !== from.id) return drop(update, deps, "not the paired user");
+  const command = text === undefined ? undefined : parseCommand(text);
+  if (command !== undefined) return answer(update, command, chat, deps);
   deps.log("update.accepted", { update: update.update_id, kind: update.kind });
+}
+
+async function answer(update: Known, name: CommandName, chat: Chat, deps: GateDeps) {
+  deps.log("command", { update: update.update_id, command: name });
+  await deps.telegram.sendMessage({ chat_id: chat.id, text: deps.command(name) });
 }
 
 type Known = Exclude<Update, { kind: "other" }>;

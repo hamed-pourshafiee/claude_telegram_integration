@@ -575,6 +575,75 @@ Committed as `98b9351` after the user's go (2026-09-28).
 
 ## Next
 
-After the user confirms 2.5 and it is committed, and after their go: **2.6 Presence**. The broker is
-running and paired; it polls Telegram while it runs. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
-(CLAUDE.md).
+Committed as `9793b5d` after the user's go (2026-09-28).
+
+## 2.6 Presence
+
+- **Date:** 2026-09-28
+- **Decision (the user, 2026-09-28):** from now on the work goes on by itself. A step that passes is
+  committed and the next one starts; the work stops only where the user has to act. Codex reviews are
+  paused until the project is done. Recorded in CLAUDE.md and plan §1 (rev. 8).
+- **Result:** passed, committed on its own under the new way of working. Live: the user locked the Mac
+  by hand and the broker counted them away (locked) 4.7 s later; a `/status` from the phone was answered
+  in 0.4 s. Not seen literally: a `/status` sent while the Mac was locked (the user locked it and left);
+  they are asked to confirm it at the next stop.
+- **Evidence:**
+  - `bun run typecheck` exit 0 · `bun run lint` "Checked 72 files … No fixes applied." · `bun test`
+    "323 pass, 0 fail", four full runs in a row.
+  - The recorder (`ioreg` once a second): `19:06:39 IOConsoleLocked=Yes sessionLocked=Yes
+    keys=CGSSessionScreenIsLocked,CGSSessionScreenLockedTime idle=1801.4s`. The Mac locked itself
+    after 30 minutes without input.
+  - `ctl status` while it was locked: `presence: away (locked); idle 4426 s, screen locked; mode auto`,
+    read by the live broker in its minimal environment.
+  - The broker log follows the Mac on its own: active, in between after 30 s, away after 180 s, active
+    again at the first input.
+  - The manual lock: the recorder read `CGSSessionScreenLockedTime` 20:06:47, and the broker logged
+    `presence.changed {state: away, because: locked}` at 20:06:51.741, 4.7 s later (plan: within 10 s).
+  - A live `/status` at 20:04:23.656 (`getUpdates`, 354 bytes) → `command status` at .673 →
+    `sendMessage` 200 at 20:04:24.082.
+  - Positive controls, each caught by the tests: away at > 180 s instead of ≥ (1 test), active at
+    ≤ 30 s (1), nanoseconds read as microseconds (8), an unknown idle time counted as away (4),
+    `IOConsoleLocked` ignored (1), commands heard before the paired-user check (2), the mode not
+    stored (2), only changes of state logged (1), the old lock (1).
+- **Built:**
+  - `src/broker/ioreg.ts`: `parseIdleSeconds` (`HIDIdleTime` in ns, F12), `parseScreenLocked` (F17), and
+    `readPresence`, which runs `/usr/sbin/ioreg` twice at once with a 2 s limit and never throws.
+  - `src/broker/presence.ts`: `stateOf` (flow 3: locked or ≥ 180 s away, < 30 s active, in between
+    otherwise; an unknown idle time counts as active), and `Presence`, which looks every 5 s and keeps
+    the mode in SQLite (`presence.mode`).
+  - `src/broker/commands.ts`: `/status`, `/away`, `/auto`, `/off`; the gate answers them for the paired
+    user only.
+  - The broker loads `config.json` (the thresholds); `/health` and `ctl status` show presence.
+  - Fixtures recorded on this Mac: `tests/fixtures/ioreg/IOHIDSystem.txt`, `Root-unlocked.txt` and
+    `Root-locked.txt` (login and full name masked, the 93 KB `IOKitDiagnostics` shortened to `{}`).
+- **Found along the way, a bug from 2.3:** two brokers started at the same moment could both give up
+  the single-instance lock, leaving none. With `locking_mode = EXCLUSIVE` each kept the read lock it
+  took first, so neither could write. The process test that starts two brokers at once failed about one
+  run in three. A new test races 8 pairs of processes at the same instant; it failed in 2 of 3 runs. Now
+  the lock is an open `BEGIN EXCLUSIVE` transaction with a 0.5 s busy timeout: SQLite fails the one that
+  would deadlock, which lets go of its read lock, and the other gets the lock. Five runs since, all 40
+  pairs had exactly one winner. A second broker now waits up to 0.5 s before it leaves, where 2.3's note
+  says "at once".
+- **Decisions (mine, open to change):**
+  - Locked means `IOConsoleLocked = Yes`, or `CGSSessionScreenIsLocked`=Yes in the session on the
+    console (F17). A lock that can't be read never makes you away.
+  - `/away` lasts until `/auto`; it doesn't end by itself when you come back. `/status` says why you
+    count as away, so a forgotten `/away` shows.
+  - Presence looks at the Mac from the broker's start, paired or not.
+  - Another command, such as `/start`, is a plain message for now. Phase 3 must not hand it to Claude.
+  - Logs: `presence.changed` on a change of state or of its reason; `presence.unreadable` and
+    `presence.readable` when what can't be read changes; `presence.mode`; `command`. No message text.
+- **Learned:**
+  - macOS checks a newly written executable the first time it runs: 0.3 to 0.7 s here, and over 2 s
+    under test load, which timed out a stand-in `ioreg`. The real `/usr/sbin/ioreg` never pays it, and
+    the stand-ins now get 10 s.
+  - `ioreg -n Root -d 1` prints 94 KB, 93 KB of it `IOKitDiagnostics`; both reads take about 20 ms.
+  - This Mac locks itself after 30 minutes without input, so an unattended Mac becomes "away (locked)"
+    at 30 minutes; "away (idle)" comes first, at 3 minutes.
+
+## Next
+
+**2.7 Notify hooks + install**, which stops for the user's OK before `~/.claude/settings.json` changes;
+at that stop, also ask them to send `/status` from the phone while the Mac is locked (2.6). The broker is
+running and paired. `.env` holds the real token: scan only staged files, and lock `.env` during any Codex
+review (CLAUDE.md).

@@ -4,8 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/broker/app.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
+import type { Reading } from "../../src/broker/ioreg.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
 import { pairingInstructions } from "../../src/ctl/pair.ts";
+import { parseConfig } from "../../src/shared/config.ts";
 import { asFields } from "../../src/shared/json.ts";
 import { noLog } from "../../src/shared/log.ts";
 import { Secret } from "../../src/shared/secret.ts";
@@ -18,6 +20,8 @@ const fake = new FakeTelegram();
 const dir = mkdtempSync(join(tmpdir(), "tg-app-"));
 let controller = new AbortController();
 let files = 0;
+/** What the stand-in Mac shows. */
+let mac: Reading = { idleSeconds: 1, locked: false, problems: [] };
 afterAll(() => {
   controller.abort();
   fake.stop();
@@ -26,6 +30,7 @@ afterAll(() => {
 beforeEach(() => {
   controller.abort();
   controller = new AbortController();
+  mac = { idleSeconds: 1, locked: false, problems: [] };
   fake.reset();
   // Like long polling: an empty answer after a short wait.
   fake.fallback("getUpdates", { json: { ok: true, result: [] }, delayMs: 30 });
@@ -35,7 +40,9 @@ function app(db?: BrokerDb) {
   files += 1;
   const opened = db ?? BrokerDb.open(join(dir, `app-${files}.db`));
   const deps = { token: new Secret(FAKE_TOKEN), db: opened, log: noLog, signal: controller.signal };
-  return { db: opened, ...createApp({ ...deps, apiBase: fake.url }) };
+  const config = parseConfig({}, { repoRoot: dir, home: dir });
+  const readPresence = () => Promise.resolve(mac);
+  return { db: opened, ...createApp({ ...deps, config, readPresence, apiBase: fake.url }) };
 }
 
 const you = { id: 4242, is_bot: false, first_name: "Hamed", username: "hamed" };
@@ -77,6 +84,31 @@ test("once paired, a restarted broker polls at once", async () => {
   const { poller } = app(db);
   expect(poller.running).toBe(true);
   expect(await until(() => fake.calls("getUpdates").length > 0)).toBe(true);
+});
+
+test("/status from the paired user gets where the Mac says you are (plan 2.6)", async () => {
+  mac = { idleSeconds: 3, locked: true, problems: [] };
+  const db = BrokerDb.open(join(dir, "status.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+  const { routes, presence } = app(db);
+  expect(await until(() => presence.snapshot().because === "locked")).toBe(true);
+  const chat = { id: you.id, type: "private" };
+  const status = { message_id: 3, date: 0, chat, from: you, text: "/status" };
+  fake.answer("getUpdates", ok([{ update_id: 600, message: status }]));
+  fake.answer("sendMessage", ok({ message_id: 4, date: 0, chat, text: "🔴 Away" }));
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  expect(fake.calls("sendMessage")[0]?.body).toMatchObject({
+    chat_id: you.id,
+    text: expect.stringMatching(/^🔴 Away: the screen is locked\n/),
+  });
+  expect(asFields(routes.health())?.presence).toEqual({
+    mode: "auto",
+    state: "away",
+    because: "locked",
+    idleSeconds: 3,
+    locked: true,
+  });
 });
 
 test("ctl pair shows the code and what to send", () => {

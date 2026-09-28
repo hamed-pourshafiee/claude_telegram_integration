@@ -2,6 +2,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { CommandName } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { handleUpdate } from "../../src/broker/gate.ts";
 import { MAX_ATTEMPTS, Pairing } from "../../src/broker/pairing.ts";
@@ -21,11 +22,13 @@ const SECRET_TEXT = "a message whose text must never reach the log";
 
 let sent: SendMessageParams[] = [];
 let logged: string[] = [];
+let commands: CommandName[] = [];
 let pairing: Pairing;
 let nextId = 0;
 beforeEach(() => {
   sent = [];
   logged = [];
+  commands = [];
   pairing = new Pairing(BrokerDb.open(join(dir, `gate-${Date.now()}-${nextId}.db`)));
 });
 
@@ -50,7 +53,11 @@ function message(
   };
 }
 
-const handle = (update: Update) => handleUpdate(update, { telegram, pairing, log });
+const command = (name: CommandName) => {
+  commands.push(name);
+  return `answer to /${name}`;
+};
+const handle = (update: Update) => handleUpdate(update, { telegram, pairing, log, command });
 const reasons = () =>
   logged.filter((line) => line.includes("update.dropped")).map((line) => JSON.parse(line).reason);
 
@@ -125,5 +132,37 @@ describe("after pairing, only the paired user in a private chat is heard", () =>
     await handle(message(you, privateChat(you.id), "hello"));
     expect(reasons()).toEqual(["not paired yet"]);
     expect(sent).toEqual([]);
+  });
+});
+
+describe("commands of the paired user (plan 2.6)", () => {
+  test("/status and /away@SomeBot are carried out and answered in their chat", async () => {
+    pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+    await handle(message(you, privateChat(you.id), "/status"));
+    await handle(message(you, privateChat(you.id), "/away@SomeBot"));
+    expect(commands).toEqual(["status", "away"]);
+    expect(sent).toEqual([
+      { chat_id: you.id, text: "answer to /status" },
+      { chat_id: you.id, text: "answer to /away" },
+    ]);
+  });
+
+  test("anyone else's command, or one in a group, is dropped unanswered", async () => {
+    pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+    await handle(message(stranger, privateChat(stranger.id), "/away"));
+    await handle(message(you, group, "/off"));
+    expect(commands).toEqual([]);
+    expect(sent).toEqual([]);
+    expect(reasons()).toEqual(["not the paired user", "not a private chat"]);
+  });
+
+  test("before pairing /status is dropped; after it, a plain message is only accepted", async () => {
+    await handle(message(you, privateChat(you.id), "/status"));
+    expect(reasons()).toEqual(["not paired yet"]);
+    pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+    await handle(message(you, privateChat(you.id), "status please"));
+    expect(commands).toEqual([]);
+    expect(sent).toEqual([]);
+    expect(logged.filter((line) => line.includes("update.accepted"))).toHaveLength(1);
   });
 });

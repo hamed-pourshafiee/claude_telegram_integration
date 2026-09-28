@@ -25,6 +25,17 @@ export interface BrokerHealth {
   readonly pairingUntil: string | null;
   /** Whether it polls Telegram, which it does once someone is paired or a pairing is pending. */
   readonly polling: boolean;
+  /** Where the bridge thinks you are (plan 2.6); missing from a broker older than that. */
+  readonly presence?: PresenceHealth;
+}
+
+/** Presence in /health: a null value is one ioreg didn't give. */
+export interface PresenceHealth {
+  readonly mode: string;
+  readonly state: string;
+  readonly because: string;
+  readonly idleSeconds: number | null;
+  readonly locked: boolean | null;
 }
 
 /** How to start a broker: a Bun binary, the entry file and the bunfig.toml to load (F14). */
@@ -167,6 +178,7 @@ function parseHealth(value: unknown): BrokerHealth | undefined {
   }
   const keys: readonly unknown[] = envKeys;
   const names = keys.filter((key): key is string => typeof key === "string");
+  const presence = parsePresence(fields.presence);
   return {
     pid,
     startedAt,
@@ -178,5 +190,22 @@ function parseHealth(value: unknown): BrokerHealth | undefined {
     paired,
     pairingUntil,
     polling,
+    ...(presence === undefined ? {} : { presence }),
   };
+}
+
+function parsePresence(value: unknown): PresenceHealth | undefined {
+  const fields = asFields(value);
+  if (fields === undefined) return undefined;
+  const { mode, state, because, idleSeconds, locked } = fields;
+  if (
+    typeof mode !== "string" ||
+    typeof state !== "string" ||
+    typeof because !== "string" ||
+    !(idleSeconds === null || typeof idleSeconds === "number") ||
+    !(locked === null || typeof locked === "boolean")
+  ) {
+    return undefined;
+  }
+  return { mode, state, because, idleSeconds, locked };
 }
