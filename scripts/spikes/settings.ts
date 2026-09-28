@@ -33,11 +33,16 @@ export function spikeEntries(bun: string, repoRoot: string): Record<string, Spik
   }
   const run = (script: string): string =>
     `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${repoRoot}/scripts/spikes/${script}`;
-  const command = (script: string, extra: JsonObject): JsonObject => ({
+  const group = (script: string, extra: JsonObject, matcher?: string): JsonObject => ({
+    ...(matcher === undefined ? {} : { matcher }),
     hooks: [{ type: "command", command: run(script), ...extra }],
   });
   return {
-    s1: { event: "Stop", group: command("s1-stop-rewake.ts", { timeout: 900, asyncRewake: true }) },
+    s1: { event: "Stop", group: group("s1-stop-rewake.ts", { timeout: 900, asyncRewake: true }) },
+    s2: {
+      event: "PreToolUse",
+      group: group("s2-answer-question.ts", { timeout: 30 }, "AskUserQuestion"),
+    },
   };
 }
 

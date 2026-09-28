@@ -68,18 +68,10 @@ describe("s1 hook in a session outside sandbox/", () => {
   });
 });
 
-describe("spike settings entries", () => {
-  const s1 = spikeEntries("/opt/bun", "/repo").s1;
-  if (!s1) throw new Error("no s1 entry");
-  const spikes = "/repo/scripts/spikes";
-  const codex = { hooks: [{ type: "command", command: "/x/codex-checkpoint-code.sh" }] };
-  const original: JsonObject = {
-    theme: "dark",
-    hooks: { Stop: [codex] },
-    autoCompactEnabled: true,
-  };
-  const stopGroups = (settings: JsonObject): unknown => asObject(settings.hooks)?.Stop;
+const s1 = spikeEntries("/opt/bun", "/repo").s1;
+if (!s1) throw new Error("no s1 entry");
 
+describe("spike settings entries", () => {
   test("s1 is an asyncRewake Stop hook that pins Bun's env file and config", () => {
     expect(s1.event).toBe("Stop");
     expect(s1.group).toEqual({
@@ -94,6 +86,38 @@ describe("spike settings entries", () => {
       ],
     });
   });
+
+  test("s2 is a synchronous PreToolUse hook matched to AskUserQuestion", () => {
+    expect(spikeEntries("/opt/bun", "/repo").s2).toEqual({
+      event: "PreToolUse",
+      group: {
+        matcher: "AskUserQuestion",
+        hooks: [
+          {
+            type: "command",
+            command:
+              "/opt/bun --no-env-file --config=/repo/bunfig.toml /repo/scripts/spikes/s2-answer-question.ts",
+            timeout: 30,
+          },
+        ],
+      },
+    });
+  });
+
+  test("refuses paths that would need shell quoting", () => {
+    expect(() => spikeEntries("/Applications/My Bun/bun", "/repo")).toThrow("shell quoting");
+  });
+});
+
+describe("adding and removing spike entries", () => {
+  const spikes = "/repo/scripts/spikes";
+  const codex = { hooks: [{ type: "command", command: "/x/codex-checkpoint-code.sh" }] };
+  const original: JsonObject = {
+    theme: "dark",
+    hooks: { Stop: [codex] },
+    autoCompactEnabled: true,
+  };
+  const stopGroups = (settings: JsonObject): unknown => asObject(settings.hooks)?.Stop;
 
   test("adding appends after the existing Stop groups, once", () => {
     const once = withGroup(original, s1.event, s1.group);
@@ -123,9 +147,5 @@ describe("spike settings entries", () => {
     const noStop: JsonObject = { hooks: { SessionStart: [codex] } };
     const roundTrip = withoutSpikes(withGroup(noStop, s1.event, s1.group), spikes);
     expect(JSON.stringify(roundTrip)).toBe(JSON.stringify(noStop));
-  });
-
-  test("refuses paths that would need shell quoting", () => {
-    expect(() => spikeEntries("/Applications/My Bun/bun", "/repo")).toThrow("shell quoting");
   });
 });

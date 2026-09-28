@@ -102,9 +102,49 @@ Committed as `892b670` after the user's go (2026-09-28).
 - **Found:** a session in `sandbox/` would also load `<repo>/CLAUDE.md`, which sends it to the build
   docs, and they describe this spike. Proposed: `sandbox/.claude/settings.json` with `claudeMdExcludes`.
 
+Committed as `dc9b0e8` after the user's go (2026-09-28).
+
+## 1.3 Spike S2: answer a question from a hook
+
+- **Date:** 2026-09-28
+- **Result:** passed. Waiting for the user's confirmation, then a local commit.
+- **Evidence:** no local dialog, and Claude reported the injected answer (an option and free text) in
+  the VS Code panel (2.1.283) and in a terminal (`claude` 2.1.274, entrypoint `cli`). Gate:
+  `bun run typecheck` exit 0 · `bun run lint` "Checked 10 files … No fixes applied." · `bun test`
+  "32 pass, 0 fail". Codex review (`code-claude_telegram_integration-20260928-040144.md`): no
+  actionable findings.
+- **Prepared:** `scripts/spikes/s2-answer-question.ts`, a `PreToolUse` hook on
+  `AskUserQuestion`; `.state/spikes/s2.json` picks the mode (`first`, `multi`, `text`, `off`). Tests in
+  `tests/spikes/s2.test.ts`; gate green (32 pass). Self-test without Claude: each mode prints `allow`
+  with the expected `updatedInput.answers`; `off` prints nothing.
+- **From the 2.1.283 binary:** `answers` is `record<question text, string | string[]>`, and a list is
+  joined with `", "` (F4's comma rule). Question texts must be unique, and option labels unique within a
+  question. New question kinds: `choice` (default), `text` (free-text box, `placeholder`) and `number`
+  (`min`, `max`, `step`, `defaultValue`, `unit`), plus per-question `description` and `annotations`
+  (`preview`, `notes`). Phase 4 must handle text and number questions.
+- **Installed 2026-09-28 04:03 (local):** `settings.ts add s2`; backup
+  `.state/backups/settings.2026-09-28T00-33-13-287Z.json`. The diff is exactly one group appended to
+  `hooks.PreToolUse`.
+- **Live runs** (evidence in `.state/spikes/s2.log` and the sandbox transcripts):
+  - Panel, `first`: the answer arrived 100 ms after the question; Claude got "Red". The tool result
+    reads like a local answer: `Your questions have been answered: "…"="Red". You can now continue…`.
+  - Panel, `text`: 114 ms; Claude got "Purple, typed on my phone" and took it for the user's own
+    "Other" answer. Free text comes with another wrapper: `The user answered: "…"="…". Read the answers
+    carefully — they may request clarification, changes, or that you not proceed — and follow what they
+    ask`, so Claude treats it as the user's instruction.
+  - Terminal, `first` and `text`: the same, 114 ms; the CLI shows "User answered Claude's questions:
+    · … → Red".
+  - Terminal, `multi` (optional): Claude got the list as "Bun,Biome". 2.1.274 passes a list through and
+    joins it with "," and no space, where 2.1.283's schema joins with ", ". Phase 4 must send one string
+    it joins itself with ", ", never a list.
+  - `PreToolUse` input keys: `cwd`, `effort`, `hook_event_name`, `permission_mode`, `prompt_id`,
+    `scratchpad_dir`, `session_id`, `tool_input`, `tool_name`, `tool_use_id`, `transcript_path`.
+- **After the runs:** S2 is `off` (`.state/spikes/s2.json`), so 1.4's sessions see normal dialogs. Its
+  settings entry stays until 1.5.
+
 ## Next
 
-After the user confirms 1.2 and it is committed: **1.3 Spike S2** (answer an `AskUserQuestion` from a
-`PreToolUse` hook), after the user's go. It adds a settings entry: back up, show it, wait for the OK.
-Test in a new sandbox conversation. Don't change repo files while a sandbox conversation runs (the Codex
-hook would react there, since the sandbox lives inside this repo).
+After the user confirms 1.3 and it is committed: **1.4 Spike S3** (record real hook inputs as test
+fixtures), after the user's go. It adds a logging hook for every event in design §3's table, limited to
+`sandbox/` sessions: back up, show the entries, wait for the OK. Don't change repo files while a sandbox
+conversation runs (the Codex hook would react there, since the sandbox lives inside this repo).
