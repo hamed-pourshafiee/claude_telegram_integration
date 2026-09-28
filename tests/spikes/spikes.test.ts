@@ -68,7 +68,8 @@ describe("s1 hook in a session outside sandbox/", () => {
   });
 });
 
-const s1 = spikeEntries("/opt/bun", "/repo").s1;
+const entries = spikeEntries("/opt/bun", "/repo");
+const s1 = entries.s1?.[0];
 if (!s1) throw new Error("no s1 entry");
 
 describe("spike settings entries", () => {
@@ -88,25 +89,49 @@ describe("spike settings entries", () => {
   });
 
   test("s2 is a synchronous PreToolUse hook matched to AskUserQuestion", () => {
-    expect(spikeEntries("/opt/bun", "/repo").s2).toEqual({
-      event: "PreToolUse",
-      group: {
-        matcher: "AskUserQuestion",
-        hooks: [
-          {
-            type: "command",
-            command:
-              "/opt/bun --no-env-file --config=/repo/bunfig.toml /repo/scripts/spikes/s2-answer-question.ts",
-            timeout: 30,
-          },
-        ],
+    expect(entries.s2).toEqual([
+      {
+        event: "PreToolUse",
+        group: {
+          matcher: "AskUserQuestion",
+          hooks: [
+            {
+              type: "command",
+              command:
+                "/opt/bun --no-env-file --config=/repo/bunfig.toml /repo/scripts/spikes/s2-answer-question.ts",
+              timeout: 30,
+            },
+          ],
+        },
       },
-    });
+    ]);
   });
 
   test("refuses paths that would need shell quoting", () => {
     expect(() => spikeEntries("/Applications/My Bun/bun", "/repo")).toThrow("shell quoting");
   });
+});
+
+test("s3 records all nine events; only UserPromptSubmit and SessionEnd are synchronous", () => {
+  const recorded = (entries.s3 ?? []).map((entry) => {
+    const hooks = entry.group.hooks;
+    const hook = Array.isArray(hooks) ? asObject(hooks[0]) : undefined;
+    expect(hook?.command).toBe(
+      "/opt/bun --no-env-file --config=/repo/bunfig.toml /repo/scripts/spikes/s3-record.ts",
+    );
+    return [entry.event, entry.group.matcher ?? "", hook?.async ? "async" : "sync", hook?.timeout];
+  });
+  expect(recorded).toEqual([
+    ["SessionStart", "", "async", 10],
+    ["UserPromptSubmit", "", "sync", 10],
+    ["Stop", "", "async", 10],
+    ["Notification", "", "async", 10],
+    ["StopFailure", "", "async", 10],
+    ["PreToolUse", "AskUserQuestion", "async", 10],
+    ["PostToolUse", "AskUserQuestion", "async", 10],
+    ["PermissionRequest", "", "async", 10],
+    ["SessionEnd", "", "sync", 5],
+  ]);
 });
 
 describe("adding and removing spike entries", () => {

@@ -142,9 +142,56 @@ Committed as `dc9b0e8` after the user's go (2026-09-28).
 - **After the runs:** S2 is `off` (`.state/spikes/s2.json`), so 1.4's sessions see normal dialogs. Its
   settings entry stays until 1.5.
 
+Committed as `6234b4e` after the user's go (2026-09-28).
+
+## 1.4 Spike S3: record real hook inputs
+
+- **Date:** 2026-09-28
+- **Result:** passed. Waiting for the user's confirmation, then a local commit.
+- **Evidence:** 25 fixtures in `tests/fixtures/hooks/` (panel 9, terminal 9, `claude -p` 7) cover every
+  event of design §3's table; `tests/fixtures.test.ts` checks names, redaction and coverage. Gate:
+  `bun run typecheck` exit 0 · `bun run lint` "Checked 13 files … No fixes applied." · `bun test`
+  "68 pass, 0 fail". Codex review (`code-claude_telegram_integration-20260928-050742.md`): two redaction
+  gaps, both confirmed and fixed with regression tests: Telegram tokens inside Bot API URLs
+  (`…/bot<TOKEN>/…`, no word boundary) or ending in `-`, and object keys (answers are keyed by question).
+- **Prepared:** `scripts/spikes/s3-record.ts` saves each event's stdin, redacted (home path
+  to `~`, secret families masked, strings capped at 4,000 characters), to
+  `.state/spikes/s3/<entrypoint>/`, and a summary line to `.state/spikes/s3.log`. The settings tool now
+  holds a list of entries per spike; S3 has nine, one per event of design §3's table, all async except
+  `UserPromptSubmit` (to measure the delay) and `SessionEnd`. Tests in `tests/spikes/s3.test.ts`; gate
+  green (39 pass). Self-test: redaction works; a Bun hook that exits at once takes about 17 ms from spawn
+  to exit (16–22 ms over 10 runs).
+- All nine event names are in the 2.1.283 settings schema, and `StopFailure` is in the 2.1.274 binary.
+- The user OKed the entries and the `claude -p` runs, and asked for a Codex review before the install.
+- **Installed 2026-09-28 04:41 (local):** `settings.ts add s3`, nine groups; backup
+  `.state/backups/settings.2026-09-28T01-41-00-539Z.json`.
+- **Results** (raw records in `.state/spikes/s3/` and `s3.log`):
+  - `idle_prompt` fires in the terminal (2.1.274) 60.2 s after a Stop, but **never in the VS Code
+    panel** (2.1.283): none in 5½ minutes idle, while other notifications arrived. Plan 1.5's
+    contingency applies: a wrapper around the Codex hook, which needs the user's OK.
+  - `PermissionRequest` fires in the panel and the terminal as the dialog opens, for Bash and also for
+    `AskUserQuestion`, whose dialog is a permission request.
+  - `permission_prompt` notification: in the panel 6 s after a dialog opened and was still unanswered;
+    in the terminal none with a dialog open about 7 s.
+  - Sync `UserPromptSubmit`: the prompt entered the transcript 19–63 ms after Enter and our hook had
+    finished by 84–170 ms (its process 9–82 ms); a Bun hook that exits at once takes about 17 ms. A sync
+    barrier adds about 0.1 s at most.
+  - `StopFailure` fires when the API rejects a request (`claude -p --model not-a-real-model`):
+    SessionStart → UserPromptSubmit → StopFailure → SessionEnd.
+  - `SessionEnd` reasons: `other` (panel tab closed; end of `claude -p`), `prompt_input_exit` (`/exit`).
+  - `CLAUDE_CODE_ENTRYPOINT`: `claude-vscode` (panel), `cli` (terminal), `sdk-cli` (`claude -p`).
+  - `claude -p` has no `AskUserQuestion`; in the user's auto mode `ls` ran without a PermissionRequest.
+  - Scoping: a session started in the repo root that ran `cd sandbox` was then treated as a sandbox
+    session (its later inputs carry `cwd` in `sandbox/`), while `CLAUDE_PROJECT_DIR` stayed at the repo
+    root. The real hooks must decide what to serve by `CLAUDE_PROJECT_DIR`, not by `cwd` (F15, for 1.5).
+  - Transcripts record the duration of sync SessionStart and Stop hooks (the Codex checkpoint takes
+    113–130 ms per stop), not of UserPromptSubmit.
+  - Biome skips `tests/fixtures/`, so recorded data stays as recorded.
+- **After:** S3 stays installed until 1.5 removes all spike entries; it records only sandbox sessions.
+
 ## Next
 
-After the user confirms 1.3 and it is committed: **1.4 Spike S3** (record real hook inputs as test
-fixtures), after the user's go. It adds a logging hook for every event in design §3's table, limited to
-`sandbox/` sessions: back up, show the entries, wait for the OK. Don't change repo files while a sandbox
-conversation runs (the Codex hook would react there, since the sandbox lives inside this repo).
+After the user confirms 1.4 and it is committed: **1.5 Findings.** Remove only the spike entries (the
+tool reports whether the file is byte-identical to the pre-spike backup), write
+`project-docs/spike-findings.md`, propose the design changes (F15 scoping, the `idle_prompt` fallback,
+the SessionStart note, multi-select as one string, question kinds, SIGTERM in waiters), then go/no-go.

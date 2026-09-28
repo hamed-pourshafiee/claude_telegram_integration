@@ -1,0 +1,41 @@
+{
+  "recordedAt": "2026-09-28T01:52:45.294Z",
+  "entrypoint": "claude-vscode",
+  "projectDir": "~/src/bc/claude_telegram_integration/sandbox",
+  "input": {
+    "session_id": "b1e81638-e169-4a47-9891-766f05aaa292",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/b1e81638-e169-4a47-9891-766f05aaa292.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "scratchpad_dir": "/private/tmp/claude-501/-Users-USER-src-bc-claude-telegram-integration-sandbox/b1e81638-e169-4a47-9891-766f05aaa292/scratchpad",
+    "prompt_id": "3a6cdde4-fe1a-423c-aedc-4a1cd59b1ccc",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "xhigh"
+    },
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "AskUserQuestion",
+    "tool_input": {
+      "questions": [
+        {
+          "question": "Which color do you prefer?",
+          "header": "Color",
+          "options": [
+            {
+              "label": "Red",
+              "description": "The color red."
+            },
+            {
+              "label": "Green",
+              "description": "The color green."
+            },
+            {
+              "label": "Blue",
+              "description": "The color blue."
+            }
+          ],
+          "multiSelect": false
+        }
+      ]
+    }
+  }
+}

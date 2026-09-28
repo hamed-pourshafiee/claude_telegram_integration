@@ -1,0 +1,14 @@
+{
+  "recordedAt": "2026-09-28T02:02:33.006Z",
+  "entrypoint": "cli",
+  "projectDir": "~/src/bc/claude_telegram_integration/sandbox",
+  "input": {
+    "session_id": "67c68fde-dae9-47ab-81e8-728e3033296c",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "scratchpad_dir": "/private/tmp/claude-501/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c/scratchpad",
+    "prompt_id": "42effe18-3fbb-4566-b6fe-417ca6181158",
+    "hook_event_name": "SessionEnd",
+    "reason": "prompt_input_exit"
+  }
+}

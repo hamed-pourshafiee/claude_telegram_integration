@@ -1,0 +1,17 @@
+{
+  "recordedAt": "2026-09-28T01:43:13.427Z",
+  "entrypoint": "sdk-cli",
+  "projectDir": "~/src/bc/claude_telegram_integration/sandbox",
+  "input": {
+    "session_id": "d4888c73-7ddf-4a9f-b24e-cf6727e3a1c4",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/d4888c73-7ddf-4a9f-b24e-cf6727e3a1c4.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "prompt_id": "81426680-0b10-4988-ba91-8e9e0245e7cd",
+    "effort": {
+      "level": "high"
+    },
+    "hook_event_name": "StopFailure",
+    "error": "model_not_found",
+    "last_assistant_message": "There's an issue with the selected model (not-a-real-model). It may not exist or you may not have access to it. Run --model to pick a different model."
+  }
+}

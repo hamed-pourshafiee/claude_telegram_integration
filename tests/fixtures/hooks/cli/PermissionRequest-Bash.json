@@ -1,0 +1,36 @@
+{
+  "recordedAt": "2026-09-28T02:02:17.252Z",
+  "entrypoint": "cli",
+  "projectDir": "~/src/bc/claude_telegram_integration/sandbox",
+  "input": {
+    "session_id": "67c68fde-dae9-47ab-81e8-728e3033296c",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "scratchpad_dir": "/private/tmp/claude-501/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c/scratchpad",
+    "prompt_id": "e55848bb-2151-4613-b16e-7008302326ad",
+    "permission_mode": "default",
+    "effort": {
+      "level": "high"
+    },
+    "hook_event_name": "PermissionRequest",
+    "tool_name": "Bash",
+    "tool_input": {
+      "command": "touch permission-test-2.txt",
+      "description": "Create an empty test file"
+    },
+    "permission_suggestions": [
+      {
+        "type": "addDirectories",
+        "directories": [
+          "~/src/bc/claude_telegram_integration/sandbox"
+        ],
+        "destination": "session"
+      },
+      {
+        "type": "setMode",
+        "mode": "acceptEdits",
+        "destination": "session"
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "recordedAt": "2026-09-28T01:41:42.615Z",
+  "entrypoint": "sdk-cli",
+  "input": {
+    "session_id": "556d6210-76fa-4557-a517-cda4059a6c78",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/556d6210-76fa-4557-a517-cda4059a6c78.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "prompt_id": "1aa6f362-2ddc-4609-be58-a69f7c8fc069",
+    "hook_event_name": "SessionEnd",
+    "reason": "other"
+  }
+}

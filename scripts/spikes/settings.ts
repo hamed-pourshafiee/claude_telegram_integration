@@ -26,23 +26,43 @@ export interface SpikeEntry {
   group: JsonObject;
 }
 
-/** The settings group each spike adds. Paths must be shell-safe: the command runs through a shell. */
-export function spikeEntries(bun: string, repoRoot: string): Record<string, SpikeEntry> {
+/** The settings groups each spike adds. Paths must be shell-safe: the command runs through a shell. */
+export function spikeEntries(bun: string, repoRoot: string): Record<string, SpikeEntry[]> {
   for (const path of [bun, repoRoot]) {
     if (!SAFE_PATH.test(path)) throw new Error(`path needs shell quoting, refusing: ${path}`);
   }
   const run = (script: string): string =>
     `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${repoRoot}/scripts/spikes/${script}`;
-  const group = (script: string, extra: JsonObject, matcher?: string): JsonObject => ({
-    ...(matcher === undefined ? {} : { matcher }),
-    hooks: [{ type: "command", command: run(script), ...extra }],
-  });
-  return {
-    s1: { event: "Stop", group: group("s1-stop-rewake.ts", { timeout: 900, asyncRewake: true }) },
-    s2: {
-      event: "PreToolUse",
-      group: group("s2-answer-question.ts", { timeout: 30 }, "AskUserQuestion"),
+  const entry = (
+    event: string,
+    script: string,
+    extra: JsonObject,
+    matcher?: string,
+  ): SpikeEntry => ({
+    event,
+    group: {
+      ...(matcher === undefined ? {} : { matcher }),
+      hooks: [{ type: "command", command: run(script), ...extra }],
     },
+  });
+  // S3 records every event of design §3's table. Only UserPromptSubmit is synchronous, to measure the
+  // delay a synchronous prompt hook adds; SessionEnd too, so its record is written before Claude exits.
+  const record = (event: string, extra: JsonObject, matcher?: string): SpikeEntry =>
+    entry(event, "s3-record.ts", { timeout: 10, ...extra }, matcher);
+  return {
+    s1: [entry("Stop", "s1-stop-rewake.ts", { timeout: 900, asyncRewake: true })],
+    s2: [entry("PreToolUse", "s2-answer-question.ts", { timeout: 30 }, "AskUserQuestion")],
+    s3: [
+      record("SessionStart", { async: true }),
+      record("UserPromptSubmit", {}),
+      record("Stop", { async: true }),
+      record("Notification", { async: true }),
+      record("StopFailure", { async: true }),
+      record("PreToolUse", { async: true }, "AskUserQuestion"),
+      record("PostToolUse", { async: true }, "AskUserQuestion"),
+      record("PermissionRequest", { async: true }),
+      record("SessionEnd", { timeout: 5 }),
+    ],
   };
 }
 
@@ -135,28 +155,32 @@ function run(argv: string[]): void {
   } else if (action === "remove") {
     remove();
   } else if (action === "show" || action === "add") {
-    const entry = spikeEntries(process.execPath, REPO_ROOT)[spike];
-    if (!entry) throw new Error(`unknown spike "${spike}"`);
-    if (action === "show") {
+    const entries = spikeEntries(process.execPath, REPO_ROOT)[spike];
+    if (!entries) throw new Error(`unknown spike "${spike}"`);
+    if (action === "add") {
+      add(spike, entries);
+      return;
+    }
+    for (const entry of entries) {
       console.log(`${SETTINGS_FILE}, append to hooks.${entry.event}:\n${serialize(entry.group)}`);
-    } else {
-      add(spike, entry);
     }
   } else {
     throw new Error("usage: settings.ts show <spike> | backup | add <spike> | remove");
   }
 }
 
-function add(spike: string, entry: SpikeEntry): void {
+function add(spike: string, entries: SpikeEntry[]): void {
   const { text, settings } = readSettings();
-  const next = serialize(withGroup(settings, entry.event, entry.group));
+  const merged = entries.reduce((acc, entry) => withGroup(acc, entry.event, entry.group), settings);
+  const next = serialize(merged);
   if (next === text) {
     console.log(`${spike} is already installed; nothing changed`);
     return;
   }
   const saved = backup();
   writeAtomically(next, text);
-  console.log(`added ${spike} to hooks.${entry.event}; previous file: ${saved}`);
+  const events = entries.map((entry) => `hooks.${entry.event}`).join(", ");
+  console.log(`added ${spike} to ${events}; previous file: ${saved}`);
 }
 
 function remove(): void {

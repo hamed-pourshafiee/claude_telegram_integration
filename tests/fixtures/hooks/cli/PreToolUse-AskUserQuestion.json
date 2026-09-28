@@ -1,0 +1,42 @@
+{
+  "recordedAt": "2026-09-28T02:01:22.730Z",
+  "entrypoint": "cli",
+  "projectDir": "~/src/bc/claude_telegram_integration/sandbox",
+  "input": {
+    "session_id": "67c68fde-dae9-47ab-81e8-728e3033296c",
+    "transcript_path": "~/.claude/projects/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c.jsonl",
+    "cwd": "~/src/bc/claude_telegram_integration/sandbox",
+    "scratchpad_dir": "/private/tmp/claude-501/-Users-USER-src-bc-claude-telegram-integration-sandbox/67c68fde-dae9-47ab-81e8-728e3033296c/scratchpad",
+    "prompt_id": "1c265898-14fa-4dff-9503-6c5efeea223d",
+    "permission_mode": "auto",
+    "effort": {
+      "level": "high"
+    },
+    "hook_event_name": "PreToolUse",
+    "tool_name": "AskUserQuestion",
+    "tool_input": {
+      "questions": [
+        {
+          "question": "Which color do you prefer?",
+          "header": "Color",
+          "options": [
+            {
+              "label": "Red",
+              "description": "Warm, high-energy, attention-grabbing."
+            },
+            {
+              "label": "Green",
+              "description": "Natural, calm, easy on the eyes."
+            },
+            {
+              "label": "Blue",
+              "description": "Cool, calm, the classic default."
+            }
+          ],
+          "multiSelect": false
+        }
+      ]
+    },
+    "tool_use_id": "toolu_01UwtGFRT2ctxd3BfG1eHB2U"
+  }
+}
