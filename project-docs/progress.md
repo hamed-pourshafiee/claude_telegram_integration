@@ -189,9 +189,43 @@ Committed as `6234b4e` after the user's go (2026-09-28).
   - Biome skips `tests/fixtures/`, so recorded data stays as recorded.
 - **After:** S3 stays installed until 1.5 removes all spike entries; it records only sandbox sessions.
 
+Committed as `6133dd7` after the user's go (2026-09-28).
+
+## 1.5 Findings and go/no-go
+
+- **Date:** 2026-09-28
+- **Result:** go/no-go done; all three spikes passed. The Codex plan review found three real problems in
+  the first version of the changes, all fixed. Waiting for the user's confirmation, then a local commit.
+- **Evidence:** [spike-findings.md](spike-findings.md). Spike entries removed with `settings.ts remove`:
+  "now byte-identical to backup settings.2026-09-27T20-48-55-447Z.json", confirmed by `cmp`; no spike
+  references left in settings.json and no spike processes running.
+- **Decisions (the user, 2026-09-28):** remove the spike entries; detect a real finish by reading the
+  stop's `stop_hook_summary` (F16, option B) instead of wrapping the Codex hook; apply the other changes
+  (F2 and F4–F7 updated, F15 and F16 new, scoping by `CLAUDE_PROJECT_DIR`, the SessionStart note, the
+  question-relay details, the waiter on SIGTERM, the 🔐 ping on `PermissionRequest`); a Codex plan
+  review of the edits.
+- **Docs:** design rev. 5, plan rev. 6, CLAUDE.md now says F1–F16. The plan's 2.5 list now names
+  Telegram bot tokens, which it had missed.
+- **Codex plan review** (`~/.claude/codex-reviews/plan----20260928-054822.md`): UNSOUND, 3 findings, all
+  confirmed and fixed in design rev. 5 and plan rev. 6 (design §8):
+  1. `hookErrors` also holds non-blocking errors, and `additionalContext` continues without it (checked
+     in the 2.1.283 code). The rule now reads Claude Code's own continuation entries in the stop's
+     chain (`hook_blocking_error`, `hook_additional_context`), with `preventedContinuation` and an
+     "unknown" result that sends nothing.
+  2. No rule said which summary belongs to which stop. Now: tail read, match `last_assistant_message`,
+     follow `parentUuid`.
+  3. SIGTERM ends only that waiter's generation; the broker marks a session as not listening only when
+     no newer waiter is live.
+- **Decision (the user):** the edge cases are proven in phase 2 as pass checks of 2.8 (recorded
+  transcript sequences, plus live checks with throwaway Stop hooks), before the served folders widen.
+- **Learned:** in this build session's transcript, all 11 blocked stops show the chain assistant → meta
+  "Stop hook feedback" → `hook_blocking_error` attachment → summary, and Claude continued; a real finish
+  is assistant → summary directly. The terminal (2.1.274) writes the same `stop_hook_summary`.
+- The spike code stays in `scripts/spikes/` as a reference until 2.7 replaces it, then it goes with its
+  tests; the fixtures stay.
+
 ## Next
 
-After the user confirms 1.4 and it is committed: **1.5 Findings.** Remove only the spike entries (the
-tool reports whether the file is byte-identical to the pre-spike backup), write
-`project-docs/spike-findings.md`, propose the design changes (F15 scoping, the `idle_prompt` fallback,
-the SessionStart note, multi-select as one string, question kinds, SIGTERM in waiters), then go/no-go.
+After the user confirms 1.5 and it is committed, and after the user's go: **phase 2**, starting with
+**2.1 Config and secrets**: create `.env` from `.env.example` (0600) for the user to fill in; never ask
+for the token in chat.

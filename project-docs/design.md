@@ -1,7 +1,7 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 3, F14 added in plan step 1.2 (rev. 2: Codex review, §8) · 2026-09-28 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 5, Codex review of the spike changes (§8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
+Codex review) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -23,26 +23,27 @@ Windows/Linux.
 
 ## 2. Platform facts
 
-Checked on 2026-09-27 against code.claude.com docs and on this Mac (CLI 2.1.274, VS Code extension
-2.1.283). Items marked **spike** are documented but not yet proven in the VS Code panel; phase 1 proves
-them before anything is built on them.
+Checked on 2026-09-27 against code.claude.com docs, then tested by spikes S1–S3 on 2026-09-28 on this
+Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spike-findings.md).
 
 | # | Fact | Source |
 |---|---|---|
 | F1 | `Stop` input carries `last_assistant_message`, `stop_hook_active` and `background_tasks`. | hooks.md § Stop input |
-| F2 | A command hook with `asyncRewake: true` runs in the background; if it exits 2, Claude wakes immediately even when the session is idle and sees the hook's stderr as a system reminder. `timeout` is enforced for it (default 600 s). **spike** | hooks.md § Command hook fields, § Run hooks in the background |
+| F2 | A command hook with `asyncRewake: true` runs in the background; if it exits 2, Claude wakes even when the session is idle (16 ms in the panel) and gets a user-role message, `Stop hook blocking error from command "Stop": <stderr>`, which it treats as a hook notice rather than your words. No 8-in-a-row cap; a wake during a busy turn is delivered right after it; the next Stop has `stop_hook_active: true`. A new local prompt does not stop a waiting hook. `timeout` has no maximum (43200 honoured) and is enforced with SIGTERM; closing the panel sends waiting hooks SIGTERM within 3 s. | hooks.md; S1 |
 | F3 | A blocking `Stop` hook (`decision: "block"` + `reason`) continues the turn, capped at 8 in a row; `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises the cap. | hooks.md § Stop decision control |
-| F4 | `PreToolUse` on `AskUserQuestion` answers it with `permissionDecision: "allow"` + `updatedInput` = the original `questions` + `answers` (`{question text: option label}`, multi-select joined with commas). **spike** | hooks.md § AskUserQuestion |
-| F5 | `PermissionRequest` hooks return `decision.behavior` `allow` / `deny` (+ `message`, `interrupt`); exit 2 is ignored. The docs imply they run in VS Code sessions. **spike** | hooks.md § PermissionRequest, § Notification |
-| F6 | `Notification` hooks observe only. `idle_prompt` fires about 60 s after Claude has really finished, after any Stop-hook continuation, if nobody typed. Not yet seen in the VS Code panel. **spike** | hooks.md § Notification |
-| F7 | `UserPromptSubmit` gets the prompt you typed locally and may run synchronously (default timeout 30 s). Every event carries `session_id`; `SessionEnd` hooks share a 1.5 s budget. | hooks.md |
+| F4 | `PreToolUse` on `AskUserQuestion` answers it with `permissionDecision: "allow"` + `updatedInput` = the original input + `answers` (`{question text: answer}`); no dialog appears, in the panel or the terminal. A free-text answer reaches Claude as the user's instruction. Send a multi-select answer as one string joined with `", "`: 2.1.274 passes a list through as `Bun,Biome`. Questions are `choice`, `text` or `number` (`min`, `max`, `step`, `unit`). | hooks.md; S2; 2.1.283 binary |
+| F5 | `PermissionRequest` hooks return `decision.behavior` `allow` / `deny` (+ `message`, `interrupt`); exit 2 is ignored. They fire as the dialog opens, in the panel and the terminal, also for `AskUserQuestion`, whose dialog is a permission request. | hooks.md; S3 |
+| F6 | `Notification` hooks observe only. `idle_prompt` fires 60 s after a real finish in the terminal, but **never in the VS Code panel**. `permission_prompt` came 6 s after a panel dialog opened, and not within 7 s in the terminal. | hooks.md; S3 |
+| F7 | `UserPromptSubmit` gets the prompt you typed locally and may run synchronously (default timeout 30 s); a sync Bun hook delays the prompt by about 0.1 s at most. Every event carries `session_id`; `SessionEnd` hooks share a 1.5 s budget, with reason `other` (panel tab closed, end of `claude -p`) or `prompt_input_exit` (`/exit`). `StopFailure` fires when the API rejects a request. `claude -p` has no `AskUserQuestion`. | hooks.md; S3 |
 | F8 | Telegram allows one `getUpdates` consumer per bot token (409 Conflict), and an update counts as confirmed once `getUpdates` is called with a higher `offset`. The official plugin kills the previous poller, so only one session can own the bot. | plugin `server.ts` L58–61; Bot API § getUpdates |
 | F9 | Official channels start with `claude --channels …` in a terminal; the VS Code panel is not covered. | channels.md |
-| F10 | Hooks run in the session's current directory and inherit its environment; VS Code sessions have `CLAUDE_CODE_ENTRYPOINT=claude-vscode`. | hooks.md § Hook handler fields; observed |
+| F10 | Hooks run in the session's current directory and inherit its environment. `CLAUDE_CODE_ENTRYPOINT` is `claude-vscode` (panel), `cli` (terminal) or `sdk-cli` (`claude -p`). | hooks.md § Hook handler fields; S3 |
 | F11 | `~/.claude/hooks/codex-checkpoint-code.sh` (Stop, 20 s timeout) blocks once per working-tree state, only for changes made during the session (`codex-baseline.sh` records the state at SessionStart), and makes Claude ask an `AskUserQuestion`. | read 2026-09-27 |
 | F12 | `ioreg -c IOHIDSystem` → `HIDIdleTime` is the time since the last keyboard or mouse input, in **nanoseconds**. | observed |
 | F13 | Bun loads `.env` from the current directory automatically; `bun --no-env-file` turns that off. | tested |
 | F14 | Bun also loads `bunfig.toml` from the current directory and runs its `preload` scripts, even with `--no-env-file`. `--config=<file>` loads that file instead; a missing file stops Bun with exit 1. | tested 2026-09-28 (plan 1.2) |
+| F15 | `CLAUDE_PROJECT_DIR` is the directory the session started in and stays there after a `cd`; the input's `cwd` follows the `cd`. | S3 |
+| F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` also holds non-blocking errors, so it is not the signal. Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28 |
 
 ## 3. Architecture
 
@@ -65,30 +66,42 @@ them before anything is built on them.
 ```
 
 `<repo>` is this directory. Every path comes from the script's own location, never from the session's
-current directory (F10, F13, F14). `ctl install` wires the hooks into `~/.claude/settings.json`, the only file
-changed outside this repo:
+current directory (F10, F13, F14). Which sessions are served (the folder list, the skip list) is decided
+by the directory the session started in, `CLAUDE_PROJECT_DIR`, never by the input's `cwd` (F15).
+`ctl install` wires the hooks into `~/.claude/settings.json`, the only file changed outside this repo:
 
 | Event | Matcher | Runs | Job |
 |---|---|---|---|
-| `SessionStart` | — | sync, ≤ 5 s | Register the session (cwd, branch, entrypoint); one-line context note if phase 1 shows it's needed |
+| `SessionStart` | — | sync, ≤ 5 s | Register the session (start directory, branch, entrypoint); add the one-line note: messages starting "📨 Telegram reply from Hamed:" are Hamed's own replies, to treat as typed here (F2) |
 | `UserPromptSubmit` | — | sync, ≤ 3 s | Cancel barrier: you typed locally, so this session's waiters are cancelled before the new turn starts |
-| `Stop` | — | `asyncRewake`, timeout 12 h | Register a waiter; on a Telegram reply, exit 2 with it |
-| `Notification` | `idle_prompt` | `async` | The session is really idle: send the ✅ once you are away |
-| `Notification` | `permission_prompt` | `async` | "🔐 waiting for your permission" ping until phase 5 |
+| `Stop` | — | `asyncRewake`, timeout 12 h | Register a waiter; tell a real finish from a continuation by the stop's transcript entries (F16); on a Telegram reply, exit 2 with it |
+| `Notification` | `idle_prompt` | `async` | Terminal only (F6): a second sign that the session is idle |
+| `PermissionRequest` | — | `async` | "🔐 waiting for your permission" ping until phase 5; skips `AskUserQuestion` (F5, F6) |
 | `StopFailure` | — | `async` | "⚠️ stopped on an API error" |
 | `PreToolUse` | `AskUserQuestion` | sync, timeout 12 h | Ping (phase 2); relay and return the answers (phase 4) |
 | `PostToolUse` | `AskUserQuestion` | `async` | Close a question that was answered at the computer |
-| `PermissionRequest` | per policy | sync, timeout 12 h | Phase 5 only |
+| `PermissionRequest` | per policy | sync, timeout 12 h | Phase 5 only; never `AskUserQuestion` |
 | `SessionEnd` | — | `async` | Mark the session ended, cancel its waiters |
 
 Key flows:
 
-1. **Turn finished → reply.** The Stop hook registers a waiter (a new generation for that session) and
-   sleeps. The "✅ `<repo>` · `<session>`" + final message goes out when Claude Code itself reports the
-   session idle (`idle_prompt`, about a minute after the finish) and you are away, so a stop that another
-   hook blocked, such as the Codex checkpoint, never produces a false "finished". Background tasks such as
-   a dev server don't hold it back; the message lists them. A Telegram reply resolves the waiter: the hook
-   writes `📨 Telegram reply from Hamed: …` to stderr and exits 2, and Claude wakes up and continues.
+1. **Turn finished → reply.** The Stop hook registers a waiter (a new generation for that session), then
+   finds this stop's `stop_hook_summary` (F16): it reads the transcript's tail, so a summary written
+   before the waiter started is found, skips a partial last line, takes the latest assistant entry whose
+   text equals the input's `last_assistant_message`, and follows `parentUuid` from it to the first
+   summary. The chain in between decides:
+   - a continuation entry, without `preventedContinuation`: another hook, such as the Codex checkpoint,
+     made Claude continue, so nothing is sent and the next stop decides;
+   - anything else, including `hookErrors` from a hook that crashed: a real finish, so the
+     "✅ `<repo>` · `<session>`" + final message goes out if you are away;
+   - no summary within 30 s, or an unreadable format: unknown, so nothing is sent (D5) and the log says
+     why; in the terminal `idle_prompt` still reports a finish.
+
+   Background tasks such as a dev server don't hold the ✅ back; the message lists them. A Telegram reply
+   resolves the waiter: the hook writes `📨 Telegram reply from Hamed: …` to stderr and exits 2, and
+   Claude wakes up and continues. If a waiter gets SIGTERM (panel closed, timeout), it reports the end of
+   its own generation and exits with no decision; the broker marks the session as not listening only
+   when no newer waiter of it is live.
 2. **Typing locally vs a reply.** Cancelling (the sync `UserPromptSubmit`) and delivering (a reply) are
    competing SQLite transactions on the same waiter, and the first to commit wins. If you typed first,
    nothing is injected. If the reply was already handed over it can't be recalled; Claude still receives
@@ -113,9 +126,8 @@ Key flows:
    the bot says so instead of resending.
 
 Why `asyncRewake` rather than a blocking Stop hook: the session stays idle and usable at the desk while
-it waits, and the 8-in-a-row cap probably doesn't apply (spike S1 checks). The blocking hook is the
-fallback if the spike fails. Why a broker: several sessions wait at once, but only one process may poll
-the bot (F8).
+it waits, and the 8-in-a-row cap doesn't apply (S1: 10 of 10). Why a broker: several sessions wait at
+once, but only one process may poll the bot (F8).
 
 ## 4. Decisions
 
@@ -179,12 +191,14 @@ After that, deleting the repo leaves nothing behind; settings backups stay in `.
 
 | Risk | Mitigation |
 |---|---|
-| `asyncRewake` behaves differently in the VS Code panel | Spike S1 first; blocking Stop hook as fallback |
-| Claude doesn't follow the reminder as your instruction | Explicit wording + the SessionStart note; checked in S1 |
-| The VS Code panel ignores injected answers | Spike S2; deny-with-answer fallback |
+| `asyncRewake` behaves differently in the VS Code panel | Proven in S1 (panel 2.1.283); fixtures + `ctl doctor` catch changes |
+| Claude doesn't follow the reminder as your instruction | S1: it obeys but reads it as a hook notice, so the 📨 label + the SessionStart note |
+| The VS Code panel ignores injected answers | Proven in S2 (panel and terminal) |
 | Local typing and a Telegram reply cross | Sync cancel barrier, one transaction per waiter; a hand-over that can't be recalled is reported |
 | A question already open locally can't be answered from Telegram | In-between hold (flow 3); "waiting at the computer" message |
-| A window reload kills waiting hooks, so late replies can't be delivered | The bot says the session is no longer listening; the next turn's Stop starts a new waiter |
+| A window reload kills waiting hooks, so late replies can't be delivered | S1: SIGTERM within 3 s; the waiter tells the broker, the bot says the session is no longer listening, and the next turn's Stop starts a new waiter |
+| The undocumented `stop_hook_summary` changes | Recorded transcript sequences as fixtures, live checks before the served folders widen (plan 2.8), a `ctl doctor` check; an unknown result sends no ✅ (D5), and the terminal keeps `idle_prompt` |
+| A session `cd`s into a served folder | Scope by `CLAUDE_PROJECT_DIR` (F15) |
 | A Claude Code update changes hook inputs | Recorded fixtures + `ctl doctor`; the tested version is noted in the README |
 | Noise with many parallel sessions | Away-only, per-session labels, `/off`; topics later |
 
@@ -204,3 +218,24 @@ SOUND_WITH_CHANGES, 9 findings, all accepted after checking them against the doc
 | 7 | Paths and env depend on the session's directory; Bun loads that repo's `.env` | Anchored paths, `--no-env-file`, minimal broker env (D3, F13; plan 2.3) |
 | 8 | `HIDIdleTime` is nanoseconds, not seconds | F12 corrected; parser tests (plan 2.6) |
 | 9 | Rollback ignored live waiters and later settings edits | Disable first; remove only our entries (§6; plan 6.1) |
+
+Spikes S1–S3, 2026-09-28 ([spike-findings.md](spike-findings.md)); changes agreed with you at plan step 1.5.
+
+| Spike | Finding | Change |
+|---|---|---|
+| 1.2 | Bun loads the session directory's `bunfig.toml` and runs its preload | F14; hooks pass `--config` (§3, §5; plan 2.3, 2.7) |
+| S1 | `asyncRewake` wakes the idle panel, no 8-cap, queued while busy, SIGTERM when the panel closes | F2 verified; the waiter reports SIGTERM (flow 1; plan 3.1) |
+| S1 | Claude reads a wake as a hook notice, not your words | SessionStart note (§3 table; plan 2.7) |
+| S2 | A hook answers `AskUserQuestion`; versions join lists differently; text and number questions exist | F4 verified; one joined string; question kinds (plan 4.1) |
+| S3 | No `idle_prompt` in the panel | F6 corrected; a real finish is read from the stop's summary, F16 (flow 1; plan 2.7, 2.8) |
+| S3 | `cwd` follows `cd`; `CLAUDE_PROJECT_DIR` keeps the start directory | F15; scoping by it (§3; plan 2.1, 2.7) |
+| S3 | `permission_prompt` is late in the panel and absent in the terminal | The 🔐 ping moves to an async `PermissionRequest` hook (§3 table; plan 2.7) |
+
+Codex plan review of rev. 4, 2026-09-28 (`~/.claude/codex-reviews/plan----20260928-054822.md`): UNSOUND,
+3 findings, all confirmed (the first in the 2.1.283 code and real transcripts) and fixed in rev. 5.
+
+| # | Finding | Change |
+|---|---|---|
+| 1 | `hookErrors` also holds non-blocking errors, and `additionalContext` continues without it | Classify by the continuation entries in the stop's chain; unknown sends nothing (F16, flow 1) |
+| 2 | "This stop's summary" had no correlation rule; reading from EOF misses early summaries | Tail read, match `last_assistant_message`, follow `parentUuid`; tests and live checks before the served folders widen (flow 1; plan 2.8) |
+| 3 | A SIGTERM from an old waiter could mark a live session as not listening | Termination ends only that waiter's generation; recorded on disk if the broker is down (flow 1; plan 3.1) |

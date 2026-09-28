@@ -1,9 +1,9 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 4 (F14: hooks pin Bun's config; the sandbox skips our CLAUDE.md) · 2026-09-28 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 6 (Codex review of rev. 5: finish detection by the stop's continuation entries, proven in
+2.8; SIGTERM per waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F14), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F16), architecture and
 flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -69,13 +69,16 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   - No `idle_prompt` in the panel → a pass-through wrapper around the Codex checkpoint hook that reports
     whether it blocked. This needs your OK, because it changes that hook's settings entry.
 
-  **Go/no-go with you.**
+  **Go/no-go with you.** Done 2026-09-28: all three spikes passed. `idle_prompt` never fires in the
+  panel, and you chose to read each stop's summary (F16) instead of the wrapper; see
+  [spike-findings.md](spike-findings.md).
 
 ### Phase 2: Notifications (Telegram pings you; no replies yet)
 
 - **2.1 Config and secrets.** `.env` in `<repo>` holds the token (0600) and is loaded explicitly.
   `config.json` holds the presence thresholds, the folders to serve (only `sandbox/` until the phase 2
-  checkpoint), which entrypoints to serve, repos to skip, and the content policy. **Pass:** tests show a
+  checkpoint), which entrypoints to serve, repos to skip, and the content policy. Folders and skips are
+  matched against the session's start directory, `CLAUDE_PROJECT_DIR` (F15). **Pass:** tests show a
   missing or invalid token produces a clear error that never prints the token.
 - **2.2 Telegram client.** `getMe`, `getUpdates`, `sendMessage`, `editMessageText`, `answerCallbackQuery`,
   `sendDocument`; honours 429 `retry_after`. The token is part of every API URL, so it is scrubbed from
@@ -92,18 +95,22 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   and from then on only your Telegram user id is accepted, in a private chat; everything else is dropped
   and logged. **Pass:** tests reject a wrong or expired code, another user and a group chat; live, the
   bot answers "Paired ✅".
-- **2.5 Formatter (needs O1).** Redaction covers private keys, JWTs, `sk-`, `AKIA`, `AIza`, `glpat-`,
-  `ghp_`, `xox*-`, bearer tokens and `KEY=value` lines with secret-looking names. Plus HTML escaping,
-  4096-char chunks, and the cap with the full text as a file. **Pass:** a fixture with one sample of each
-  secret family comes out with none surviving, and no chunk exceeds 4096 characters.
+- **2.5 Formatter (needs O1).** Redaction covers private keys, JWTs, Telegram bot tokens, `sk-`, `AKIA`,
+  `AIza`, `glpat-`, `ghp_`, `xox*-`, bearer tokens and `KEY=value` lines with secret-looking names. Its
+  patterns don't rely on `\b`: a bot token follows `bot` directly in API URLs and may end in `-`, and
+  `sk-` must not match inside `task-notification`. Plus HTML escaping, 4096-char chunks, and the cap with
+  the full text as a file. **Pass:** a fixture with one sample of each secret family, including a token
+  inside a Bot API URL, comes out with none surviving, and no chunk exceeds 4096 characters.
 - **2.6 Presence.** Parse the real `ioreg` output (nanoseconds → seconds) every 5 s, check the screen
   lock, and handle `/away` `/auto` `/off` `/status`. **Pass:**
   - parser tests on recorded `ioreg` output, with boundaries at 29/30 s and 179/180 s;
   - a missing value counts as present and shows as "unknown";
   - live, locking the screen makes `/status` say away within 10 s.
-- **2.7 Notify hooks + install.** SessionStart, UserPromptSubmit (cancel barrier), Stop (waiter, notify
-  only for now), Notification (`idle_prompt`, `permission_prompt`), StopFailure, the `AskUserQuestion`
-  ping, SessionEnd.
+- **2.7 Notify hooks + install.** SessionStart (with the one-line note), UserPromptSubmit (cancel
+  barrier), Stop (waiter, notify only for now; a real finish is told from a continuation by the stop's
+  transcript entries, F16, proven in 2.8),
+  Notification (`idle_prompt`, terminal only), PermissionRequest (async 🔐 ping, skipping
+  `AskUserQuestion`), StopFailure, the `AskUserQuestion` ping, SessionEnd.
   - Skipped: subagents (`agent_id` set), entrypoints not served (per S3), repos in the skip list. Running
     background tasks are listed in the message, never a reason to skip.
   - `ctl install` backs up settings, adds tagged entries idempotently and writes atomically. The entries
@@ -115,13 +122,22 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   - Installing twice leaves one set of entries.
   - Uninstalling removes only ours and keeps a settings edit you made after install.
   - Live, in a new `sandbox/` session with `/away` on: "say hi" reaches Telegram, while the build session
-    and your other sessions send nothing.
+    and your other sessions send nothing, including a session started elsewhere that `cd`s into
+    `sandbox/` (F15).
   - At the keyboard with `/auto`: nothing is sent.
   - With a dev server left running in the background, the ✅ still arrives and lists it.
-- **2.8 Coexisting with the Codex hook.** Nothing extra if S3 showed `idle_prompt` in the panel, because
-  the ✅ waits for it; otherwise the wrapper from 1.5. **Pass:** live, change a file during the session
-  (the Codex hook ignores changes made before the session started). You get the Codex question first and
-  exactly one ✅ after the real finish, even when Claude's continuation takes longer than 20 s.
+- **2.8 Finish detection and the Codex hook.** The Stop waiter classifies each stop from its transcript
+  entries (F16, flow 1), so the Codex hook's settings entry stays untouched. Proven here, before the
+  checkpoint widens the served folders. **Pass:**
+  - tests on recorded transcript sequences: a stop blocked by a hook, a hook continuing via
+    `additionalContext`, a Stop hook that crashes (non-blocking error), blocked-then-final, a summary
+    written before the waiter started, a partial last line, identical final texts in two turns, and a
+    cancel before the notification;
+  - live in `sandbox/`, with throwaway Stop hooks for the block, the `additionalContext` and the crash:
+    exactly one ✅, only after the real finish;
+  - live, change a file during the session (the Codex hook ignores changes made before the session
+    started): you get the Codex question first and exactly one ✅ after the real finish, even when
+    Claude's continuation takes longer than 20 s.
 - **Checkpoint:** you choose which folders to serve beyond `sandbox/` (all, or a list); then a day of
   notify-only use, and you tell me what is noisy.
 
@@ -134,10 +150,16 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   - If the broker is down, the cancel is written to disk and applied before the broker accepts replies.
   - With the disabled flag, waiters exit with no decision.
   - A waiter exits if its parent Claude process dies, and reconnects if the broker restarts.
+  - On SIGTERM (panel closed, timeout) a waiter reports the end of its own generation, then exits with no
+    decision (S1). The broker marks the session as not listening only when no newer waiter of it is
+    live. If the broker is down, the end is written to disk like a cancel, and at start the broker also
+    drops waiters whose Claude process is gone.
 
   **Pass:** tests cover:
   - both race orders (typed first, reply first);
   - a late cancel that must not hit a newer waiter;
+  - an old waiter ending after its replacement registered, which leaves the session listening;
+  - a waiter ending while the broker is down;
   - a broker crash at each boundary: after fetching an update, after storing it, after handing it over.
 - **3.2 Routing and queue**, as in flow 4. **Pass:** tests for reply-to, the single waiting session, the
   picker, nobody listening, queued-while-busy, a repeated `update_id`, and an answer for an expired request.
@@ -152,19 +174,21 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
 - **4.1 Relay `AskUserQuestion`** with the three presence states of flow 3. One message per question:
   - options are buttons (`callback_data` ≤ 64 bytes: request id + index), and a text reply is your own
     answer;
-  - multi-select uses toggles + Submit;
+  - multi-select uses toggles + Submit, and the answer goes back as one string joined with `", "` (F4);
+  - `text` questions take the reply as typed, `number` questions a number within `min`–`max`;
   - `/local` hands the question back to the local dialog.
 
   **Pass:**
-  - tests for single, multi (comma-joined), free text, a stale button → "expired", and an in-between
-    hold released by input;
+  - tests for single, multi (one joined string), free text, text and number questions, a stale button →
+    "expired", and an in-between hold released by input;
   - live, you answer the Codex checkpoint question from your phone;
   - live, leaving while a question is open locally gets you a "waiting at the computer" message.
 - **4.2 (optional)** `ExitPlanMode`: the plan as a `.md` file + Approve / Keep planning.
 
 ### Phase 5: Permission approvals (only if O2 = yes)
 
-- **5.1 Relay `PermissionRequest` per the tool policy**, with the presence states of flow 3.
+- **5.1 Relay `PermissionRequest` per the tool policy**, with the presence states of flow 3. Never for
+  `AskUserQuestion`, whose dialog is also a permission request (F5); 4.1 handles it.
   - The message shows the complete operation: the whole Bash command and its cwd, or the file path and
     the full change for Edit/Write. Long ones are split over several messages or sent as a file, never
     shortened.
@@ -182,7 +206,8 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
 ### Phase 6: Hardening and handover
 
 - **6.1** `README.md` (setup, pairing, commands, uninstall), `ctl doctor` (token valid via `getMe`,
-  broker up, socket permissions, hooks installed, Bun path), log rotation, and the uninstall order of
+  broker up, socket permissions, hooks installed, Bun path, the stop summary still readable, F16), log
+  rotation, and the uninstall order of
   design §6. **Pass:** uninstall works while a Stop waiter, a held question and a permission request are
   all active, after a settings edit made since install.
 - **6.2** Full gate: `typecheck`, `lint` and `test` with their summary lines, plus the Codex code-review
