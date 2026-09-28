@@ -1,7 +1,7 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 5, Codex review of the spike changes (§8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
-Codex review) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 6, O1 decided as D8 (rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3;
+rev. 3: F14; rev. 2: Codex review) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -150,13 +150,14 @@ Taken (say so before the step if you disagree):
   closed a MacBook sleeps unless it is on power with an external display.
 - **D7 At-most-once delivery** (flow 4): a lost message is announced, and an instruction is never
   injected twice.
+- **D8 What text leaves the Mac** (O1, decided with you on 2026-09-28 at plan step 2.5): Claude's final
+  reply, redacted, up to about 3,500 characters in the chat. A longer reply gets a button that sends the
+  full text, redacted, as a `.md` file. Folders listed in `config.json` (`content.pingOnly`) get pings
+  only. Bot chats are Telegram cloud chats, not end-to-end encrypted, so that text is stored by
+  Telegram.
 
 Open, needed at the plan step shown:
 
-- **O1 (step 2.5) How much text leaves the Mac.** Recommended: the full reply, redacted, capped at
-  ~3,500 characters, with the rest sent as a `.md` file on request. Alternative: ping-only for chosen
-  repos. Bot chats are Telegram cloud chats, not end-to-end encrypted, so company code or customer data
-  in a reply is stored by Telegram.
 - **O2 (phase 5) Remote permission approval at all.** If yes, recommended: Allow once only, for Bash, Edit
   and Write; never for MCP tools or WebFetch; the complete operation shown; every decision in an audit log.
 - **O3 (step 1.1) Git remote** for this repo: company GitLab, personal, or local only.
@@ -170,7 +171,7 @@ Open, needed at the plan step shown:
 - Hooks run with `--no-env-file --config=<repo>/bunfig.toml` and the broker with a minimal environment,
   so another repo's `.env`, its `bunfig.toml` preload or a stray variable never reaches our processes
   (F13, F14).
-- Outbound text is redacted and capped (O1). Logs hold ids and sizes, not message text.
+- Outbound text is redacted and capped (D8). Logs hold ids and sizes, not message text.
 - Relayed replies are labelled as coming from Telegram, and only our hook can produce them.
 - Remote approvals are opt-in, Allow once only, bound to what you saw, and audited (O2).
 - Two-step verification on Telegram (plan step 0.2): a hijacked Telegram account would mean remote control

@@ -15,8 +15,15 @@ export interface Config {
   readonly entrypoints: readonly string[];
   /** Active under activeSeconds since your last input, away from awaySeconds on (D4, flow 3). */
   readonly presence: { readonly activeSeconds: number; readonly awaySeconds: number };
-  /** How much of Claude's text leaves the Mac (O1); pingOnly folders get pings without text. */
-  readonly content: { readonly default: ContentMode; readonly pingOnly: readonly string[] };
+  /**
+   * How much of Claude's text leaves the Mac (D8): up to maxChars characters in the chat, the full text
+   * as a file on request. Folders in pingOnly get pings without text.
+   */
+  readonly content: {
+    readonly default: ContentMode;
+    readonly pingOnly: readonly string[];
+    readonly maxChars: number;
+  };
 }
 
 /** Where relative ("sandbox") and "~/" paths in config.json point. */
@@ -27,15 +34,14 @@ export interface Places {
 
 /**
  * What applies when config.json or one of its settings is missing; config.example.json spells it out.
- * Only sandbox/ is served until the phase 2 checkpoint, and text stays on the Mac until O1 is decided
- * at step 2.5.
+ * Only sandbox/ is served until the phase 2 checkpoint. Text follows D8 (O1, decided at step 2.5).
  */
 export const DEFAULTS = {
   serve: ["sandbox"],
   skip: [],
   entrypoints: ["claude-vscode", "cli"],
   presence: { activeSeconds: 30, awaySeconds: 180 },
-  content: { default: "ping-only", pingOnly: [] },
+  content: { default: "full", pingOnly: [], maxChars: 3500 },
 } as const;
 
 /** Reads config.json; without one, the defaults apply. */
@@ -59,7 +65,11 @@ export function parseConfig(raw: unknown, places: Places): Config {
     "activeSeconds",
     "awaySeconds",
   ]);
-  const content = settings(pick(top, "content", {}), "content", ["default", "pingOnly"]);
+  const content = settings(pick(top, "content", {}), "content", [
+    "default",
+    "pingOnly",
+    "maxChars",
+  ]);
   const paths = (value: unknown, where: string): string[] =>
     strings(value, where).map((path) => absolutePath(path, where, places));
   const active = pick(presence, "activeSeconds", DEFAULTS.presence.activeSeconds);
@@ -75,6 +85,7 @@ export function parseConfig(raw: unknown, places: Places): Config {
     content: {
       default: contentMode(pick(content, "default", DEFAULTS.content.default)),
       pingOnly: paths(pick(content, "pingOnly", DEFAULTS.content.pingOnly), "content.pingOnly"),
+      maxChars: characters(pick(content, "maxChars", DEFAULTS.content.maxChars)),
     },
   };
   if (config.presence.activeSeconds >= config.presence.awaySeconds) {
@@ -126,6 +137,16 @@ function strings(value: unknown, where: string): string[] {
 function seconds(value: unknown, where: string): number {
   if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
     throw new ConfigError(`config.json: ${where} must be a whole number of seconds above 0`);
+  }
+  return value;
+}
+
+/** The cap on text in the chat: a whole number from 200 to 100,000 characters. */
+function characters(value: unknown): number {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < 200 || value > 100_000) {
+    throw new ConfigError(
+      "config.json: content.maxChars must be a whole number from 200 to 100000",
+    );
   }
   return value;
 }

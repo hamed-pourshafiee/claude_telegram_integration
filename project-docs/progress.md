@@ -515,7 +515,66 @@ Committed as `c6658db` after the user's go (2026-09-28).
 
 ## Next
 
-After the user confirms 2.4 and it is committed, and after their go: **2.5 Formatter**, which needs
-O1 (ask it at the start of the step). The broker is running and paired; it polls Telegram while it
-runs. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
+Committed as `98b9351` after the user's go (2026-09-28).
+
+## 2.5 Formatter
+
+- **Date:** 2026-09-28
+- **Decision (the user, 2026-09-28), O1:** the full reply, capped. Claude's final message goes out
+  redacted, up to about 3,500 characters in the chat; a longer one gets a button that sends the full
+  text as a `.md` file, and folders listed in `config.json` get pings only. Recorded as D8 (design
+  rev. 6, plan rev. 7). The config's content default is now `full`, with `content.maxChars` 3500.
+- **Result:** code and tests done, gate green, the Codex findings fixed; the plan's pass check is the
+  tests. Waiting for the user's confirmation, then a local commit.
+- **Evidence:** `bun run typecheck` exit 0 · `bun run lint` "Checked 66 files … No fixes applied." ·
+  `bun test` "264 pass, 0 fail" (after the Codex fixes below).
+- **Codex review** (`code-claude_telegram_integration-20260928-180030.md`), with `.env` locked (mode 0,
+  a read attempt failed) and unlocked to 600 afterwards. Two findings, both confirmed by tests that
+  failed (9 of 11 in `tests/broker/redact.test.ts`), then fixed:
+  1. (P1) A quoted setting value was masked only up to its first space or comma:
+     `PASSWORD="correct horse battery staple"` kept "horse battery staple", and a short first word
+     kept all of it. Now a quoted value is masked up to its closing quote, and an unquoted one up to
+     the end of the line.
+  2. (P2) Short credentials in an explicit header were missed: `Authorization: Basic dXNlcjpwYXNz`
+     (user:pass) and `Authorization: Bearer abc123`. Now an `Authorization:` or
+     `Proxy-Authorization:` header masks its credential, however short.
+  - Found while fixing: backtracking let the end-of-line rule give back the space after the colon and
+    mask an existing "[redacted …]" again, losing the kept name. A value now never starts with a
+    space.
+  - Positive controls, each failing the tests: no header rule (4 tests), quoted values cut at a space
+    (4), values allowed to start with a space (10).
+  - The pass check (`tests/broker/format.test.ts`; its fixture `tests/helpers/secret-samples.ts` is
+    assembled at runtime):
+    - one sample of each family: a private key, a JWT, a Telegram token inside a Bot API URL and
+      ending in `-`, `sk-`, AWS, Google, GitLab, GitHub, Slack, Bearer and Basic credentials, and
+      three `KEY=value` lines;
+    - none survives, in the chat or in the full text, and each becomes "[redacted <family>]";
+    - names and prefixes stay (`API_KEY=`, `Authorization: Bearer `, the Bot API URL), and so does
+      `task-notification`, even in a longer word such as `task-notification-received-event`.
+  - A long text full of `<`, `&` and emoji: no message exceeds 4096 characters, nothing is lost or
+    doubled, and no message is cut inside an emoji or an escape.
+  - Positive controls, each failing the tests: a `\b` before the token pattern (2 tests), no
+    look-behind before `sk-` (1), a splitter that ignores escaping (1), no `KEY=value` family (2).
+- **Built:** `src/broker/redact.ts`, and `src/broker/format.ts` (`formatReply`, `escapeHtml`,
+  `split`); `content.maxChars` in `config.json`.
+- **Decisions (mine, open to change):**
+  - A mask names the family it hides, such as "[redacted GitHub token]".
+  - Beyond the plan's list: `Basic` credentials (base64 of user:password), GitHub's other token kinds
+    (`gho_`, `ghu_`, `ghs_`, `ghr_`, `github_pat_`) and AWS temporary keys (`ASIA`).
+  - A `KEY=value` secret is a whole line that starts with the name (after `export` or a quote), so
+    code such as `const TOKEN_KEY = "…"` is left alone.
+  - Claude's Markdown goes out as escaped plain text, with only our header in bold; turning Markdown
+    into Telegram formatting can come later.
+  - A cut reply ends with a note of how much is shown; the button for the file comes with the
+    notifications (2.7).
+  - A message is at most 4096 characters even counting the HTML escapes. That is stricter than
+    Telegram, which counts after parsing.
+- **Learned:** my first `KEY=value` pattern took "Authorization" as a setting (it contains AUTH) and
+  masked the word "Bearer" as its value; the tests caught it. A setting's value can no longer be
+  `Bearer` or `Basic`.
+
+## Next
+
+After the user confirms 2.5 and it is committed, and after their go: **2.6 Presence**. The broker is
+running and paired; it polls Telegram while it runs. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
 (CLAUDE.md).

@@ -148,9 +148,11 @@ describe("recorded sessions: the start folder decides, not the cwd (F15)", () =>
   });
 });
 
-describe("content policy (O1)", () => {
-  test("ping-only everywhere by default", () => {
-    expect(contentModeFor(defaults, join(repo, "sandbox"))).toBe("ping-only");
+describe("content policy (D8)", () => {
+  test("full by default; ping-only everywhere when content.default says so", () => {
+    expect(contentModeFor(defaults, join(repo, "sandbox"))).toBe("full");
+    const pingOnly = parseConfig({ content: { default: "ping-only" } }, places);
+    expect(contentModeFor(pingOnly, join(repo, "sandbox"))).toBe("ping-only");
   });
 
   test("full, except in the ping-only folders", () => {

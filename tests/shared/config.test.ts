@@ -37,7 +37,7 @@ describe("defaults", () => {
       skip: [],
       entrypoints: ["claude-vscode", "cli"],
       presence: { activeSeconds: 30, awaySeconds: 180 },
-      content: { default: "ping-only", pingOnly: [] },
+      content: { default: "full", pingOnly: [], maxChars: 3500 },
     });
   });
 
@@ -101,6 +101,7 @@ describe("a wrong setting is named in the error", () => {
     ["seconds as text", { presence: { awaySeconds: "180" } }, "awaySeconds must be a whole number"],
     ["active not below away", { presence: { activeSeconds: 180 } }, "must be below awaySeconds"],
     ["an unknown content mode", { content: { default: "summary" } }, "content.default must be"],
+    ["a cap too small", { content: { maxChars: 50 } }, "content.maxChars must be a whole number"],
   ])("%s", (_name, raw, expected) => {
     expect(parseError(raw)).toContain(expected);
   });

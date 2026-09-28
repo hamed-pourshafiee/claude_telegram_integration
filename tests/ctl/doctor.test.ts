@@ -54,7 +54,7 @@ describe("ctl doctor: .env and Telegram", () => {
     expect(output).toContain("shaped right (not shown)");
     expect(output).toContain("✓ telegram     the bot @bridge_test_bot answers (getMe)");
     expect(output).toContain("not found, so the defaults apply");
-    expect(output).toContain("ping-only everywhere");
+    expect(output).toContain("full reply up to 3500 characters; ping-only in: none");
     expect(fake.calls("getMe")).toEqual([{ method: "getMe", token: FAKE_TOKEN, body: {} }]);
   });
 

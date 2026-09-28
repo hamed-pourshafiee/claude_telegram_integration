@@ -50,7 +50,7 @@ function configChecks(paths: DoctorPaths): Check[] {
     folders.length === 0 ? "none" : folders.map((path) => tilde(path, paths.home)).join(", ");
   const missing = config.serve.filter((folder) => !existsSync(folder));
   const { activeSeconds, awaySeconds } = config.presence;
-  const { default: mode, pingOnly } = config.content;
+  const { default: mode, pingOnly, maxChars } = config.content;
   return [
     { ok: true, name: "config.json", detail: found ? "read" : "not found, so the defaults apply" },
     missing.length === 0
@@ -67,7 +67,9 @@ function configChecks(paths: DoctorPaths): Check[] {
       ok: true,
       name: "content",
       detail:
-        mode === "ping-only" ? "ping-only everywhere" : `full, but ping-only in: ${show(pingOnly)}`,
+        mode === "ping-only"
+          ? "ping-only everywhere"
+          : `full reply up to ${maxChars} characters; ping-only in: ${show(pingOnly)}`,
     },
   ];
 }

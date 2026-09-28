@@ -1,10 +1,10 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 6 (Codex review of rev. 5: finish detection by the stop's continuation entries, proven in
-2.8; SIGTERM per waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 7 (O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
+continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 What we build and why is in [design.md](design.md): the goal, platform facts (F1–F16), architecture and
-flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and the review log. References such as
+flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
 ## 1. How we work
@@ -95,7 +95,7 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   and from then on only your Telegram user id is accepted, in a private chat; everything else is dropped
   and logged. **Pass:** tests reject a wrong or expired code, another user and a group chat; live, the
   bot answers "Paired ✅".
-- **2.5 Formatter (needs O1).** Redaction covers private keys, JWTs, Telegram bot tokens, `sk-`, `AKIA`,
+- **2.5 Formatter (O1, decided: D8).** Redaction covers private keys, JWTs, Telegram bot tokens, `sk-`, `AKIA`,
   `AIza`, `glpat-`, `ghp_`, `xox*-`, bearer tokens and `KEY=value` lines with secret-looking names. Its
   patterns don't rely on `\b`: a bot token follows `bot` directly in API URLs and may end in `-`, and
   `sk-` must not match inside `task-notification`. Plus HTML escaping, 4096-char chunks, and the cap with
@@ -194,7 +194,7 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
     shortened.
   - Allow once / Deny / Deny with a reason; the buttons are bound to that request and a hash of what you
     were shown. Never "always allow" from Telegram, and every decision goes to the audit log.
-  - If the repo's content policy (O1) is ping-only, approvals stay local.
+  - If the repo's content policy (D8) is ping-only, approvals stay local.
 
   **Pass:**
   - a tool outside the policy gets the local dialog only;
