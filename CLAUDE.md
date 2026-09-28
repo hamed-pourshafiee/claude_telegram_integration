@@ -44,7 +44,9 @@ Read these completely before doing anything in a new session:
   `.env` locked: `chmod 000 .env` right before it and `chmod 600 .env` right after, in the same command
   with a trap so the unlock also runs if the review fails; then check the mode is 600 again.
 - Before any change to `~/.claude/settings.json`: back it up (to `.state/backups/`), show the user the
-  exact entries to be added or removed, and wait for their OK.
+  exact entries to be added or removed, and wait for their OK. Then the user runs `bun run ctl install`
+  (or `uninstall`) themselves, which makes the backup: Claude Code's auto mode doesn't let Claude write
+  its own settings file. Afterwards, check the result against the backup.
 - If a doc turns out wrong or a spike fails, stop and propose the change to the docs before working
   around it.
 - When a step passes, commit it locally (no confirmation needed). No git remote until the user chooses one
@@ -61,6 +63,8 @@ bun run ctl doctor     # checks config.json, .env and the bot (getMe); never sho
 bun run ctl status     # broker running with this repo's token? paired? presence? also: start | stop
 bun run ctl disable    # sets the disabled flag and stops the broker, until `ctl enable` (design §6)
 bun run ctl pair       # a one-time code (10 min) to send the bot as `/pair <code>`
+bun run ctl install    # our hooks into ~/.claude/settings.json, after a backup; --dry-run shows them
+bun run ctl uninstall  # removes only our hooks (the user runs both; see the rules above)
 ```
 
 In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/away` relays

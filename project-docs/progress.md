@@ -585,8 +585,7 @@ Committed as `9793b5d` after the user's go (2026-09-28).
   paused until the project is done. Recorded in CLAUDE.md and plan §1 (rev. 8).
 - **Result:** passed, committed on its own under the new way of working. Live: the user locked the Mac
   by hand and the broker counted them away (locked) 4.7 s later; a `/status` from the phone was answered
-  in 0.4 s. Not seen literally: a `/status` sent while the Mac was locked (the user locked it and left);
-  they are asked to confirm it at the next stop.
+  in 0.4 s. A `/status` sent while the Mac was locked was confirmed later, in 2.7's live check.
 - **Evidence:**
   - `bun run typecheck` exit 0 · `bun run lint` "Checked 72 files … No fixes applied." · `bun test`
     "323 pass, 0 fail", four full runs in a row.
@@ -643,7 +642,118 @@ Committed as `9793b5d` after the user's go (2026-09-28).
 
 ## Next
 
-**2.7 Notify hooks + install**, which stops for the user's OK before `~/.claude/settings.json` changes;
-at that stop, also ask them to send `/status` from the phone while the Mac is locked (2.6). The broker is
-running and paired. `.env` holds the real token: scan only staged files, and lock `.env` during any Codex
-review (CLAUDE.md).
+Committed as `edf80ed` (2026-09-28).
+
+## 2.7 Notify hooks + install
+
+- **Date:** 2026-09-28 to 2026-09-29
+- **Result:** passed. Live, with our hooks in `~/.claude/settings.json`:
+  - A new sandbox session with `/away` got its ✅ 1.7 s after the stop, and it listed a dev server left
+    running in the background.
+  - At the keyboard with `/auto`, nothing was sent.
+  - The build session sent nothing, also after it `cd`'d into `sandbox/`.
+
+  2.6's leftover is confirmed too: a `/status` sent while the Mac was locked was answered.
+- **Evidence:**
+  - `bun run typecheck` exit 0 · `bun run lint` "Checked 86 files … No fixes applied." · `bun test`
+    "370 pass, 0 fail", twice.
+  - **Install.** The user ran `bun run ctl install` after their OK (see Learned).
+    - `ctl.log`: `hooks.installed {hooks: 8, replaced: 0}`.
+    - Backup: `.state/backups/settings.2026-09-28T20-41-22-093Z.json` (0600).
+    - Compared with the backup (key names and counts only): nothing outside `hooks` changed, and each of
+      the 8 events holds exactly its old groups plus ours at the end (`StopFailure` is new).
+    - The file already round-tripped byte for byte, so no other line changed. Its mode stayed 644.
+  - **A new sandbox session** (VS Code, Claude Code: Open in New Tab): `hook.event SessionStart` came 2 s
+    after the tab opened. The broker registered `7af8…` as `sandbox`, `claude-vscode`, branch `main`.
+  - **"say hi" with `/away`** (`presence.mode away`):
+    - UserPromptSubmit at 20:51:00.442 and Stop at 20:51:04.413.
+    - `hook.stop finish, no continuation entry` 0.2 s later.
+    - `notice.sent finish` at 20:51:06.105 (`sendMessage` 200 in 1.5 s).
+  - **A background dev server** (`python3 -m http.server 8765`):
+    - Two 🔐 pings for its permission dialogs (`notice.sent permission`).
+    - Then `hook.stop … tasks: 1`, and the ✅, which listed the server.
+    - When I stopped the server, the task's exit woke the session by itself: UserPromptSubmit, a 🔐 ping,
+      a Stop and a ✅ (still `/away`).
+  - **"say hi" with `/auto` at the keyboard:** `stop.result finish, current`, then `notice.skipped … at
+    the Mac` at 22:57:23.454. Nothing reached the phone.
+  - **The build session.** It ran our Stop hook from then on: its `stop_hook_summary` lists our command,
+    with no hook errors. That held after a `cd` into `sandbox/` too (the summary's `cwd` was
+    `…/sandbox`). The broker never heard from it: since the install, every `hook.event` came from the
+    sandbox session.
+  - **2.6's leftover:** the broker counted the Mac away (locked) at 23:02:52.971. `command status` at
+    23:02:58.983 was answered (`sendMessage` 200) at 23:02:59.329, with the Mac still locked. The user saw
+    the expected "🔴 Away: the screen is locked".
+  - **Before the install:** real sessions that didn't touch `~/.claude/settings.json`.
+    - The setup: `claude -p` (2.1.274) in a throwaway repo copy, with our hooks loaded through
+      `--settings` and `--setting-sources project`, a fake token and an unpaired broker.
+    - SessionStart started the broker (schema 2). UserPromptSubmit and Stop each began a generation.
+    - The Stop hook classified the real transcript as `finish` ("no continuation entry") within 2 ms.
+    - The broker logged `stop.result … current: true` and `notice.skipped … not paired`. SessionEnd
+      arrived last.
+    - A second run left `sleep 45` running in the background. The Stop input carried it (`tasks: 1`),
+      and the stop still counted as a finish, 0.2 s after the Stop.
+  - The classifier replayed on real transcripts, each stop seen only up to its own summary: all 129
+    stops of this build session (41 continuing, blocked by the Codex hook; 88 finishes), and 11 in the
+    sandbox transcripts from the panel and the terminal.
+  - Positive controls, each caught: install without removing ours first (1 test), uninstall taking
+    every hook as ours (3), subagents not skipped (2), no cancel barrier (1), continuation entries
+    ignored (5), notices while at the Mac (2), ping-only text sent (1), a ping for AskUserQuestion's
+    permission dialog (1), a second ✅ after idle_prompt (1), the prompt check dropped (1, after adding
+    the test it showed was missing).
+- **Built:**
+  - Hooks: `src/hooks/main.ts` runs each event's handler (`events.ts`) for served sessions only, never in
+    a subagent (`agent_id`). SessionStart registers the session and adds the note; UserPromptSubmit is
+    the cancel barrier; Stop registers, classifies (`finish.ts`, F16) and reports; Notification
+    (`idle_prompt`), PermissionRequest (not for AskUserQuestion), PreToolUse (AskUserQuestion),
+    StopFailure and SessionEnd report to the broker. `branch.ts` reads the branch from `.git/HEAD`,
+    without running git in the session's repo.
+  - Broker: `sessions.ts` (schema 2: sessions and their generations), `hook-events.ts` (a stop's result
+    counts only in its generation; idle_prompt sends a ✅ an unknown or held-back stop didn't),
+    `notifier.ts` (only while away and not muted; D8 formatting; the 📄 button), `notices.ts` (✅ 🔐 ❓
+    ⚠️), `full-texts.ts` (the 📄 texts, in memory only, a day at most).
+  - `ctl install [--dry-run]` and `ctl uninstall [--dry-run]` (`src/ctl/install.ts`, `setup.ts`): a
+    backup first, our hooks recognised by their command path, one rename to write, refused for a
+    symlink or a file changed meanwhile.
+  - The spike code is deleted with its tests (`scripts/spikes/`, `tests/spikes/`); the fixtures stay.
+- **Decisions (mine, open to change):**
+  - Phase 2's entries wait for nothing, so their limits are short: Stop is `async` with 60 s (design §3
+    has `asyncRewake`, 12 h, for phase 3) and the AskUserQuestion hook has 10 s (12 h in phase 4). Both
+    go up with `ctl install` when those phases need them.
+  - Notices go out only while you are away (not in between); `/off` mutes them. A ✅ held back because
+    you were at the Mac can still go out at `idle_prompt` (terminal only) if you have left by then.
+  - Labels: folder, branch and the first 4 characters of the session id, e.g. "sandbox (main) · b1e8".
+  - Running background tasks are listed first in the ✅, at most five by name; ping-only folders get a
+    count only. A permission ping shows the command, file or URL; a question ping its options.
+  - The note names the paired user's first name from Telegram, or "the user" when none is paired.
+  - The 📄 texts stay in memory only, so none of Claude's text is written to disk.
+- **Found along the way:**
+  - A resumed or compacted session's transcript holds earlier entries a second time, with the same
+    uuids. The classifier only looks at the entries up to the current stop, so they do no harm; the
+    replay above includes such stops.
+  - Two backups in the same millisecond had the same name, and the second write was refused; backups
+    now get a number.
+  - A formatting error in the last test added (the prompt check) had slipped past; the final gate caught
+    it.
+- **Learned:**
+  - Claude Code's auto mode refused to let me run `ctl install`, even after the user's OK: writing
+    `~/.claude/settings.json` counts as Claude changing its own settings. The user runs `ctl install` and
+    `ctl uninstall` themselves (CLAUDE.md now says so). Later installs will go the same way, such as
+    phases 3 and 4 raising the limits.
+  - A session that is already running takes up hooks added to `~/.claude/settings.json` without a
+    restart (2.1.283): this build session ran our Stop hook 8 minutes after the install. An uninstall
+    should act the same way, but that hasn't been seen yet.
+  - `code -n <folder>` brings forward a window already open on that folder rather than opening a second
+    one, and its Claude panel may show an older conversation. Claude Code: Open in New Tab (Cmd+Shift+Esc)
+    starts a new session, whose SessionStart runs as soon as the tab opens, before any prompt.
+  - A background task that exits wakes its session as if prompted: UserPromptSubmit runs, so the
+    generation moves on, and then a Stop. While you are away, that turn's ✅ goes out like any other.
+  - The live check was done one small step at a time, each waiting for the user (their wish, 2026-09-29).
+
+## Next
+
+2.8, finish detection and the Codex hook:
+- tests on recorded transcript sequences;
+- live throwaway Stop hooks in `sandbox/`: block, `additionalContext` and crash;
+- a live check with the Codex hook's question.
+
+Our hooks stay installed. The broker is running the 2.7 code.

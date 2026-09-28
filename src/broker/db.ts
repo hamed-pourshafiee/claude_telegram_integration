@@ -1,9 +1,24 @@
 import { Database } from "bun:sqlite";
 
+/** A value SQLite takes as a parameter. */
+export type Binding = string | number | bigint | boolean | null;
+
 /** Each entry takes the schema one version up. Later steps append (plan 2.4 onward). */
 const MIGRATIONS: readonly (readonly string[])[] = [
   // 1 (plan 2.3): facts such as the Telegram offset and the paired user
   ["CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL) STRICT"],
+  // 2 (plan 2.7): the sessions hooks report; a stop's result counts only in its own generation
+  [
+    `CREATE TABLE sessions (
+      id TEXT PRIMARY KEY,
+      project_dir TEXT NOT NULL,
+      entrypoint TEXT NOT NULL,
+      branch TEXT NOT NULL DEFAULT '',
+      started_at TEXT NOT NULL,
+      ended_at TEXT,
+      generation INTEGER NOT NULL DEFAULT 0
+    ) STRICT`,
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;
@@ -55,6 +70,15 @@ export class BrokerDb {
 
   deleteMeta(key: string): void {
     this.#db.query("DELETE FROM meta WHERE key = ?").run(key);
+  }
+
+  /** The first row `sql` selects, or undefined. */
+  get<Row>(sql: string, ...params: Binding[]): Row | undefined {
+    return this.#db.query<Row, Binding[]>(sql).get(...params) ?? undefined;
+  }
+
+  run(sql: string, ...params: Binding[]): void {
+    this.#db.query<unknown, Binding[]>(sql).run(...params);
   }
 
   /** Runs `work` in one transaction: all of its writes happen, or none. */

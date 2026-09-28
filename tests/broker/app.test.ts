@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, expect, test } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/broker/app.ts";
@@ -109,6 +109,35 @@ test("/status from the paired user gets where the Mac says you are (plan 2.6)", 
     idleSeconds: 3,
     locked: true,
   });
+});
+
+test("a finished turn while you're away: the ✅ arrives, and 📄 sends the whole reply (plan 2.7)", async () => {
+  mac = { idleSeconds: 400, locked: false, problems: [] };
+  const db = BrokerDb.open(join(dir, "notify.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
+  const { routes, presence } = app(db);
+  expect(await until(() => presence.snapshot().state === "away")).toBe(true);
+  mkdirSync(join(dir, "sandbox"), { recursive: true });
+  const ref = { session_id: "b1e81638", project_dir: join(dir, "sandbox"), entrypoint: "cli" };
+  const generation = asFields(routes.hook("Stop", ref).body)?.generation;
+  const chat = { id: you.id, type: "private" };
+  fake.fallback("sendMessage", ok({ message_id: 11, date: 0, chat, text: "✅" }));
+  const reply = `${"word ".repeat(1000)}END`;
+  routes.hook("StopResult", { ...ref, generation, outcome: "finish", text: reply, tasks: [] });
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  const sent = asFields(fake.calls("sendMessage")[0]?.body);
+  expect(String(sent?.text)).toStartWith("<b>✅ sandbox · b1e8</b>");
+  expect(String(sent?.text)).not.toContain("END");
+  const keyboard = asFields(sent?.reply_markup)?.inline_keyboard;
+  const data = Array.isArray(keyboard) ? asFields(keyboard[0]?.[0])?.callback_data : undefined;
+  const press = { id: "cbq1", from: you, data, message: { message_id: 11, chat } };
+  fake.answer("getUpdates", ok([{ update_id: 700, callback_query: press }]));
+  fake.answer("answerCallbackQuery", ok(true));
+  fake.answer("sendDocument", ok({ message_id: 12, date: 0, chat }));
+  expect(await until(() => fake.calls("sendDocument").length === 1)).toBe(true);
+  const file = asFields(asFields(fake.calls("sendDocument")[0]?.body)?.document);
+  expect(String(file?.content)).toEndWith("END");
 });
 
 test("ctl pair shows the code and what to send", () => {

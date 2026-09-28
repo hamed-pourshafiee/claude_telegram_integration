@@ -23,12 +23,14 @@ const SECRET_TEXT = "a message whose text must never reach the log";
 let sent: SendMessageParams[] = [];
 let logged: string[] = [];
 let commands: CommandName[] = [];
+let presses: string[] = [];
 let pairing: Pairing;
 let nextId = 0;
 beforeEach(() => {
   sent = [];
   logged = [];
   commands = [];
+  presses = [];
   pairing = new Pairing(BrokerDb.open(join(dir, `gate-${Date.now()}-${nextId}.db`)));
 });
 
@@ -57,7 +59,11 @@ const command = (name: CommandName) => {
   commands.push(name);
   return `answer to /${name}`;
 };
-const handle = (update: Update) => handleUpdate(update, { telegram, pairing, log, command });
+const press = (data: string, chat: number, queryId: string) => {
+  presses.push(`${data} ${chat} ${queryId}`);
+  return Promise.resolve();
+};
+const handle = (update: Update) => handleUpdate(update, { telegram, pairing, log, command, press });
 const reasons = () =>
   logged.filter((line) => line.includes("update.dropped")).map((line) => JSON.parse(line).reason);
 
@@ -115,6 +121,19 @@ describe("after pairing, only the paired user in a private chat is heard", () =>
     expect(logged.join("\n")).not.toContain(SECRET_TEXT);
   });
 
+  test("the paired user's button press is handed on, with its chat and query id", async () => {
+    pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+    const press = {
+      id: "cb7",
+      from: you,
+      data: "full:0123456789abcdef",
+      message: { message_id: 5, chat: privateChat(you.id) },
+    };
+    await handle({ update_id: 52, kind: "callback_query", callback_query: press });
+    expect(presses).toEqual([`full:0123456789abcdef ${you.id} cb7`]);
+    expect(logged.join("\n")).not.toContain("0123456789abcdef");
+  });
+
   test("a button press from another user, and an update of another kind, are dropped", async () => {
     pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
     const press = {
@@ -126,6 +145,7 @@ describe("after pairing, only the paired user in a private chat is heard", () =>
     await handle({ update_id: 50, kind: "callback_query", callback_query: press });
     await handle({ update_id: 51, kind: "other" });
     expect(reasons()).toEqual(["not the paired user", "not a message or a button press"]);
+    expect(presses).toEqual([]);
   });
 
   test("before any pairing, every message is dropped", async () => {

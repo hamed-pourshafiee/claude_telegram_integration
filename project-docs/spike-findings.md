@@ -97,5 +97,6 @@ are redacted too.
 - All 11 spike entries were removed from `~/.claude/settings.json` on 2026-09-28 with
   `scripts/spikes/settings.ts remove`; the file is byte-identical to the backup taken before S1
   (`.state/backups/settings.2026-09-27T20-48-55-447Z.json`).
-- The spike code stays in `scripts/spikes/` as a reference until plan 2.7 replaces it with `ctl install`
-  and the real hooks, then it is deleted with its tests. The fixtures in `tests/fixtures/hooks/` stay.
+- The spike code stayed in `scripts/spikes/` as a reference until plan 2.7 replaced it with
+  `ctl install` and the real hooks; it was deleted there with its tests, and git history keeps it
+  (last in `edf80ed`). The fixtures in `tests/fixtures/hooks/` stay.

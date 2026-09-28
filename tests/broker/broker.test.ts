@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, test } from "bun:test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { SCHEMA_VERSION } from "../../src/broker/db.ts";
 import { brokerEnv } from "../../src/shared/broker-client.ts";
 import { Secret } from "../../src/shared/secret.ts";
 import { gone, RepoCopy } from "../helpers/repo-copy.ts";
@@ -38,7 +39,7 @@ describe("one broker at a time", () => {
       pid: pids[0],
       botId: 7777777777,
       tokenFingerprint: new Secret(FAKE_TOKEN).fingerprint(),
-      schema: 1,
+      schema: SCHEMA_VERSION,
     });
     expect(copy.ctl("status").stdout).toContain("with this repo's token");
   }, 20_000);
@@ -76,7 +77,8 @@ describe("a killed broker is restarted by the next hook, but not while disabled"
     expect(await gone(before)).toBe(true);
     expect(await copy.health()).toBeUndefined();
     const run = copy.hook("SessionStart", repoA);
-    expect(run).toMatchObject({ exitCode: 0, stdout: "" });
+    const note = expect.stringContaining('"hookEventName":"SessionStart"');
+    expect(run).toMatchObject({ exitCode: 0, stdout: note });
     const after = await copy.health();
     expect(after?.pid).toBeNumber();
     expect(after?.pid).not.toBe(before);

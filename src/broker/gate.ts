@@ -1,6 +1,6 @@
 import type { Log } from "../shared/log.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
-import type { Chat, Update, User } from "../shared/telegram/types.ts";
+import type { CallbackQuery, Chat, Update, User } from "../shared/telegram/types.ts";
 import { type CommandName, parseCommand } from "./commands.ts";
 import type { Pairing, PairingResult } from "./pairing.ts";
 
@@ -10,6 +10,8 @@ export interface GateDeps {
   readonly log: Log;
   /** Carries out a command of the paired user (/status, /away…) and returns the answer. */
   readonly command: (name: CommandName) => string;
+  /** Answers the paired user's press of a button, such as 📄 (plan 2.7). */
+  readonly press: (data: string, chat: number, queryId: string) => Promise<void>;
 }
 
 const REPLIES = {
@@ -37,9 +39,17 @@ export async function handleUpdate(update: Update, deps: GateDeps): Promise<void
   const paired = deps.pairing.pairedUser();
   if (paired === undefined) return drop(update, deps, "not paired yet");
   if (paired.id !== from.id) return drop(update, deps, "not the paired user");
+  if (update.kind === "callback_query") return pressed(update.callback_query, chat, deps);
   const command = text === undefined ? undefined : parseCommand(text);
   if (command !== undefined) return answer(update, command, chat, deps);
   deps.log("update.accepted", { update: update.update_id, kind: update.kind });
+}
+
+async function pressed(query: CallbackQuery, chat: Chat, deps: GateDeps) {
+  const data = query.data ?? "";
+  // Only the kind of button is logged: "full" from "full:<id>".
+  deps.log("button", { kind: data.split(":")[0] ?? "" });
+  await deps.press(data, chat.id, query.id);
 }
 
 async function answer(update: Known, name: CommandName, chat: Chat, deps: GateDeps) {

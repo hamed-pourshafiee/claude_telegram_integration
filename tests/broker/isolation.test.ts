@@ -38,8 +38,10 @@ describe("hooks from two unrelated repos", () => {
     const leaked = { TELEGRAM_BOT_TOKEN: OTHER_TOKEN, SOME_SESSION_VARIABLE: "1" };
     const fromHostile = copy.hook("SessionStart", hostile, leaked);
     const fromPlain = copy.hook("SessionStart", plain);
-    expect(fromHostile).toMatchObject({ exitCode: 0, stdout: "" });
-    expect(fromPlain).toMatchObject({ exitCode: 0, stdout: "" });
+    // Our SessionStart hook ran in both: its output is the note of design §3.
+    const note = expect.stringContaining('"hookEventName":"SessionStart"');
+    expect(fromHostile).toMatchObject({ exitCode: 0, stdout: note });
+    expect(fromPlain).toMatchObject({ exitCode: 0, stdout: note });
     const events = copy.logged("broker").filter((entry) => entry.event === "hook.event");
     expect(events.map((entry) => entry.session)).toEqual([fromHostile.session, fromPlain.session]);
     expect(new Set(events.map((entry) => entry.pid)).size).toBe(1);

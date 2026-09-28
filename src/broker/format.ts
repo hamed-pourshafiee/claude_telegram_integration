@@ -25,6 +25,7 @@ export function formatReply(header: string, body: string, maxChars: number): Rep
   const note = cut ? `\n\n✂️ ${shown.length} of ${text.length} characters shown.` : "";
   const head = `<b>${escapeHtml(header.slice(0, HEADER_LIMIT))}</b>\n\n`;
   const pieces = split(shown + note, MESSAGE_LIMIT - head.length, MESSAGE_LIMIT);
+  if (pieces.length === 0) return { messages: [head.trimEnd()], fullText: undefined, redacted: 0 };
   const messages = pieces.map((piece, index) => (index === 0 ? head : "") + escapeHtml(piece));
   return { messages, fullText: cut ? text : undefined, redacted: count };
 }
