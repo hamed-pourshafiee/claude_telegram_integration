@@ -1,15 +1,11 @@
 import { chmodSync, rmSync } from "node:fs";
-import { asFields } from "../shared/json.ts";
-import type { Log } from "../shared/log.ts";
 
-export interface BrokerInfo {
-  readonly pid: number;
-  readonly startedAt: Date;
-  /** The public part of the token: the bot's user id. */
-  readonly botId: number;
-  /** Secret.fingerprint() of the token, so ctl can tell whether .env still holds the same one. */
-  readonly tokenFingerprint: string;
-  readonly schema: number;
+/** What the broker answers on its socket. */
+export interface Routes {
+  health(): unknown;
+  /** Starts a pairing (plan 2.4): the answer holds the one-time code, for `ctl pair` to show. */
+  pair(): unknown;
+  hook(event: string, body: unknown): { readonly status: number; readonly body: unknown };
 }
 
 /** macOS allows 104 bytes for a Unix socket path, the final NUL included. */
@@ -19,7 +15,7 @@ const MAX_SOCKET_PATH = 103;
  * Serves the broker's HTTP API on its Unix socket (0600); there is no TCP port (design §5). A socket
  * file left by a crash is replaced, which is safe because the caller holds the single-instance lock.
  */
-export function startServer(socket: string, info: BrokerInfo, log: Log): Bun.Server<undefined> {
+export function startServer(socket: string, routes: Routes): Bun.Server<undefined> {
   const bytes = Buffer.byteLength(socket);
   if (bytes > MAX_SOCKET_PATH) {
     throw new Error(
@@ -27,50 +23,29 @@ export function startServer(socket: string, info: BrokerInfo, log: Log): Bun.Ser
     );
   }
   rmSync(socket, { force: true });
-  const server = Bun.serve({ unix: socket, fetch: (request) => route(request, info, log) });
+  const server = Bun.serve({ unix: socket, fetch: (request) => route(request, routes) });
   chmodSync(socket, 0o600);
   return server;
 }
 
-async function route(request: Request, info: BrokerInfo, log: Log): Promise<Response> {
+async function route(request: Request, routes: Routes): Promise<Response> {
   const { pathname } = new URL(request.url);
-  if (request.method === "GET" && pathname === "/health") return Response.json(health(info));
+  if (request.method === "GET" && pathname === "/health") return Response.json(routes.health());
+  if (request.method === "POST" && pathname === "/pair") return Response.json(routes.pair());
   const event = /^\/hook\/([A-Za-z]{1,40})$/.exec(pathname)?.[1];
   if (request.method === "POST" && event !== undefined) {
-    return hookEvent(event, await readJson(request), info, log);
+    const { status, body } = routes.hook(event, await readJson(request));
+    return Response.json(body, { status });
   }
   return Response.json({ ok: false, error: "not found" }, { status: 404 });
 }
 
-export function health(info: BrokerInfo) {
-  return {
-    ok: true,
-    pid: info.pid,
-    startedAt: info.startedAt.toISOString(),
-    uptimeSeconds: Math.round((Date.now() - info.startedAt.getTime()) / 1000),
-    botId: info.botId,
-    tokenFingerprint: info.tokenFingerprint,
-    schema: info.schema,
-    envKeys: Object.keys(process.env).sort(),
-  };
-}
-
-/** Plan 2.3: a hook reached the broker, which logs it. Later steps handle each event. */
-function hookEvent(event: string, body: unknown, info: BrokerInfo, log: Log): Response {
-  const session = asFields(body)?.session_id;
-  if (typeof session !== "string") {
-    return Response.json({ ok: false, error: "no session_id" }, { status: 400 });
-  }
-  log("hook.event", { hook: event, session });
-  return Response.json({ ok: true, pid: info.pid });
-}
-
-/** The request's JSON body, or undefined when it isn't JSON (answered as a missing session_id). */
+/** The request's JSON body, or undefined when it isn't JSON. */
 async function readJson(request: Request): Promise<unknown> {
   const text = await request.text();
   try {
     return JSON.parse(text);
   } catch {
-    return undefined; // hookEvent answers 400; the body may be Claude's text, so it isn't logged
+    return undefined; // the route answers 400; the body may be Claude's text, so it isn't logged
   }
 }

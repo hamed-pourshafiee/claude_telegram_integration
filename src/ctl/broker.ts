@@ -50,10 +50,13 @@ export async function brokerStatus(paths: StatePaths, envFile: string, log: Log)
     lines.push("disabled: hooks do nothing and nothing starts the broker ('bun run ctl enable')");
   }
   if (health) {
-    const { pid, uptimeSeconds, tokenFingerprint } = health;
+    const { pid, uptimeSeconds, tokenFingerprint, paired, pairingUntil } = health;
     lines.push(
       `running: pid ${pid}, up ${uptimeSeconds} s, ${whichToken(tokenFingerprint, envFile)}`,
     );
+    lines.push(paired === null ? "not paired: run 'bun run ctl pair'" : `paired with ${paired}`);
+    if (pairingUntil !== null)
+      lines.push(`a pairing code is waiting, until ${clock(pairingUntil)}`);
   } else {
     lines.push(
       disabled ? "not running" : "not running; the next hook or 'bun run ctl start' starts it",
@@ -89,6 +92,11 @@ function whichToken(fingerprint: string, envFile: string): string {
   } catch (error) {
     return `and .env can't be checked: ${messageOf(error)}`;
   }
+}
+
+/** An ISO time as the local hour and minute, such as 14:05. */
+export function clock(iso: string): string {
+  return new Date(iso).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
 }
 
 /** The pid in .state/broker.pid, if that process is this repo's broker (pids get reused). */

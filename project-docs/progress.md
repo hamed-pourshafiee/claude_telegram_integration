@@ -441,7 +441,81 @@ Committed as `8e554b1` after the user's go (2026-09-28).
   - A bug of mine, caught by the tests: a log field named `event` overwrote the line's own event
     name. The log type now forbids the reserved names, and the file log writes them last.
 
+Committed as `c6658db` after the user's go (2026-09-28).
+
+## 2.4 Pairing
+
+- **Date:** 2026-09-28
+- **Result:** passed: the gate, the Codex finding fixed, and the live check. Waiting for the user's
+  confirmation, then a local commit.
+- **Live check (the user, 2026-09-28):**
+  - The user ran `bun run ctl pair` and sent `/pair <code>` from their phone. The bot answered
+    "Paired ✅ This chat now gets the bridge's messages from Claude Code on your Mac, and only you can
+    answer them."
+  - `ctl status`: "running … with this repo's token" and "paired with" the user's account.
+  - The broker log shows the poller and the pairing starting together. A message sent before the
+    `/pair` was dropped as "not paired yet", then the attempt had outcome "paired". The log held ids
+    and outcomes only, no text and no code.
+- **Evidence:** `bun run typecheck` exit 0 · `bun run lint` "Checked 61 files … No fixes applied." ·
+  `bun test` "242 pass, 0 fail" (after the Codex fix below).
+- **Codex review** (`code-claude_telegram_integration-20260928-174212.md`), with `.env` locked (mode 0,
+  a read attempt failed) and unlocked to 600 afterwards. One finding (P2), confirmed by a test that
+  failed and fixed:
+  - The poller kept one offset whatever bot `.env` named. After a switch to another bot, the new bot
+    would start from the old bot's offset, and Telegram would skip its messages, `/pair` included; the
+    test showed another bot's first poll asking from offset 900.
+  - Offsets are now kept per bot id (`telegram.offset.<bot id>`), so another bot starts afresh, and a
+    token replaced for the same bot keeps its offset.
+  - Codex could not run the new tests: its sandbox forbids temp files and listening sockets.
+  - The pass check's tests (`tests/broker/gate.test.ts`, `pairing.test.ts`):
+    - a wrong code is refused, with the tries left, and five wrong codes cancel the pairing;
+    - an expired code, another user, and a group chat (even with the right code) are all refused;
+    - the right code in a private chat pairs its sender, who gets "Paired ✅".
+
+    After pairing, another user, a group, a bot and other kinds of update are dropped and logged
+    with ids only; the log never holds message text.
+  - `tests/broker/poller.test.ts`:
+    - updates are handed over in order, and the offset is recorded after each and used after a
+      restart;
+    - a failing update is logged and passed;
+    - a 409 waits 60 s and a 401 5 minutes;
+    - an abort ends a long poll.
+  - `tests/broker/app.test.ts` runs the broker's parts together against a fake Bot API:
+    - no polling before pairing;
+    - the `/pair` route starts polling, and the `/pair` message gets "Paired ✅", after which health
+      says who is paired;
+    - a paired broker polls at once after a restart.
+  - Positive controls, each failing the tests: a group chat let through (2 tests), any user heard
+    after pairing (2), codes that never expire (1), any code accepted (2).
+- **Built:**
+  - `src/broker/pairing.ts`:
+    - codes are 8 characters from 30 that can't be confused (30⁸ ≈ 6.6 × 10¹¹), shown as
+      XXXX-XXXX, valid 10 minutes, one use;
+    - only their SHA-256 is stored, compared in constant time;
+    - five wrong codes cancel the pairing;
+    - a new pairing replaces the paired user once it succeeds.
+  - `src/broker/gate.ts`: the decision for every update (design §5).
+  - `src/broker/poller.ts`: the only poller (F8), with the offset recorded after each update, and
+    backoff.
+  - `src/broker/app.ts`: the parts wired together. `POST /pair` starts a pairing, and `/health` now
+    says who is paired, whether a code is waiting and whether it polls.
+  - `ctl pair`; `ctl status` shows the pairing.
+- **Decisions (mine, open to change):**
+  - The broker polls Telegram only once someone is paired or a pairing is pending. There is nothing to
+    hear before that, and the process tests, which have a fake token and never pair, never reach the
+    real Bot API.
+  - A `/pair` gets an answer only while a pairing is pending (wrong code, tries left, cancelled);
+    otherwise it is dropped in silence like any stranger's message. In a group it is dropped and not
+    counted.
+  - The paired user's other messages are accepted and logged, nothing more yet; replies to Claude come
+    in phase 3.
+  - Until plan 3.2's inbox, an update is handled and then its offset recorded: a crash in between
+    would hand that one update over again. For pairing that is harmless, because the code is used up.
+    3.2 stores each update first, for at-most-once delivery (D7).
+
 ## Next
 
-After the user confirms 2.3 and it is committed, and after their go: **2.4 Pairing**. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
+After the user confirms 2.4 and it is committed, and after their go: **2.5 Formatter**, which needs
+O1 (ask it at the start of the step). The broker is running and paired; it polls Telegram while it
+runs. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
 (CLAUDE.md).

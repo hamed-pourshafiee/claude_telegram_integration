@@ -56,6 +56,7 @@ bun test               # bun:test, files in tests/
 bun run ctl doctor     # checks config.json, .env and the bot (getMe); never shows the token
 bun run ctl status     # is the broker running, with this repo's token? also: start | stop
 bun run ctl disable    # sets the disabled flag and stops the broker, until `ctl enable` (design §6)
+bun run ctl pair       # a one-time code (10 min) to send the bot as `/pair <code>`
 ```
 
 Tests that need a real broker, hook or ctl process run them in a throwaway copy of the repo

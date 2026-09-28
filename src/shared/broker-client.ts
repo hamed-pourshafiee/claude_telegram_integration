@@ -19,6 +19,12 @@ export interface BrokerHealth {
   readonly schema: number;
   /** The names of its environment variables, which should be only those of brokerEnv(). */
   readonly envKeys: readonly string[];
+  /** The paired Telegram user's name, or null before pairing (plan 2.4). */
+  readonly paired: string | null;
+  /** When the pending pairing code expires, or null. */
+  readonly pairingUntil: string | null;
+  /** Whether it polls Telegram, which it does once someone is paired or a pairing is pending. */
+  readonly polling: boolean;
 }
 
 /** How to start a broker: a Bun binary, the entry file and the bunfig.toml to load (F14). */
@@ -144,6 +150,7 @@ function parseHealth(value: unknown): BrokerHealth | undefined {
   const fields = asFields(value);
   if (fields?.ok !== true) return undefined;
   const { pid, startedAt, uptimeSeconds, botId, tokenFingerprint, schema, envKeys } = fields;
+  const { paired, pairingUntil, polling } = fields;
   if (
     typeof pid !== "number" ||
     typeof startedAt !== "string" ||
@@ -151,11 +158,25 @@ function parseHealth(value: unknown): BrokerHealth | undefined {
     typeof botId !== "number" ||
     typeof tokenFingerprint !== "string" ||
     typeof schema !== "number" ||
-    !Array.isArray(envKeys)
+    !Array.isArray(envKeys) ||
+    !(paired === null || typeof paired === "string") ||
+    !(pairingUntil === null || typeof pairingUntil === "string") ||
+    typeof polling !== "boolean"
   ) {
     return undefined;
   }
   const keys: readonly unknown[] = envKeys;
   const names = keys.filter((key): key is string => typeof key === "string");
-  return { pid, startedAt, uptimeSeconds, botId, tokenFingerprint, schema, envKeys: names };
+  return {
+    pid,
+    startedAt,
+    uptimeSeconds,
+    botId,
+    tokenFingerprint,
+    schema,
+    envKeys: names,
+    paired,
+    pairingUntil,
+    polling,
+  };
 }

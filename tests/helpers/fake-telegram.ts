@@ -2,7 +2,7 @@
 // request is recorded with the token from its URL.
 
 export type FakeAnswer =
-  | { readonly status?: number; readonly json: unknown }
+  | { readonly status?: number; readonly json: unknown; readonly delayMs?: number }
   | { readonly status: number; readonly text: string }
   | { readonly hang: true };
 
@@ -33,6 +33,7 @@ export function tooManyRequests(retryAfter: number): FakeAnswer {
 export class FakeTelegram {
   #received: Received[] = [];
   readonly #answers = new Map<string, FakeAnswer[]>();
+  readonly #fallbacks = new Map<string, FakeAnswer>();
   readonly #server = Bun.serve({
     port: 0,
     hostname: "127.0.0.1",
@@ -48,6 +49,11 @@ export class FakeTelegram {
     this.#answers.set(method, [...(this.#answers.get(method) ?? []), ...answers]);
   }
 
+  /** The answer for `method` once its queue is empty (instead of a 404), until the next reset. */
+  fallback(method: string, answer: FakeAnswer): void {
+    this.#fallbacks.set(method, answer);
+  }
+
   /** The requests for `method` since the last reset. */
   calls(method: string): Received[] {
     return this.#received.filter((received) => received.method === method);
@@ -56,6 +62,7 @@ export class FakeTelegram {
   reset(): void {
     this.#received = [];
     this.#answers.clear();
+    this.#fallbacks.clear();
   }
 
   stop(): void {
@@ -67,9 +74,11 @@ export class FakeTelegram {
     const method = match?.[2] ?? "";
     const token = decodeURIComponent(match?.[1] ?? "");
     this.#received.push({ method, token, body: await readBody(request) });
-    const answer = this.#answers.get(method)?.shift() ?? apiError(404, "Not Found");
+    const queued = this.#answers.get(method)?.shift();
+    const answer = queued ?? this.#fallbacks.get(method) ?? apiError(404, "Not Found");
     if ("hang" in answer) return new Promise<Response>(() => undefined);
     if ("text" in answer) return new Response(answer.text, { status: answer.status });
+    if (answer.delayMs !== undefined) await Bun.sleep(answer.delayMs);
     return Response.json(answer.json, { status: answer.status ?? 200 });
   }
 }

@@ -1,5 +1,5 @@
 // ctl, the bridge's command line. Run it from the repo: bun run ctl <command>.
-// Later steps add pair, install and uninstall.
+// Later steps add install and uninstall.
 import { join } from "node:path";
 import { BROKER_LAUNCH } from "../shared/broker-client.ts";
 import { fileLog } from "../shared/file-log.ts";
@@ -14,13 +14,14 @@ import {
   stopBroker,
 } from "./broker.ts";
 import { formatChecks, runDoctor } from "./doctor.ts";
+import { pairBot } from "./pair.ts";
 
 process.on("unhandledRejection", (reason) => {
   console.error("ctl: unhandled promise rejection:", reason);
   process.exit(1);
 });
 
-const USAGE = "Usage: bun run ctl doctor | start | stop | status | disable | enable";
+const USAGE = "Usage: bun run ctl doctor | start | stop | status | disable | enable | pair";
 
 async function main(args: readonly string[]): Promise<number> {
   const [command, ...rest] = args;
@@ -34,6 +35,7 @@ async function main(args: readonly string[]): Promise<number> {
     status: () => brokerStatus(STATE, ENV_FILE, log),
     disable: () => disableBridge(STATE, BROKER_LAUNCH, log),
     enable: () => enableBridge(STATE),
+    pair: () => pairBot(STATE, BROKER_LAUNCH, log),
   };
   const run = command === undefined ? undefined : commands[command];
   if (run === undefined) return usage();

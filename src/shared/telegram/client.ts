@@ -1,5 +1,6 @@
 import { errorCode } from "../errors.ts";
 import { type Log, noLog } from "../log.ts";
+import { pause } from "../pause.ts";
 import type { Secret } from "../secret.ts";
 import { refuseVerboseFetch, TelegramError, type TelegramErrorKind } from "./errors.ts";
 import {
@@ -220,23 +221,6 @@ export class TelegramClient {
     const secret = token.slice(token.indexOf(":") + 1);
     return secret.length >= 8 ? text.replaceAll(secret, "<token>") : text;
   }
-}
-
-/** Waits `ms`, or until `signal` aborts, so a cancel doesn't sit out a 429 wait; clears the timer. */
-function pause(ms: number, signal: AbortSignal | undefined): Promise<void> {
-  return new Promise((resolve) => {
-    if (signal?.aborted) {
-      resolve();
-      return;
-    }
-    const done = () => {
-      clearTimeout(timer);
-      signal?.removeEventListener("abort", done);
-      resolve();
-    };
-    const timer = setTimeout(done, ms);
-    signal?.addEventListener("abort", done, { once: true });
-  });
 }
 
 function json(value: unknown): () => string {

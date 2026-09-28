@@ -10,6 +10,7 @@ import { fileLog } from "../shared/file-log.ts";
 import { ENV_FILE, STATE } from "../shared/paths.ts";
 import { ensureStateDir, isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
+import { createApp } from "./app.ts";
 import { BrokerDb } from "./db.ts";
 import { acquireLock } from "./lock.ts";
 import { startServer } from "./server.ts";
@@ -39,17 +40,13 @@ function main(): void {
   refuseVerboseFetch(process.env);
   const token = loadBotToken(ENV_FILE);
   const db = BrokerDb.open(STATE.db);
-  const info = {
-    pid: process.pid,
-    startedAt: new Date(),
-    botId: Number(token.reveal().split(":")[0]),
-    tokenFingerprint: token.fingerprint(),
-    schema: db.schemaVersion,
-  };
-  const server = startServer(STATE.socket, info, log);
+  const shutdown = new AbortController();
+  const { routes } = createApp({ token, db, log, signal: shutdown.signal });
+  const server = startServer(STATE.socket, routes);
   writeFileSync(STATE.pid, `${process.pid}\n`);
-  log("broker.started", { schema: info.schema });
+  log("broker.started", { schema: db.schemaVersion });
   const stop = (reason: string) => {
+    shutdown.abort();
     void server.stop(true);
     db.close();
     rmSync(STATE.socket, { force: true });

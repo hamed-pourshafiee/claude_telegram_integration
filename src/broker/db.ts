@@ -53,6 +53,15 @@ export class BrokerDb {
       .run(key, value);
   }
 
+  deleteMeta(key: string): void {
+    this.#db.query("DELETE FROM meta WHERE key = ?").run(key);
+  }
+
+  /** Runs `work` in one transaction: all of its writes happen, or none. */
+  transaction<T>(work: () => T): T {
+    return this.#db.transaction(work)();
+  }
+
   close(): void {
     this.#db.close();
   }
