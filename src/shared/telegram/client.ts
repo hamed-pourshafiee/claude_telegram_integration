@@ -1,6 +1,7 @@
+import { errorCode } from "../errors.ts";
 import { type Log, noLog } from "../log.ts";
 import type { Secret } from "../secret.ts";
-import { errorCode, refuseVerboseFetch, TelegramError, type TelegramErrorKind } from "./errors.ts";
+import { refuseVerboseFetch, TelegramError, type TelegramErrorKind } from "./errors.ts";
 import {
   type Answer,
   type AnswerCallbackQueryParams,

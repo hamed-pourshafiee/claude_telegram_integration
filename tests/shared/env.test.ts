@@ -118,4 +118,11 @@ describe("a Secret never prints its value", () => {
   test("reveal() returns it", () => {
     expect(secret.reveal()).toBe(FAKE_TOKEN);
   });
+
+  test("fingerprint(): 16 hex digits, the same for the same value, different for another", () => {
+    expect(secret.fingerprint()).toMatch(/^[0-9a-f]{16}$/);
+    expect(new Secret(FAKE_TOKEN).fingerprint()).toBe(secret.fingerprint());
+    expect(new Secret(`${FAKE_TOKEN}x`).fingerprint()).not.toBe(secret.fingerprint());
+    expectNoLeak(secret.fingerprint());
+  });
 });

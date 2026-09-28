@@ -353,7 +353,95 @@ Committed as `345ddba` after the user's go (2026-09-28).
   - Timeouts (`TimeoutError`) and aborts (`AbortError`) don't carry the URL. A `FormData` body can be
     sent again on a retry.
 
+Committed as `8e554b1` after the user's go (2026-09-28).
+
+## 2.3 Broker skeleton
+
+- **Date:** 2026-09-28
+- **Result:** passed: the gate and the live check, then the Codex review's two findings fixed and
+  checked live again. Waiting for the user's confirmation, then a local commit.
+- **Evidence:** `bun run typecheck` exit 0 · `bun run lint` "Checked 50 files … No fixes applied." ·
+  `bun test` "218 pass, 0 fail" (after the Codex fixes below). No test broker was left running, and
+  the tests never started this repo's broker.
+  - The pass checks run as tests against a throwaway copy of the repo (`tests/helpers/repo-copy.ts`:
+    `src/`, `bunfig.toml` and a `.env` with a fake token); its broker, hooks and ctl run as real
+    processes:
+    - `ctl start` twice leaves one broker, and `/health` answers. Of two brokers started at the same
+      moment, one keeps running; the other logs "another broker holds the lock" and exits 0.
+    - After kill -9, the next hook from a served session starts a new broker. With the disabled flag,
+      `ctl disable` stops it, hooks don't start it and `ctl start` refuses; `ctl enable` undoes it.
+    - Hooks from two unrelated repos reach the same broker. One repo has a `.env` with another token
+      and a `bunfig.toml` whose preload writes a file; a control shows that both work when Bun runs
+      there without our flags. With our flags, the broker reports this repo's bot id, its environment
+      is exactly HOME, LOGNAME, PATH and USER, and the preload never ran (F13, F14).
+    - A hook for an unserved session, with `BUN_CONFIG_VERBOSE_FETCH` set, or with input that isn't
+      JSON exits 0 with no output; for bad input only its size is logged.
+  - Positive controls, each failing the tests: the lock always granted (3 tests), the broker
+    inheriting the session's environment (1), both disabled checks removed (1). Removing only the
+    hook's check changed nothing, because `ensureBroker` checks the flag too.
+  - Live check in this repo, 2026-09-28, with `bun run ctl` and hook calls made by hand:
+    - status "not running"; `start` → "started (pid 64222)"; `start` → "already running (pid 64222)",
+      one broker process; status "running … with this repo's token";
+    - after kill -9, a hook from `sandbox/hostile-repo` (its own `.env` with a fake token, a
+      `bunfig.toml` preload) started pid 64269, and a hook from `sandbox/plain-repo` reached the same
+      pid. The broker log has both sessions under 64269, and the preload's file was never written;
+    - `disable` → "stopped (pid 64269)"; a hook then started nothing; `start` refused; `enable`; the
+      next hook started pid 64802; `stop` → "stopped (pid 64802)", socket removed;
+    - `.state/` and `.state/logs/` are 0700; `broker.db`, `broker.lock` and `broker.log` are 0600.
+      Afterwards the broker was left stopped and the two test folders were removed.
+- **Built:**
+  - `src/broker/`: `main.ts` (umask 077, the disabled flag, the lock, the token, the database, the
+    server, a pid file, a clean stop on SIGTERM), `lock.ts`, `db.ts` (migrations by `user_version`;
+    schema 1 is a `meta` table), and `server.ts` (`GET /health`, and `POST /hook/<event>`, which only
+    logs for now).
+  - `src/hooks/main.ts`: every hook event. It does nothing when disabled, for an unserved session or
+    with bad input, and otherwise makes sure the broker runs and reports to it. It fails safe (D5).
+  - `src/shared/broker-client.ts` (health, calls, start on demand, the broker's environment),
+    `state.ts` (the `.state/` folder, the disabled flag), `file-log.ts` (JSON lines, 0600), `json.ts`.
+  - `ctl start | stop | status | disable | enable` (`src/ctl/broker.ts`).
+- **Codex review** (`code-claude_telegram_integration-20260928-084308.md`), with `.env` locked (mode 0,
+  a read attempt failed) and unlocked to 600 afterwards. Two findings (P2), each confirmed by a test
+  that failed on the old code (`tests/broker/disable-race.test.ts`), then fixed:
+  1. `ctl disable` during a broker's startup: after the broker had looked at the flag but before it
+     could be found, ctl found nothing and reported success, and the broker stayed up while disabled.
+     The test holds `broker.db` to keep a starting broker in that window. Now the broker looks at the
+     flag again once it can be found (socket and pid file), and then every second. ctl sets the flag
+     before it looks, so either ctl finds the broker or the broker sees the flag. A flag set by hand
+     now stops a running broker too.
+  2. `ctl status` compared bot ids, which stay the same when a token is replaced in BotFather, so a
+     broker still on the old token passed as "with this repo's token". `/health` now gives a
+     fingerprint of the whole token (the first 16 hex digits of its SHA-256), and status compares
+     that.
+  - Found along the way: `BrokerDb.open` set `busy_timeout` after `journal_mode`, so a busy database
+    failed the broker at once instead of making it wait; it is now set first.
+  - Codex could not run the process tests: its sandbox forbids temp files.
+  - Live again in this repo: `ctl status` says "with this repo's token" by fingerprint, with the real
+    token. A flag set by hand (`touch .state/disabled`) stopped the running broker within 1.5 s
+    ("broker.stopped", reason "disabled"). Then `ctl enable`; no broker running.
+- **Decisions (mine, open to change):**
+  - The single-instance lock is an exclusive SQLite lock on `.state/broker.lock`. The OS drops it
+    when the process dies, even after kill -9, so there is never a stale lock (tested).
+  - The broker runs detached in a session of its own (Bun's `detached`, which calls setsid), in the
+    repo folder, with only PATH, HOME, USER and LOGNAME, taken from the user database. Its stderr goes
+    to `.state/logs/broker.stderr.log`.
+  - `ctl disable` sets the flag, then stops the broker; `ctl enable` only clears the flag.
+  - `~/` in `config.json` means the home folder from the user database, not `$HOME`.
+  - A hook refuses to run while `BUN_CONFIG_VERBOSE_FETCH` is set: Bun would print its requests on
+    stdout, which Claude reads as the hook's output.
+  - The broker doesn't call Telegram yet (the poller comes with pairing, 2.4). `/health` gives the
+    bot id and a fingerprint of the token, so `ctl status` can say whether the broker uses the token
+    now in `.env` without showing it.
+- **Learned:**
+  - Bun's `detached: true` calls setsid: the child outlives its parent, gets ppid 1 and a process
+    group of its own, and receives only the environment passed to it.
+  - An exclusive SQLite lock (`locking_mode = EXCLUSIVE` plus a write) refuses a second process at
+    once with "database is locked", and a kill -9 of the holder frees it at once.
+  - A bun:sqlite `Database` that is garbage-collected releases its connection, so the broker keeps
+    the lock's connection in a module variable.
+  - A bug of mine, caught by the tests: a log field named `event` overwrote the line's own event
+    name. The log type now forbids the reserved names, and the file log writes them last.
+
 ## Next
 
-After the user confirms 2.2 and it is committed, and after the user's go: **2.3 Broker skeleton**.
-`.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews (CLAUDE.md).
+After the user confirms 2.3 and it is committed, and after their go: **2.4 Pairing**. `.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews
+(CLAUDE.md).

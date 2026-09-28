@@ -1,3 +1,5 @@
+import { asFields } from "../json.ts";
+
 // The parts of the Telegram Bot API (core.telegram.org/bots/api) that the bridge uses. Answers are
 // checked as they arrive, so the rest of the code can rely on these shapes.
 
@@ -97,14 +99,6 @@ export interface SendDocumentParams {
   readonly caption?: string;
   readonly parse_mode?: "HTML";
   readonly reply_parameters?: ReplyParameters;
-}
-
-export type Fields = Readonly<Record<string, unknown>>;
-
-export function asFields(value: unknown): Fields | undefined {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Fields)
-    : undefined;
 }
 
 export function parseUser(value: unknown): User | undefined {

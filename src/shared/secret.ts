@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { inspect } from "node:util";
 
 const MASK = "[secret]";
@@ -15,6 +16,11 @@ export class Secret {
 
   reveal(): string {
     return this.#value;
+  }
+
+  /** The first 16 hex digits of the value's SHA-256: tells two secrets apart without showing either. */
+  fingerprint(): string {
+    return createHash("sha256").update(this.#value).digest("hex").slice(0, 16);
   }
 
   toString(): string {

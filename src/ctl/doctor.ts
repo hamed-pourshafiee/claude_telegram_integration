@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { type Config, loadConfig, type Places } from "../shared/config.ts";
 import { loadBotToken, TOKEN_KEY } from "../shared/env.ts";
+import { messageOf } from "../shared/errors.ts";
 import type { Secret } from "../shared/secret.ts";
 import { TelegramClient } from "../shared/telegram/client.ts";
 import { TelegramError } from "../shared/telegram/errors.ts";
@@ -43,7 +44,7 @@ function configChecks(paths: DoctorPaths): Check[] {
   try {
     config = loadConfig(paths.configFile, paths);
   } catch (error) {
-    return [{ ok: false, name: "config.json", detail: describe(error) }];
+    return [{ ok: false, name: "config.json", detail: messageOf(error) }];
   }
   const show = (folders: readonly string[]) =>
     folders.length === 0 ? "none" : folders.map((path) => tilde(path, paths.home)).join(", ");
@@ -77,7 +78,7 @@ function tokenCheck(envFile: string): { check: Check; secret?: Secret } {
     const detail = `private to you; ${TOKEN_KEY} is shaped right (not shown)`;
     return { check: { ok: true, name: ".env", detail }, secret };
   } catch (error) {
-    return { check: { ok: false, name: ".env", detail: describe(error) } };
+    return { check: { ok: false, name: ".env", detail: messageOf(error) } };
   }
 }
 
@@ -96,12 +97,8 @@ async function telegramCheck(secret: Secret | undefined, options: DoctorOptions)
       const fix = "check it in BotFather: /mybots, your bot, API Token";
       return { ok: false, name, detail: `Telegram refused the token (401 Unauthorized); ${fix}` };
     }
-    return { ok: false, name, detail: describe(error) };
+    return { ok: false, name, detail: messageOf(error) };
   }
-}
-
-function describe(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 function tilde(path: string, home: string): string {

@@ -1,5 +1,4 @@
 import { ConfigError } from "../errors.ts";
-import { asFields } from "./types.ts";
 
 export type TelegramErrorKind =
   | "api"
@@ -50,11 +49,4 @@ export function refuseVerboseFetch(env: Readonly<Record<string, string | undefin
         "Unset it and run again.",
     );
   }
-}
-
-/** The error's code, such as ConnectionRefused, when it looks like one; otherwise its name. */
-export function errorCode(error: unknown): string {
-  const code = asFields(error)?.code;
-  if (typeof code === "string" && /^[A-Za-z_]{1,40}$/.test(code)) return code;
-  return error instanceof Error ? error.name : "unknown";
 }
