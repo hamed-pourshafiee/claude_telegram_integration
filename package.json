@@ -6,7 +6,8 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "biome check --error-on-warnings .",
-    "test": "bun test"
+    "test": "bun test",
+    "ctl": "bun src/ctl/main.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.14",

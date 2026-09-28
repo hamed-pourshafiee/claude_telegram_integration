@@ -1,0 +1,7 @@
+{
+  "serve": ["sandbox"],
+  "skip": [],
+  "entrypoints": ["claude-vscode", "cli"],
+  "presence": { "activeSeconds": 30, "awaySeconds": 180 },
+  "content": { "default": "ping-only", "pingOnly": [] }
+}

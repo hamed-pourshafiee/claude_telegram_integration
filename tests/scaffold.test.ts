@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { dirname, join } from "node:path";
+import { CONFIG_FILE, ENV_FILE, REPO_ROOT } from "../src/shared/paths.ts";
 
 // Anchored to this file, not the cwd (design §3).
 const repoRoot = dirname(import.meta.dir);
@@ -27,16 +28,26 @@ describe(".gitignore keeps secrets and runtime state out of git", () => {
     "sandbox/notes.md",
     "node_modules/typescript/package.json",
     "CLAUDE.local.md",
+    "config.json",
   ])("ignores %s", (path) => {
     expect(isIgnored(path)).toBe(true);
   });
 
-  test.each([".env.example", "CLAUDE.md", "src/broker/main.ts", "project-docs/progress.md"])(
-    "tracks %s",
-    (path) => {
-      expect(isIgnored(path)).toBe(false);
-    },
-  );
+  test.each([
+    ".env.example",
+    "config.example.json",
+    "CLAUDE.md",
+    "src/broker/main.ts",
+    "project-docs/progress.md",
+  ])("tracks %s", (path) => {
+    expect(isIgnored(path)).toBe(false);
+  });
+});
+
+test("src/shared/paths.ts anchors on the repo, not on the cwd", () => {
+  expect(REPO_ROOT).toBe(repoRoot);
+  expect(ENV_FILE).toBe(join(repoRoot, ".env"));
+  expect(CONFIG_FILE).toBe(join(repoRoot, "config.json"));
 });
 
 // implementation-plan §1: files ≤ 300 lines. Function length is checked by Biome.

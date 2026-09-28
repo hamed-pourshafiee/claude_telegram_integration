@@ -1,3 +1,7 @@
 # Hook commands run Bun in the session's directory, where Bun would otherwise load that repo's
 # bunfig.toml and run its preload scripts. They pass --config=<repo>/bunfig.toml to load this file
 # instead, so keep it free of preloads. It must exist: a missing --config file stops Bun at once.
+
+# No automatic .env loading, for bun run, bun test and the hooks alike (F13). The bot token is read
+# from <repo>/.env explicitly where it is needed, so it never lands in process.env.
+env = false

@@ -34,7 +34,11 @@ Read these completely before doing anything in a new session:
 - Reply in English, even when the user writes in Farsi.
 - Never ask the user to paste the bot token into the chat. When `.env` is needed, create it from
   `.env.example` (mode 0600) and tell the user to fill in the token themselves. Never print `.env` or read
-  it into the conversation either.
+  it into the conversation either. Search or scan for secrets only in tracked or staged files
+  (`git ls-files`, `git diff --cached`), never the whole working tree, which holds `.env`.
+- Codex reviews can read any file in the repo, and what they read goes to OpenAI. Run each one with
+  `.env` locked: `chmod 000 .env` right before it and `chmod 600 .env` right after, in the same command
+  with a trap so the unlock also runs if the review fails; then check the mode is 600 again.
 - Before any change to `~/.claude/settings.json`: back it up (to `.state/backups/`), show the user the
   exact entries to be added or removed, and wait for their OK.
 - If a doc turns out wrong or a spike fails, stop and propose the change to the docs before working
@@ -49,15 +53,19 @@ bun install            # dev dependencies (the network here is slow: allow a few
 bun run typecheck      # tsc --noEmit
 bun run lint           # biome check; warnings fail too
 bun test               # bun:test, files in tests/
+bun run ctl doctor     # checks config.json and .env; never shows the token
 ```
 
 ## Layout
 
 ```
-src/            hooks/ and broker/ (design §3); paths come from the script's own location, never the cwd
+src/            hooks/ and broker/ (design §3), ctl/ (command line), shared/ (config, .env, scope);
+                paths come from the script's own location, never the cwd
 tests/          bun:test
 scripts/        helper scripts
 project-docs/   design, plan, progress, spike findings
 sandbox/        gitignored; open a second VS Code window here to test hooks live
 .state/         gitignored runtime state: SQLite, broker.sock, logs, settings backups
+.env            gitignored, mode 600: the bot token; never read it into the conversation
+config.json     gitignored: your settings; config.example.json holds the defaults used without it
 ```

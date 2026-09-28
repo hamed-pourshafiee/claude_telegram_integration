@@ -224,8 +224,77 @@ Committed as `6133dd7` after the user's go (2026-09-28).
 - The spike code stays in `scripts/spikes/` as a reference until 2.7 replaces it, then it goes with its
   tests; the fixtures stay.
 
+Committed as `014439b` after the user's go (2026-09-28).
+
+## 2.1 Config and secrets
+
+- **Date:** 2026-09-28
+- **Result:** passed: the gate and the live check. Waiting for the user's confirmation, then a local
+  commit.
+- **Live check (the user, 2026-09-28):** the user put the token into `.env` with the hidden-input
+  command, then ran `bun run ctl doctor`: all seven lines ✓, the last "✓ .env private to you;
+  TELEGRAM_BOT_TOKEN is shaped right (not shown)". The token never appeared on screen or in the chat.
+- **Evidence:** `bun run typecheck` exit 0 · `bun run lint` "Checked 27 files … No fixes applied." ·
+  `bun test` "158 pass, 0 fail" (after the Codex fix below).
+  - The pass check's tests (`tests/shared/env.test.ts`, `tests/ctl/doctor.test.ts`) cover:
+    - no `.env`, a mode other users can read, a folder;
+    - no key, an empty value, the token on its own line;
+    - spaces, quotes, no colon, letters before the colon, a cut-off token, the key twice.
+
+    Each gives an error that says how to fix it, and no error or doctor line holds any 8-character
+    piece of the token.
+  - Positive control: making the error include the first 20 characters of the value failed 5 tests.
+  - `bun run ctl doctor` before `.env` existed: "✗ .env No .env file at …", exit 1. `.env` was then
+    created from the template with `umask 077`; `stat` shows mode 600 and `cmp` shows it equals the
+    template. It was never read. The doctor now says "✗ .env TELEGRAM_BOT_TOKEN in .env is empty.
+    Paste the token after the = sign.", exit 1.
+- **Built:**
+  - `src/shared/env.ts` reads the token only from `<repo>/.env`, never from `process.env` (F13), and
+    refuses a `.env` that other users can read. It returns a `Secret` (`src/shared/secret.ts`) that
+    prints as "[secret]" through `String()`, templates, JSON and `console.log`; only `reveal()` gives
+    the value.
+  - `src/shared/config.ts` reads `config.json`. Every setting is optional and the defaults fill in;
+    unknown or wrong settings are refused by name. Relative paths are under the repo, `~/` under home.
+  - `src/shared/scope.ts`: a session is served when its entrypoint is served and its
+    `CLAUDE_PROJECT_DIR`, symlinks resolved, is inside a served folder and not in a skipped one. The
+    recorded session that `cd`'d into `sandbox/` is not served (F15). A start folder that no longer
+    exists is not served. `contentModeFor` applies the content policy.
+  - `src/ctl/main.ts` with `ctl doctor`, which plan 6.1 grows: it shows the settings in effect and
+    whether `.env` holds a well-formed token, without showing the token.
+  - `bunfig.toml` has `env = false`.
+- **Decisions (mine, open to change):**
+  - `config.json` is gitignored, since it will name your folders. `config.example.json` is committed,
+    and a test keeps it equal to the defaults. Without `config.json` the defaults apply.
+  - Defaults:
+    - serve `sandbox/` only;
+    - entrypoints `claude-vscode` and `cli`, not `sdk-cli`: `claude -p` runs are scripted, with nobody
+      to reply;
+    - presence 30 s / 180 s (D4);
+    - content `ping-only` until O1 is decided at 2.5.
+  - `ctl doctor` starts now, because it is the only way to check the token without showing it.
+- **Decisions (the user, 2026-09-28):** Codex reviews 2.1 before the token goes into `.env`. From now
+  on every Codex review runs with `.env` locked (mode 000) and unlocked (600) right after; the rule is
+  in CLAUDE.md.
+- **Codex review** (`code-claude_telegram_integration-20260928-072222.md`), with `.env` locked (mode 0,
+  a read attempt failed) and unlocked to 600 afterwards:
+  - One finding (P2), confirmed with a test that failed and fixed. A session whose start folder was
+    deleted kept its path as spelled, while the configured folders were resolved. On macOS
+    (`/tmp` → `/private/tmp`) such a session got past the skip list and ping-only: `served: true`,
+    content `full`.
+  - Now a start folder that doesn't exist is not served and stays ping-only, and configured folders
+    that don't exist match nothing. The recorded-session tests now expand `~` to a real temp folder.
+  - Codex's own test run failed only because its read-only sandbox forbids temp folders (EPERM on
+    `mkdtemp`); typecheck and lint passed there.
+- **Learned:**
+  - `env = false` in `bunfig.toml` turns off Bun's automatic `.env` loading for `bun <file>`,
+    `bun run <script>` and `bun test`, and through `--config` from another folder (tested in a
+    scratch folder, with a control). Neither the tests nor `ctl` put the real token into
+    `process.env`, and the hooks get a second guard besides `--no-env-file`.
+  - Codex reviews (`codex review --uncommitted`) run shell commands that can read any file in the
+    repo, and what they read goes to OpenAI. Once `.env` holds the token, a review could leak it.
+
 ## Next
 
-After the user confirms 1.5 and it is committed, and after the user's go: **phase 2**, starting with
-**2.1 Config and secrets**: create `.env` from `.env.example` (0600) for the user to fill in; never ask
-for the token in chat.
+After the user confirms 2.1 and it is committed, and after the user's go: **2.2 Telegram client**.
+`.env` now holds the real token: scan only staged files, and lock `.env` during Codex reviews
+(CLAUDE.md).

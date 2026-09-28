@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Your settings (served folders, skip list); the template config.example.json is committed
+config.json
+
 # Runtime state: SQLite, broker socket, logs, settings backups
 .state/
 
