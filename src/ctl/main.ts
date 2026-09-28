@@ -9,7 +9,7 @@ process.on("unhandledRejection", (reason) => {
   process.exit(1);
 });
 
-function main(args: readonly string[]): number {
+async function main(args: readonly string[]): Promise<number> {
   if (args.length === 1 && args[0] === "doctor") {
     const paths = {
       envFile: ENV_FILE,
@@ -17,7 +17,7 @@ function main(args: readonly string[]): number {
       repoRoot: REPO_ROOT,
       home: homedir(),
     };
-    const checks = runDoctor(paths);
+    const checks = await runDoctor(paths);
     console.log(formatChecks(checks));
     return checks.every((check) => check.ok) ? 0 : 1;
   }
@@ -25,4 +25,4 @@ function main(args: readonly string[]): number {
   return 2;
 }
 
-process.exitCode = main(Bun.argv.slice(2));
+process.exitCode = await main(Bun.argv.slice(2));

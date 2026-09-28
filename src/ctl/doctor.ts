@@ -1,6 +1,9 @@
 import { existsSync } from "node:fs";
 import { type Config, loadConfig, type Places } from "../shared/config.ts";
 import { loadBotToken, TOKEN_KEY } from "../shared/env.ts";
+import type { Secret } from "../shared/secret.ts";
+import { TelegramClient } from "../shared/telegram/client.ts";
+import { TelegramError } from "../shared/telegram/errors.ts";
 
 export interface Check {
   readonly ok: boolean;
@@ -13,12 +16,18 @@ export interface DoctorPaths extends Places {
   readonly configFile: string;
 }
 
+export interface DoctorOptions {
+  /** The Bot API to ask; tests point it at a local fake. */
+  readonly apiBase?: string;
+}
+
 /**
- * Checks the setup and says what to fix. Later steps add their own checks (Telegram, the broker, the
- * hooks; plan 6.1). No check ever prints the token.
+ * Checks the setup and says what to fix. Later steps add their own checks (the broker, the hooks;
+ * plan 6.1). No check ever prints the token.
  */
-export function runDoctor(paths: DoctorPaths): Check[] {
-  return [...configChecks(paths), tokenCheck(paths.envFile)];
+export async function runDoctor(paths: DoctorPaths, options: DoctorOptions = {}): Promise<Check[]> {
+  const token = tokenCheck(paths.envFile);
+  return [...configChecks(paths), token.check, await telegramCheck(token.secret, options)];
 }
 
 export function formatChecks(checks: readonly Check[]): string {
@@ -62,17 +71,33 @@ function configChecks(paths: DoctorPaths): Check[] {
   ];
 }
 
-function tokenCheck(envFile: string): Check {
+function tokenCheck(envFile: string): { check: Check; secret?: Secret } {
   try {
-    loadBotToken(envFile);
+    const secret = loadBotToken(envFile);
+    const detail = `private to you; ${TOKEN_KEY} is shaped right (not shown)`;
+    return { check: { ok: true, name: ".env", detail }, secret };
   } catch (error) {
-    return { ok: false, name: ".env", detail: describe(error) };
+    return { check: { ok: false, name: ".env", detail: describe(error) } };
   }
-  return {
-    ok: true,
-    name: ".env",
-    detail: `private to you; ${TOKEN_KEY} is shaped right (not shown)`,
-  };
+}
+
+/** Asks Telegram who the bot is (getMe), which proves that the token works. */
+async function telegramCheck(secret: Secret | undefined, options: DoctorOptions): Promise<Check> {
+  const name = "telegram";
+  if (!secret) return { ok: false, name, detail: "not checked: .env has no usable token" };
+  try {
+    const where = options.apiBase === undefined ? {} : { apiBase: options.apiBase };
+    const bot = await new TelegramClient({ token: secret, timeoutMs: 10_000, ...where }).getMe();
+    if (!bot.is_bot)
+      return { ok: false, name, detail: "the token belongs to an account, not a bot" };
+    return { ok: true, name, detail: `the bot @${bot.username ?? bot.first_name} answers (getMe)` };
+  } catch (error) {
+    if (error instanceof TelegramError && error.code === 401) {
+      const fix = "check it in BotFather: /mybots, your bot, API Token";
+      return { ok: false, name, detail: `Telegram refused the token (401 Unauthorized); ${fix}` };
+    }
+    return { ok: false, name, detail: describe(error) };
+  }
 }
 
 function describe(error: unknown): string {

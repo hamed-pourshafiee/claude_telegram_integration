@@ -293,8 +293,67 @@ Committed as `014439b` after the user's go (2026-09-28).
   - Codex reviews (`codex review --uncommitted`) run shell commands that can read any file in the
     repo, and what they read goes to OpenAI. Once `.env` holds the token, a review could leak it.
 
+Committed as `345ddba` after the user's go (2026-09-28).
+
+## 2.2 Telegram client
+
+- **Date:** 2026-09-28
+- **Result:** passed: the gate and the live check. Waiting for the user's confirmation, then a local
+  commit.
+- **Live check (the user, 2026-09-28):** `bun run ctl doctor` showed all eight lines ✓, the new one
+  "✓ telegram the bot @… answers (getMe)" with the bot's name: the token in `.env` works against the
+  real Bot API, and the output held no token.
+- **Evidence:** `bun run typecheck` exit 0 · `bun run lint` "Checked 34 files … No fixes applied." ·
+  `bun test` "191 pass, 0 fail" (after the Codex fix below), with no request URL anywhere in the test
+  output.
+  - Against a local fake Bot API (`tests/helpers/fake-telegram.ts`):
+    - a 429 is retried after exactly its retry_after (2 → one wait of 2000 ms); one test really waits,
+      and retry_after 1 took at least 990 ms;
+    - after `maxRetries` 429 answers, or with a retry_after above 60 s, the call fails as "flood" and
+      carries the wait;
+    - 400, 401 and 409 are not retried. A non-JSON answer, a wrong shape, no connection, a timeout and
+      a cancel each give a `TelegramError`;
+    - no error (message, `String`, `Bun.inspect`, JSON) and no log line holds any 8-character piece of
+      the token, even when an answer quotes the URL, and no log line holds message text.
+  - Positive controls, each failing the tests: no wait before a retry (3 tests), the URL in a log line
+    (1), Bun's own error kept as the `cause` (1).
+- **Built:**
+  - `src/shared/telegram/client.ts`: `getMe`, `getUpdates` (messages and button presses only, long
+    polling), `sendMessage`, `editMessageText`, `answerCallbackQuery`, and `sendDocument`, which sends
+    a text as a `.md` file.
+  - `types.ts` checks the shape of every answer. A malformed update comes back as kind "other", so the
+    offset still moves past it.
+  - `errors.ts`: `TelegramError` (kind api, flood, network, timeout, cancelled or bad-answer), built
+    from safe parts only.
+  - `src/shared/log.ts`: log events take plain values only (ids, sizes, timings).
+  - `ctl doctor` now asks Telegram who the bot is (`getMe`); on a 401 it says to check the token in
+    BotFather.
+- **Codex review** (`code-claude_telegram_integration-20260928-075817.md`), with `.env` locked (mode 0,
+  a read attempt failed) and unlocked to 600 afterwards:
+  - One finding (P2), confirmed with a test that failed and fixed. A cancel during a 429 wait was
+    noticed only when the wait ended, up to 60 s later: with retry_after 1 and a cancel after 20 ms,
+    the call took 1,003 ms. The wait now ends as soon as the client's signal aborts, and its timer is
+    cleared; the same case takes under 500 ms.
+  - Its test run failed only because its sandbox forbids temp folders and listening sockets.
+- **Decisions (mine, open to change):**
+  - Only a 429 is retried, because Telegram did not process it. A network error or a 5xx may come
+    after the message arrived, and a retry could send it twice. The broker's poll loop retries
+    `getUpdates` itself (2.3).
+  - The client refuses to start while `BUN_CONFIG_VERBOSE_FETCH` is set (see Learned).
+  - The Bot API address is fixed in the code; only tests pass another one. It is never read from the
+    environment or `config.json`, where it could send the token elsewhere.
+- **Learned:**
+  - Bun's fetch errors keep the full URL, token included, in a `path` field. Their message is clean,
+    but `console.log(error)` prints the token, so the client never lets Bun's error out: it builds its
+    own.
+  - `BUN_CONFIG_VERBOSE_FETCH` (`curl`, `1`) prints every request URL. Unsetting it after Bun has
+    started does not turn it off, and setting it at runtime turns it on: a test that set it made the
+    rest of the test run print URLs, with the fake token. The refusal test now runs in a process of
+    its own.
+  - Timeouts (`TimeoutError`) and aborts (`AbortError`) don't carry the URL. A `FormData` body can be
+    sent again on a retry.
+
 ## Next
 
-After the user confirms 2.1 and it is committed, and after the user's go: **2.2 Telegram client**.
-`.env` now holds the real token: scan only staged files, and lock `.env` during Codex reviews
-(CLAUDE.md).
+After the user confirms 2.2 and it is committed, and after the user's go: **2.3 Broker skeleton**.
+`.env` holds the real token: scan only staged files, and lock `.env` during Codex reviews (CLAUDE.md).

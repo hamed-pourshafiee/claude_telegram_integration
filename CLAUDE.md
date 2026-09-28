@@ -53,14 +53,14 @@ bun install            # dev dependencies (the network here is slow: allow a few
 bun run typecheck      # tsc --noEmit
 bun run lint           # biome check; warnings fail too
 bun test               # bun:test, files in tests/
-bun run ctl doctor     # checks config.json and .env; never shows the token
+bun run ctl doctor     # checks config.json, .env and the bot (getMe); never shows the token
 ```
 
 ## Layout
 
 ```
-src/            hooks/ and broker/ (design §3), ctl/ (command line), shared/ (config, .env, scope);
-                paths come from the script's own location, never the cwd
+src/            hooks/ and broker/ (design §3), ctl/ (command line), shared/ (config, .env, scope,
+                telegram/ client); paths come from the script's own location, never the cwd
 tests/          bun:test
 scripts/        helper scripts
 project-docs/   design, plan, progress, spike findings
