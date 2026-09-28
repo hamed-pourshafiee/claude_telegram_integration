@@ -1,6 +1,7 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 2, after Codex review (§8) · 2026-09-27 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 3, F14 added in plan step 1.2 (rev. 2: Codex review, §8) · 2026-09-28 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -41,6 +42,7 @@ them before anything is built on them.
 | F11 | `~/.claude/hooks/codex-checkpoint-code.sh` (Stop, 20 s timeout) blocks once per working-tree state, only for changes made during the session (`codex-baseline.sh` records the state at SessionStart), and makes Claude ask an `AskUserQuestion`. | read 2026-09-27 |
 | F12 | `ioreg -c IOHIDSystem` → `HIDIdleTime` is the time since the last keyboard or mouse input, in **nanoseconds**. | observed |
 | F13 | Bun loads `.env` from the current directory automatically; `bun --no-env-file` turns that off. | tested |
+| F14 | Bun also loads `bunfig.toml` from the current directory and runs its `preload` scripts, even with `--no-env-file`. `--config=<file>` loads that file instead; a missing file stops Bun with exit 1. | tested 2026-09-28 (plan 1.2) |
 
 ## 3. Architecture
 
@@ -48,7 +50,7 @@ them before anything is built on them.
  Claude Code sessions (VS Code panel, terminal), in any repo
    │  hook events (JSON on stdin)
    ▼
- <repo>/src/hooks/   short-lived: bun --no-env-file <repo>/src/hooks/main.ts <event>
+ <repo>/src/hooks/   short-lived: bun --no-env-file --config=<repo>/bunfig.toml <repo>/src/hooks/main.ts <event>
    │  HTTP over a Unix socket: <repo>/.state/broker.sock (0600)
    ▼
  <repo>/src/broker/  one long-running Bun process, started with a minimal environment
@@ -63,7 +65,7 @@ them before anything is built on them.
 ```
 
 `<repo>` is this directory. Every path comes from the script's own location, never from the session's
-current directory (F10, F13). `ctl install` wires the hooks into `~/.claude/settings.json`, the only file
+current directory (F10, F13, F14). `ctl install` wires the hooks into `~/.claude/settings.json`, the only file
 changed outside this repo:
 
 | Event | Matcher | Runs | Job |
@@ -153,8 +155,9 @@ Open, needed at the plan step shown:
   logged.
 - The token lives only in `<repo>/.env` (0600, gitignored) and is scrubbed from logs. The socket is 0600
   inside a 0700 `.state/`, and there is no TCP port.
-- Hooks run with `--no-env-file` and the broker with a minimal environment, so another repo's `.env` or a
-  stray variable never reaches our processes (F13).
+- Hooks run with `--no-env-file --config=<repo>/bunfig.toml` and the broker with a minimal environment,
+  so another repo's `.env`, its `bunfig.toml` preload or a stray variable never reaches our processes
+  (F13, F14).
 - Outbound text is redacted and capped (O1). Logs hold ids and sizes, not message text.
 - Relayed replies are labelled as coming from Telegram, and only our hook can produce them.
 - Remote approvals are opt-in, Allow once only, bound to what you saw, and audited (O2).

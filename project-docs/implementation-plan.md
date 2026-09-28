@@ -1,9 +1,9 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 3 (hooks limited to `sandbox/` while building; progress log) · 2026-09-27 · Repo:
+Status: rev. 4 (F14: hooks pin Bun's config; the sandbox skips our CLAUDE.md) · 2026-09-28 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F13), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F14), architecture and
 flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -41,7 +41,8 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
 - **1.2 Spike S1: wake an idle VS Code session.** A throwaway Stop hook (`asyncRewake`, timeout 900)
   exits at once unless the session's cwd is inside `sandbox/`; there it sleeps 60 s, then exits 2 with
   "SPIKE: reply with the word PONG". Settings are backed up first. You test in a second VS Code window
-  opened on `sandbox/`.
+  opened on `sandbox/`, whose `.claude/settings.json` excludes `<repo>/CLAUDE.md` (`claudeMdExcludes`),
+  so the test session sees only your global CLAUDE.md, as a session in any other repo would.
   **Pass:** about 60 s after a turn ends, the idle panel wakes by itself and Claude answers PONG, and
   the panel stays usable during the wait.
 
@@ -84,8 +85,9 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   flag; `ctl start|stop|status|disable|enable`. **Pass:**
   - starting it twice leaves one process, and health is OK;
   - a killed broker is restarted by the next hook, but not while disabled;
-  - sessions in two unrelated repos, one with a `.env` that sets `TELEGRAM_BOT_TOKEN`, reach the same
-    broker, and it uses this repo's token.
+  - sessions in two unrelated repos, one with a `.env` that sets `TELEGRAM_BOT_TOKEN` and a `bunfig.toml`
+    with a `preload`, reach the same broker; it uses this repo's token, and none of that repo's code
+    runs (F13, F14).
 - **2.4 Pairing.** `ctl pair` prints a one-time code (valid 10 min). You send `/pair <code>` to the bot,
   and from then on only your Telegram user id is accepted, in a private chat; everything else is dropped
   and logged. **Pass:** tests reject a wrong or expired code, another user and a group chat; live, the
@@ -105,7 +107,8 @@ flows 1–4, decisions (D1–D7, open O1–O3), security, rollback, risks and th
   - Skipped: subagents (`agent_id` set), entrypoints not served (per S3), repos in the skip list. Running
     background tasks are listed in the message, never a reason to skip.
   - `ctl install` backs up settings, adds tagged entries idempotently and writes atomically. The entries
-    call Bun by absolute path, because the VS Code extension's `PATH` may not include `~/.bun/bin`.
+    call Bun by absolute path, because the VS Code extension's `PATH` may not include `~/.bun/bin`, with
+    `--no-env-file --config=<repo>/bunfig.toml` (F13, F14).
     `ctl uninstall` removes only those entries.
 
   **Pass:**

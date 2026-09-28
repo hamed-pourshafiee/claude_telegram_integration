@@ -1,0 +1,3 @@
+# Hook commands run Bun in the session's directory, where Bun would otherwise load that repo's
+# bunfig.toml and run its preload scripts. They pass --config=<repo>/bunfig.toml to load this file
+# instead, so keep it free of preloads. It must exist: a missing --config file stops Bun at once.
