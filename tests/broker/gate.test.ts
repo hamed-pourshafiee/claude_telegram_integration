@@ -156,6 +156,19 @@ describe("after pairing, only the paired user in a private chat is heard", () =>
     expect(presses).toEqual([]);
   });
 
+  test("a permission's Allow once pressed by another account is ignored (phase 5, D9)", async () => {
+    pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+    const press = {
+      id: "cb2",
+      from: stranger,
+      data: "ask:0a1b2c3d:0:0",
+      message: { message_id: 6, chat: privateChat(you.id) },
+    };
+    await handle({ update_id: 53, kind: "callback_query", callback_query: press });
+    expect(reasons()).toEqual(["not the paired user"]);
+    expect(presses).toEqual([]);
+  });
+
   test("before any pairing, every message is dropped", async () => {
     await handle(message(you, privateChat(you.id), "hello"));
     expect(reasons()).toEqual(["not paired yet"]);

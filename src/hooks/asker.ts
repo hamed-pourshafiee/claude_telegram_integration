@@ -20,6 +20,15 @@ export interface AskBody {
   readonly claude_pid: number;
 }
 
+/** Why a waiting hook stopped without the broker knowing: it hears of it now (plan 4.1). */
+export const UNTOLD: ReadonlySet<string> = new Set([
+  "terminated",
+  "claude gone",
+  "stopped before confirming",
+  "confirm failed",
+  "bad answer",
+]);
+
 export type AskResult =
   | { readonly kind: "answers"; readonly answers: Readonly<Record<string, string>> }
   | { readonly kind: "none"; readonly why: string };

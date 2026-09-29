@@ -2,9 +2,10 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Answer } from "../../src/broker/answer.ts";
+import { askWhere } from "../../src/broker/ask-calls.ts";
 import { AskChat } from "../../src/broker/ask-chat.ts";
 import { AskMessages } from "../../src/broker/ask-messages.ts";
-import { AskRelay, askWhere } from "../../src/broker/ask-relay.ts";
+import { AskRelay } from "../../src/broker/ask-relay.ts";
 import { Asks } from "../../src/broker/asks.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import type { Notice } from "../../src/broker/notices.ts";
@@ -12,12 +13,13 @@ import type { NoticeOf } from "../../src/broker/notifier.ts";
 import type { Mode, Snapshot, State } from "../../src/broker/presence.ts";
 import { label, type Session, Sessions } from "../../src/broker/sessions.ts";
 import { parseConfig } from "../../src/shared/config.ts";
-import { noLog } from "../../src/shared/log.ts";
+import { type LogFields, noLog } from "../../src/shared/log.ts";
 import type {
   AnswerCallbackQueryParams,
   EditMessageReplyMarkupParams,
   EditMessageTextParams,
   InlineKeyboardButton,
+  SendDocumentParams,
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
 
@@ -46,6 +48,8 @@ const config = parseConfig(
 export interface PostedQuestion extends Notice {
   readonly rows: readonly (readonly InlineKeyboardButton[])[];
   readonly messageId: number;
+  /** Sent whole, never cut (a permission prompt, D9). */
+  readonly whole: boolean;
 }
 
 export interface AskHarness {
@@ -62,6 +66,9 @@ export interface AskHarness {
   readonly markups: EditMessageReplyMarkupParams[];
   readonly toasts: AnswerCallbackQueryParams[];
   readonly sent: SendMessageParams[];
+  readonly documents: SendDocumentParams[];
+  /** The audit log's lines (D9): event and fields. */
+  readonly audited: { readonly event: string; readonly fields: LogFields }[];
   readonly hurried: () => boolean;
   /** You're now in `state`: presence tells the chat side, as in the broker. */
   readonly be: (state: State, mode?: Mode) => void;
@@ -98,19 +105,10 @@ export function askHarness(
   const pairing = { pairedUser: () => ({ id: CHAT, name: "Hamed (@someone)" }) };
   const where = askWhere({ pairing, presence, config });
   const onLocal = (ask: Parameters<AskChat["localNow"]>[0]) => chat.localNow(ask);
-  const relay = new AskRelay({
-    sessions,
-    asks,
-    messages,
-    where,
-    presence,
-    log: noLog,
-    onLocal,
-    holdMs: 60_000,
-    alive: (pid) => !dead.has(pid),
-  });
-  const telegram = record.parts.telegram;
-  const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log: noLog });
+  const common = { sessions, asks, messages, presence, log: noLog, audit: record.audit };
+  const alive = (pid: number) => !dead.has(pid);
+  const relay = new AskRelay({ ...common, where, onLocal, holdMs: 60_000, alive });
+  const chat = new AskChat({ ...common, relay, telegram: record.parts.telegram });
   return {
     db,
     sessions,
@@ -143,7 +141,10 @@ function recorder(editMs: number) {
     markups: [] as EditMessageReplyMarkupParams[],
     toasts: [] as AnswerCallbackQueryParams[],
     sent: [] as SendMessageParams[],
+    documents: [] as SendDocumentParams[],
+    audited: [] as { event: string; fields: LogFields }[],
   };
+  const audit = (event: string, fields: LogFields) => lists.audited.push({ event, fields });
   let messageId = 100;
   const message = (chatId: number) => ({
     message_id: 1,
@@ -151,10 +152,17 @@ function recorder(editMs: number) {
     chat: { id: chatId, type: "private" },
   });
   const notifier = {
-    post: (_chat: number, _kind: string, session: Session, noticeOf: NoticeOf, rows = []) => {
+    post: (
+      _chat: number,
+      _kind: string,
+      session: Session,
+      noticeOf: NoticeOf,
+      rows = [],
+      options: { readonly whole?: boolean } = {},
+    ) => {
       messageId += 1;
       const notice = noticeOf(label(session), "full");
-      lists.posted.push({ ...notice, rows, messageId });
+      lists.posted.push({ ...notice, rows, messageId, whole: options.whole === true });
       return Promise.resolve([{ messageId, html: `<b>${notice.header}</b>` }]);
     },
     send: (_kind: string, session: Session, noticeOf: NoticeOf) => {
@@ -180,6 +188,10 @@ function recorder(editMs: number) {
       lists.toasts.push(params);
       return Promise.resolve();
     },
+    sendDocument: (params: SendDocumentParams) => {
+      lists.documents.push(params);
+      return Promise.resolve(message(params.chat_id));
+    },
   };
-  return { lists, parts: { notifier, telegram } };
+  return { lists, parts: { notifier, telegram }, audit };
 }

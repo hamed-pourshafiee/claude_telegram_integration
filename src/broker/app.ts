@@ -1,12 +1,13 @@
 import type { Config } from "../shared/config.ts";
-import type { Log } from "../shared/log.ts";
+import { type Log, noLog } from "../shared/log.ts";
 import type { StatePaths } from "../shared/paths.ts";
 import type { Secret } from "../shared/secret.ts";
 import { TelegramClient } from "../shared/telegram/client.ts";
 import type { Update } from "../shared/telegram/types.ts";
+import { askWhere } from "./ask-calls.ts";
 import { AskChat } from "./ask-chat.ts";
 import { AskMessages } from "./ask-messages.ts";
-import { AskRelay, askWhere } from "./ask-relay.ts";
+import { AskRelay } from "./ask-relay.ts";
 import { type Ask, Asks } from "./asks.ts";
 import { runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
@@ -30,6 +31,8 @@ export interface AppDeps {
   readonly token: Secret;
   readonly db: BrokerDb;
   readonly log: Log;
+  /** Every step of a permission prompt relayed to Telegram (D9). */
+  readonly audit?: Log;
   readonly config: Config;
   /** Where hooks leave cancels and ends while no broker runs (plan 3.1). */
   readonly paths: StatePaths;
@@ -70,7 +73,8 @@ export function createApp(deps: AppDeps): App {
   const link = (chat: number, messageId: number, session: Session, kind: string) =>
     outbox.link(chat, messageId, { sessionId: session.id, generation: session.generation, kind });
   const notifier = new Notifier({ telegram, pairing, presence, config, log, fullTexts, link });
-  const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, notifier });
+  const audit = deps.audit ?? noLog;
+  const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, audit, notifier });
   const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
   const { relay, router } = replyParts(parts);
   const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, asks: ask.relay, log });
@@ -133,6 +137,7 @@ interface AskParts {
   readonly presence: Presence;
   readonly config: Config;
   readonly log: Log;
+  readonly audit: Log;
   readonly notifier: Notifier;
 }
 
@@ -140,13 +145,14 @@ interface AskParts {
  * The parts for Claude's questions (plan 4.1): their hooks' side, their messages, and your side, which
  * hears of every change of presence (flow 3).
  */
-function askParts({ db, sessions, telegram, pairing, presence, config, log, notifier }: AskParts) {
+function askParts(parts: AskParts) {
+  const { db, sessions, telegram, pairing, presence, config, log, audit, notifier } = parts;
   const asks = new Asks(db);
   const messages = new AskMessages({ asks, notifier, telegram, log });
   const where = askWhere({ pairing, presence, config });
   const onLocal = (ask: Ask) => chat.localNow(ask);
-  const relay = new AskRelay({ sessions, asks, messages, where, presence, log, onLocal });
-  const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log });
+  const relay = new AskRelay({ sessions, asks, messages, where, presence, log, onLocal, audit });
+  const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log, audit });
   presence.watch((now, before) => chat.presenceChanged(now, before));
   return { relay, chat };
 }

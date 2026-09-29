@@ -88,9 +88,9 @@ export class Notifier {
   }
 
   /**
-   * Sends a notice to `chat` whatever your presence: redacted, cut and formatted (D8), each message
-   * linked to its session. The last message carries `rows` of buttons, and the 📄 one when the text was
-   * cut. What was sent, in order.
+   * Sends a notice to `chat` whatever your presence: redacted, cut (unless `whole`) and formatted (D8),
+   * each message linked to its session. The last message carries `rows` of buttons, and the 📄 one when
+   * the text was cut. What was sent, in order.
    */
   async post(
     chat: number,
@@ -98,11 +98,14 @@ export class Notifier {
     session: Session,
     noticeOf: NoticeOf,
     rows: readonly (readonly InlineKeyboardButton[])[] = [],
+    options: { readonly whole?: boolean } = {},
   ): Promise<Posted[]> {
     const { config, log } = this.#deps;
     const mode = contentModeFor(config, session.projectDir);
     const notice = noticeOf(label(session), mode);
-    const reply = formatReply(notice.header, notice.body, config.content.maxChars);
+    // Whole: never cut, as a permission prompt must be shown (D9); its caller keeps it short enough.
+    const maxChars = options.whole === true ? Number.MAX_SAFE_INTEGER : config.content.maxChars;
+    const reply = formatReply(notice.header, notice.body, maxChars);
     const full = reply.fullText === undefined ? [] : [this.#button(reply.fullText, session)];
     const keyboard = [...rows, ...full];
     const posted: Posted[] = [];

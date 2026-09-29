@@ -57,7 +57,8 @@ describe("our entries (design §3)", () => {
       "SessionEnd",
     ]);
     for (const [event, [group]] of Object.entries(groups)) {
-      const flag = event === "Stop" || event === "PreToolUse" ? " --wait" : "";
+      const waits = ["Stop", "PreToolUse", "PermissionRequest"];
+      const flag = waits.includes(event) ? " --wait" : "";
       expect(group?.hooks).toEqual([
         expect.objectContaining({
           type: "command",
@@ -92,6 +93,17 @@ describe("our entries (design §3)", () => {
     expect(() => hookGroups("/Users/some one/bun", repoRoot)).toThrow("shell quoting");
     expect(() => hookGroups(bun, "relative/path")).toThrow("shell quoting");
   });
+});
+
+test("phase 5: the PermissionRequest hook waits for your decision, for every tool (it picks)", () => {
+  const groups = hookGroups(bun, repoRoot);
+  expect(groups.PermissionRequest?.[0]).not.toHaveProperty("matcher");
+  expect(groups.PermissionRequest?.[0]?.hooks).toEqual([
+    expect.objectContaining({ timeout: 43_200 }),
+  ]);
+  expect(groups.PermissionRequest?.[0]?.hooks).not.toEqual([
+    expect.objectContaining({ async: true }),
+  ]);
 });
 
 describe("install and uninstall", () => {

@@ -1,6 +1,7 @@
 import type { ContentMode } from "../shared/config.ts";
 import type { BackgroundTask } from "../shared/hook-input.ts";
 import { asFields, type Fields } from "../shared/json.ts";
+import { operationTitle } from "./operation.ts";
 import { type AskInput, questionBody } from "./questions.ts";
 
 /** A notice before formatting: a header (bold, one line) and a body, which may be cut (D8). */
@@ -62,6 +63,10 @@ export function askNotice(label: string, input: AskInput, index: number): Notice
   if (input.plan !== undefined) {
     return { header: `📋 ${label} has a plan ready`, body: questionBody(input, index) };
   }
+  if (input.permission !== undefined) {
+    const header = `🔐 ${label} ${operationTitle(input.permission)}`;
+    return { header, body: questionBody(input, index) };
+  }
   const count = input.questions.length;
   const of = count > 1 ? ` (${index + 1} of ${count})` : "";
   return { header: `❓ ${label} asks${of}`, body: questionBody(input, index) };
@@ -76,6 +81,13 @@ export function waitingNotice(
   input: AskInput | undefined,
   mode: ContentMode,
 ): Notice {
+  const permission = input?.permission;
+  if (permission !== undefined) {
+    const header = `🔐 ${label} is waiting for your permission at the computer`;
+    const what =
+      mode === "full" ? describeTool(permission.tool, permission.input) : permission.tool;
+    return { header, body: `${what}\n\n${AT_THE_MAC}` };
+  }
   const plan = input?.plan !== undefined;
   const what = plan ? "a plan" : "a question";
   const header = `${plan ? "📋" : "❓"} ${label} has ${what} waiting at the computer`;

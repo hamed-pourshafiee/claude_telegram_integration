@@ -1,30 +1,34 @@
 import type { Log } from "../shared/log.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { Ask, Asks } from "./asks.ts";
-import { escapeHtml } from "./format.ts";
+import { escapeHtml, formatReply } from "./format.ts";
 import { askNotice, waitingNotice } from "./notices.ts";
-import type { Notifier } from "./notifier.ts";
-import { questionButtons } from "./questions.ts";
-import type { Session } from "./sessions.ts";
+import type { NoticeOf, Notifier } from "./notifier.ts";
+import { needsFile, operationFile } from "./operation.ts";
+import { type AskInput, PERMISSION_HOW, questionButtons } from "./questions.ts";
+import { label, type Session } from "./sessions.ts";
 
 export interface AskMessagesDeps {
   readonly asks: Asks;
   readonly notifier: Pick<Notifier, "post" | "send">;
   readonly telegram: Pick<
     TelegramClient,
-    "sendMessage" | "editMessageText" | "editMessageReplyMarkup"
+    "sendMessage" | "sendDocument" | "editMessageText" | "editMessageReplyMarkup"
   >;
   readonly log: Log;
 }
 
 /** How a call left Telegram, as its messages then say. */
-export type Settled = "moved" | "withdrawn" | "lost";
+export type Settled = "moved" | "atMac" | "withdrawn" | "lost";
 
 const SETTLED: Readonly<Record<Settled, string>> = {
   moved: "🖥 Moved to the Mac: answer it there.",
+  atMac: "🖥 Answered at the Mac.",
   withdrawn: "⏹ No longer asked: Claude stopped waiting at the Mac.",
   lost: "⚠️ Claude stopped waiting before your answers went in, so they weren't used.",
 };
+/** A permission prompt longer than this many messages goes as a file. */
+const MAX_MESSAGES = 4;
 /** Telegram's limit for a message's text. */
 const MAX_TEXT = 4096;
 /** An answer shown under its question is cut to this. */
@@ -47,6 +51,7 @@ export class AskMessages {
     const { asks, notifier } = this.#deps;
     const input = ask.input;
     if (input === undefined) return;
+    if (input.permission !== undefined) return this.#postPermission(ask, session, chat, input);
     for (const [index, question] of input.questions.entries()) {
       const rows = questionButtons(ask.id, index, question, []);
       const posted = await notifier.post(
@@ -60,6 +65,36 @@ export class AskMessages {
       if (last !== undefined) {
         asks.shown(ask.id, index, { chatId: chat, messageId: last.messageId, html: last.html });
       }
+    }
+  }
+
+  /**
+   * A permission prompt, never shortened (D9): in as many messages as it takes, up to four. Beyond that,
+   * or with a line that would end its code block early, the operation goes as a file, and the buttons
+   * under a short note.
+   */
+  async #postPermission(ask: Ask, session: Session, chat: number, input: AskInput): Promise<void> {
+    const { asks, notifier, telegram } = this.#deps;
+    const [question] = input.questions;
+    const permission = input.permission;
+    if (question === undefined || permission === undefined) return;
+    const rows = questionButtons(ask.id, 0, question, []);
+    const notice = askNotice(label(session), input, 0);
+    const whole = formatReply(notice.header, notice.body, Number.MAX_SAFE_INTEGER);
+    let noticeOf: NoticeOf = () => notice;
+    if (needsFile(permission) || whole.messages.length > MAX_MESSAGES) {
+      const content = operationFile(permission);
+      const filename = `operation-${permission.hash}.txt`;
+      await telegram.sendDocument({ chat_id: chat, filename, content });
+      const note = `The whole operation is in the file above: ${content.length} characters.`;
+      noticeOf = () => ({ header: notice.header, body: `${note}\n\n${PERMISSION_HOW}` });
+    }
+    const posted = await notifier.post(chat, "permission", session, noticeOf, rows, {
+      whole: true,
+    });
+    const last = posted.at(-1);
+    if (last !== undefined) {
+      asks.shown(ask.id, 0, { chatId: chat, messageId: last.messageId, html: last.html });
     }
   }
 

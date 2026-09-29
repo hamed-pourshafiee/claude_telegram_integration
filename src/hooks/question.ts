@@ -6,21 +6,12 @@ import type { Log } from "../shared/log.ts";
 import { HOME_DIR } from "../shared/paths.ts";
 import { PLAN_TOOL, planDecision } from "../shared/plan.ts";
 import { isInside } from "../shared/scope.ts";
-import { askBroker } from "./asker.ts";
+import { askBroker, UNTOLD } from "./asker.ts";
 import type { HookContext } from "./events.ts";
 
 const QUESTION_TOOL = "AskUserQuestion";
 /** A plan file larger than this is left to the dialog. */
 const MAX_PLAN_BYTES = 1_000_000;
-
-/** Why a question hook stopped without the broker knowing: it hears of it now (plan 4.1). */
-const UNTOLD: ReadonlySet<string> = new Set([
-  "terminated",
-  "claude gone",
-  "stopped before confirming",
-  "confirm failed",
-  "bad answer",
-]);
 
 /**
  * The question hook (PreToolUse on AskUserQuestion and ExitPlanMode, flow 3). Installed with --wait,

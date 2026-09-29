@@ -19,6 +19,8 @@ import { startServer } from "./server.ts";
 process.umask(0o077);
 ensureStateDir(STATE);
 const log = fileLog(join(STATE.logs, "broker.log"), "broker");
+/** Every step of a permission prompt relayed to Telegram (D9). */
+const audit = fileLog(join(STATE.logs, "audit.log"), "audit");
 
 process.on("unhandledRejection", (reason) => {
   log("broker.crash", { error: messageOf(reason) });
@@ -47,6 +49,7 @@ function main(): void {
     token,
     db,
     log,
+    audit,
     config,
     paths: STATE,
     signal: shutdown.signal,

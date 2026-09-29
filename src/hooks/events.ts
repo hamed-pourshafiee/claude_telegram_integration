@@ -3,9 +3,9 @@ import type { HookInput } from "../shared/hook-input.ts";
 import { asFields } from "../shared/json.ts";
 import type { Log } from "../shared/log.ts";
 import type { Pending } from "../shared/pending.ts";
-import { PLAN_TOOL } from "../shared/plan.ts";
 import { gitBranch } from "./branch.ts";
 import { type ClassifyOptions, classifyStop } from "./finish.ts";
+import { permissionRequest } from "./permission.ts";
 import { postToolUse, preToolUse } from "./question.ts";
 import { type WaiterDeps, waitForReply } from "./waiter.ts";
 
@@ -177,17 +177,6 @@ async function notification(context: HookContext): Promise<void> {
   if (context.input.notificationType !== "idle_prompt") return;
   if (!(await context.ensureBroker())) return;
   await context.call("Idle", context.session);
-}
-
-/**
- * The 🔐 ping. The dialogs of AskUserQuestion and ExitPlanMode are permission requests too; the
- * question hook relays those (plans 4.1, 4.2).
- */
-async function permissionRequest(context: HookContext): Promise<void> {
-  const { toolName, toolInput } = context.input;
-  if (toolName === undefined || toolName === "AskUserQuestion" || toolName === PLAN_TOOL) return;
-  if (!(await context.ensureBroker())) return;
-  await context.call("PermissionRequest", { ...context.session, tool: toolName, input: toolInput });
 }
 
 async function stopFailure(context: HookContext): Promise<void> {

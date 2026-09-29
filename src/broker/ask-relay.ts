@@ -1,19 +1,14 @@
-import type { Config } from "../shared/config.ts";
 import { messageOf } from "../shared/errors.ts";
-import { asFields, type Fields } from "../shared/json.ts";
-import type { Log } from "../shared/log.ts";
+import type { Fields } from "../shared/json.ts";
+import type { Log, LogFields } from "../shared/log.ts";
 import { processAlive } from "../shared/process.ts";
-import { contentModeFor } from "../shared/scope.ts";
 import { type Answer, bad, ok } from "./answer.ts";
+import { type Call, callOf, keptOf, newAskId, type Where, whereOf } from "./ask-calls.ts";
 import type { AskMessages, Settled } from "./ask-messages.ts";
 import type { Ask, Asks } from "./asks.ts";
-import type { Pairing } from "./pairing.ts";
 import type { Presence } from "./presence.ts";
 import { parseAskInput } from "./questions.ts";
 import type { Session, Sessions } from "./sessions.ts";
-
-/** Where a new call goes: to the chat, or to the dialog at the Mac, and why. */
-export type Where = { readonly chat: number } | { readonly local: string };
 
 export interface AskRelayDeps {
   readonly sessions: Pick<Sessions, "get">;
@@ -25,6 +20,8 @@ export interface AskRelayDeps {
   readonly log: Log;
   /** A call that went to the Mac at once, which you may still have to hear of (flow 3). */
   readonly onLocal?: (ask: Ask) => void;
+  /** Every step of a permission prompt (D9): relayed, answered, delivered, moved, ended. */
+  readonly audit?: Log;
   /** How long an Ask is held before it answers "waiting"; default 25 s. */
   readonly holdMs?: number;
   /** Whether a process runs; default: a signal-0 kill. */
@@ -35,35 +32,6 @@ export interface AskRelayDeps {
 interface Parked {
   readonly resolve: (answer: Answer) => void;
   readonly timer: ReturnType<typeof setTimeout>;
-}
-
-/** A hook's call, as it names the AskUserQuestion call it waits for. */
-interface Call {
-  readonly sessionId: string;
-  readonly toolUseId: string;
-  readonly pid: number;
-  readonly claudePid: number;
-  readonly input: Fields | undefined;
-}
-
-/**
- * Flow 3 for a new call: to the chat while you're in between or away, and to the dialog at the Mac
- * while you're active, or when the bridge is muted, not paired, or the folder is ping-only (D8).
- */
-export function askWhere(deps: {
-  readonly pairing: Pick<Pairing, "pairedUser">;
-  readonly presence: Pick<Presence, "snapshot">;
-  readonly config: Config;
-}): (session: Session) => Where {
-  return (session) => {
-    const user = deps.pairing.pairedUser();
-    if (user === undefined) return { local: "not paired" };
-    const { mode, state } = deps.presence.snapshot();
-    if (mode === "off") return { local: "muted" };
-    if (contentModeFor(deps.config, session.projectDir) !== "full") return { local: "ping-only" };
-    if (state === "active") return { local: "at the Mac" };
-    return { chat: user.id };
-  };
 }
 
 /**
@@ -98,6 +66,7 @@ export class AskRelay {
     const moved = this.#deps.asks.move(ask.id, ["answered"], "delivered");
     const delivered = moved || ask.state === "delivered";
     this.#deps.log("ask.confirmed", { ask: ask.id, delivered });
+    if (moved) this.#audit("permission.delivered", ask, {});
     return ok({ delivered });
   }
 
@@ -117,6 +86,10 @@ export class AskRelay {
 
   /** You typed at the Mac, or the turn stopped: a call open in the dialog is over. */
   moved(sessionId: string): void {
+    // A permission prompt answered at the Mac leaves its hook waiting: Claude Code drops its answer.
+    for (const ask of this.#deps.asks.inState(["remote"], sessionId)) {
+      this.release(ask.id, "the turn moved on", "atMac");
+    }
     for (const ask of this.#deps.asks.inState(["local", "delivered"], sessionId)) this.#close(ask);
   }
 
@@ -129,12 +102,13 @@ export class AskRelay {
   }
 
   /** Hands a call in the chat to the dialog at the Mac: you're back, or chose it; whether it moved. */
-  release(id: string, why: string): boolean {
+  release(id: string, why: string, how: Settled = "moved"): boolean {
     const ask = this.#deps.asks.get(id);
     if (ask === undefined || !this.#deps.asks.move(id, ["remote"], "local")) return false;
     this.#deps.log("ask.local", { ask: id, why });
+    this.#audit("permission.at-mac", ask, { why });
     this.#resolve(id, ok({ state: "local" }));
-    this.#settle(ask, "moved", false);
+    this.#settle(ask, how, false);
     this.#hurry();
     return true;
   }
@@ -172,7 +146,7 @@ export class AskRelay {
   #create(session: Session, call: Call): Ask {
     const { asks, log } = this.#deps;
     const input = parseAskInput(call.input);
-    const where: Where = input === undefined ? { local: "unreadable" } : this.#deps.where(session);
+    const where = whereOf(input, session, this.#deps.where);
     const raw = JSON.stringify(keptOf(call.input));
     const ask = asks.create({
       id: this.#deps.newId?.() ?? newAskId(),
@@ -189,6 +163,7 @@ export class AskRelay {
     const plan = input?.plan !== undefined;
     const fields = { session: session.id, ask: ask.id, state: ask.state, questions, plan, ...why };
     log("ask.created", fields);
+    this.#audit("permission.asked", ask, { relayed: ask.state === "remote", ...why });
     if ("chat" in where) this.#post(ask, session, where.chat);
     else this.#deps.onLocal?.(ask);
     this.#hurry();
@@ -215,6 +190,7 @@ export class AskRelay {
   #end(ask: Ask, why: string): void {
     if (!this.#deps.asks.move(ask.id, ["remote", "answered"], "ended")) return;
     this.#deps.log("ask.ended", { ask: ask.id, was: ask.state, why });
+    this.#audit("permission.ended", ask, { was: ask.state, why });
     this.#resolve(ask.id, ok({ state: "ended" }));
     this.#settle(ask, ask.state === "answered" ? "lost" : "withdrawn", true);
     this.#hurry();
@@ -233,9 +209,26 @@ export class AskRelay {
       .catch((error: unknown) => {
         this.#deps.log("ask.edit-failed", { ask: ask.id, error: messageOf(error) });
       })
-      .finally(() => {
+      .then(() => {
         if (over) this.#deps.asks.forget(ask.id);
+      })
+      .catch((error: unknown) => {
+        // The database may be closing with the broker; the next start prunes old calls anyway.
+        this.#deps.log("ask.forget-failed", { ask: ask.id, error: messageOf(error) });
       });
+  }
+
+  /** A permission prompt's step, in the audit log (D9): by its ref, never its text. */
+  #audit(event: string, ask: Ask, fields: LogFields): void {
+    const permission = ask.input?.permission;
+    if (permission === undefined) return;
+    const bound = {
+      session: ask.sessionId,
+      ask: ask.id,
+      tool: permission.tool,
+      ref: permission.hash,
+    };
+    this.#deps.audit?.(event, { ...bound, ...fields });
   }
 
   /** In between, presence looks every second while a call waits in the chat (flow 3). */
@@ -266,27 +259,4 @@ export class AskRelay {
     this.#parked.delete(id);
     parked.resolve(answer);
   }
-}
-
-function callOf(fields: Fields): Call | undefined {
-  const { session_id: sessionId, tool_use_id: toolUseId, pid, claude_pid: claudePid } = fields;
-  if (typeof sessionId !== "string" || sessionId === "" || typeof toolUseId !== "string") {
-    return undefined;
-  }
-  if (toolUseId === "" || typeof pid !== "number" || typeof claudePid !== "number")
-    return undefined;
-  return { sessionId, toolUseId, pid, claudePid, input: asFields(fields.input) };
-}
-
-/** What is kept of a call's input: a plan waiting for approval (plan 4.2), or the questions. */
-function keptOf(input: Fields | undefined): object {
-  const plan = input?.plan;
-  if (typeof plan === "string") return { plan };
-  return { title: input?.title, questions: input?.questions };
-}
-
-/** Eight hex digits: short enough for the buttons' callback_data. */
-function newAskId(): string {
-  const bytes = crypto.getRandomValues(new Uint8Array(4));
-  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }

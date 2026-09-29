@@ -37,8 +37,9 @@ const QUESTION_TOOLS = "AskUserQuestion|ExitPlanMode";
  * Our hook groups, event by event (design §3): each calls Bun by absolute path with --no-env-file and
  * our bunfig.toml (F13, F14). Since phase 3 the Stop hook waits for a reply (--wait) and wakes Claude
  * with it (asyncRewake, F2); since phase 4 the question hook waits for your answers (--wait), with a
- * spinner that says so. The flag and the long timeout go together, so only this install makes a hook
- * wait.
+ * spinner that says so; since phase 5 the PermissionRequest hook waits for your decision on Bash, Edit
+ * and Write (D9) while the dialog is open. The flag and the long timeout go together, so only this
+ * install makes a hook wait.
  */
 export function hookGroups(bun: string, repoRoot: string): Readonly<Record<string, Json[]>> {
   for (const path of [bun, repoRoot]) {
@@ -62,7 +63,7 @@ export function hookGroups(bun: string, repoRoot: string): Readonly<Record<strin
     UserPromptSubmit: group("UserPromptSubmit", { timeout: 3 }),
     Stop: group("Stop", { timeout: WAIT_SECONDS, asyncRewake: true }, undefined, " --wait"),
     Notification: group("Notification", { timeout: 10, async: true }, "idle_prompt"),
-    PermissionRequest: group("PermissionRequest", { timeout: 10, async: true }),
+    PermissionRequest: group("PermissionRequest", { timeout: WAIT_SECONDS }, undefined, " --wait"),
     StopFailure: group("StopFailure", { timeout: 10, async: true }),
     PreToolUse: group(
       "PreToolUse",

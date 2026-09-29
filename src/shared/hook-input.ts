@@ -16,6 +16,8 @@ export interface HookInput {
   readonly event: string;
   readonly sessionId: string;
   readonly transcriptPath: string | undefined;
+  /** The session's current directory; it follows a `cd` (F15). */
+  readonly cwd: string | undefined;
   /** Correlates a prompt with everything until the next one; also on the transcript's user entries. */
   readonly promptId: string | undefined;
   /** Set only when the hook fires inside a subagent. */
@@ -42,6 +44,7 @@ export function parseHookInput(value: unknown): HookInput | undefined {
     event: text(fields.hook_event_name) ?? "",
     sessionId,
     transcriptPath: text(fields.transcript_path),
+    cwd: text(fields.cwd),
     promptId: text(fields.prompt_id),
     agentId: text(fields.agent_id) || undefined,
     lastAssistantMessage: text(fields.last_assistant_message),

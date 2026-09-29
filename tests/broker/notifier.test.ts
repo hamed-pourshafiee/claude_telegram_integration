@@ -218,3 +218,15 @@ describe("what leaves the Mac (D8)", () => {
     expect(documents).toEqual([]);
   });
 });
+
+test("sent whole (a permission prompt, D9): never cut, in as many messages as it takes", async () => {
+  const text = `${"word ".repeat(1500)}END`;
+  const posted = await notifier.post(4242, "permission", session("sandbox"), finish(text), [], {
+    whole: true,
+  });
+  expect(posted.length).toBeGreaterThan(1);
+  expect(sent.map((message) => message.text).join("\n")).toContain("END");
+  expect(sent.every((message) => message.text.length <= 4096)).toBe(true);
+  expect(sent.some((message) => message.text.includes("✂️"))).toBe(false);
+  expect(sent.some((message) => message.reply_markup !== undefined)).toBe(false);
+});

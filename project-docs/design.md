@@ -1,11 +1,11 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 14, F20: no hook can approve a plan, so plans are reviewed from the phone (rev. 13: O2
-decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11:
-D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's
-parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1
-decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
-Codex review) · 2026-09-29 · Repo:
+Status: rev. 15, permission prompts in flow 3 (phase 5, D9) (rev. 14: F20, no hook can approve a plan, so
+plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built
+in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake
+fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded
+stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes,
+§8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
@@ -85,11 +85,10 @@ by the directory the session started in, `CLAUDE_PROJECT_DIR`, never by the inpu
 | `UserPromptSubmit` | — | sync, ≤ 3 s | Cancel barrier: you typed locally, so this session's waiters are cancelled before the new turn starts |
 | `Stop` | — | `asyncRewake`, timeout 12 h | Register a waiter; tell a real finish from a continuation by the stop's transcript entries (F16); on a Telegram reply, exit 2 with it |
 | `Notification` | `idle_prompt` | `async` | Terminal only (F6): a second sign that the session is idle |
-| `PermissionRequest` | — | `async` | "🔐 waiting for your permission" ping until phase 5; skips `AskUserQuestion` and `ExitPlanMode`, relayed by `PreToolUse` (F5, F6) |
+| `PermissionRequest` | — | sync, timeout 12 h | While the dialog is open (F5): relay a Bash, Edit or Write prompt and return your decision (phase 5, D9); for any other tool, the "🔐 waiting for your permission" ping; skips `AskUserQuestion` and `ExitPlanMode`, relayed by `PreToolUse` |
 | `StopFailure` | — | `async` | "⚠️ stopped on an API error" |
 | `PreToolUse` | `AskUserQuestion\|ExitPlanMode` | sync, timeout 12 h | Ping (phase 2); relay a question and return the answers, or a plan and send it back for more planning (phase 4; F20) |
 | `PostToolUse` | `AskUserQuestion\|ExitPlanMode` | `async` | Close a question or plan that was answered |
-| `PermissionRequest` | per policy | sync, timeout 12 h | Phase 5 only; never `AskUserQuestion` |
 | `SessionEnd` | — | `async` | Mark the session ended, cancel its waiters |
 
 Key flows:
@@ -135,6 +134,16 @@ Key flows:
    denies the call with your words, so Claude keeps planning. No hook can approve a plan (F20): it is
    approved in its dialog at the Mac, which opens at your first touch or when you tap "🖥 Approve at the
    Mac".
+
+   A permission prompt for Bash, Edit or Write (phase 5, D9) goes the same way too, but its dialog is
+   open at the Mac all along: the `PermissionRequest` hook runs beside it (F5), so answering at the Mac
+   works as ever. In the chat it shows the whole operation, never cut: the command, where it runs and
+   every other field of its input, or the file and the full change, over up to four messages, or else as
+   a file. Allow once or Deny; a reply denies it with your reason; never "always allow". A prompt with
+   something that looks like a secret in it stays at the Mac, as it couldn't be shown whole, and so do
+   ping-only folders. Claude Code drops a hook's answer once the dialog has one, so when the turn moves
+   on, a prompt still in the chat was answered at the Mac: its message says so, and its hook stops.
+   Every step, by the operation's ref (a hash), goes to the audit log.
 4. **Routing and delivery.** Every bot message is linked to its session and request.
    - A reply-to goes to that session.
    - A plain message goes to the only waiting session; if several are waiting, the bot asks

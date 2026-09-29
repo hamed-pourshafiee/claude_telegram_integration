@@ -1,6 +1,8 @@
 import { asFields } from "../shared/json.ts";
+import { ALLOW_ONCE, DENY, PERMISSION_QUESTION } from "../shared/permission.ts";
 import { KEEP_PLANNING, PLAN_QUESTION } from "../shared/plan.ts";
 import type { InlineKeyboardButton } from "../shared/telegram/types.ts";
+import { operationBody, type Permission, parsePermission } from "./operation.ts";
 
 /** How a question is answered (F4): by picking options, by typing, or with a number in a range. */
 export type Kind = "choice" | "text" | "number";
@@ -33,12 +35,17 @@ export interface AskInput {
   readonly questions: readonly Question[];
   /** A plan waiting for approval (ExitPlanMode, plan 4.2): its one question is PLAN_QUESTION. */
   readonly plan: string | undefined;
+  /** A permission prompt (phase 5): its one question is PERMISSION_QUESTION. */
+  readonly permission: Permission | undefined;
 }
 
 /** How to answer a plan, under it. */
 const PLAN_HOW =
   "To approve it, tap 🖥 Approve at the Mac: its dialog opens there. To have Claude keep planning, tap " +
   "Keep planning, or reply to this message with what to change.";
+/** How to answer a permission prompt, under its operation. */
+export const PERMISSION_HOW =
+  "Allow it once, or deny it. To deny it with a reason, reply to this message.";
 
 /** A press of a question's button (plan 4.1). */
 export type Press =
@@ -62,23 +69,38 @@ const BUTTON = /^ask:([0-9a-f]{8}):(?:(\d):(\d|done)|mac)$/;
 export function parseAskInput(value: unknown): AskInput | undefined {
   const fields = asFields(value);
   if (typeof fields?.plan === "string") return planInput(fields.plan);
+  if (fields?.permission !== undefined) return permissionInput(fields.permission);
   const list: readonly unknown[] = Array.isArray(fields?.questions) ? fields.questions : [];
   if (list.length === 0 || list.length > 4) return undefined;
   const questions = list.map(parseQuestion);
   if (!questions.every((question) => question !== undefined)) return undefined;
   if (new Set(questions.map((question) => question.text)).size < questions.length) return undefined;
-  return { title: text(fields?.title), questions, plan: undefined };
+  return { title: text(fields?.title), questions, plan: undefined, permission: undefined };
 }
 
 /** A plan waiting for approval (plan 4.2), as a call with one question: Keep planning, or what to change. */
 function planInput(plan: string): AskInput | undefined {
   if (plan.trim() === "") return undefined;
-  const question: Question = {
-    text: PLAN_QUESTION,
+  const questions = [builtIn(PLAN_QUESTION, [KEEP_PLANNING])];
+  return { title: undefined, questions, plan, permission: undefined };
+}
+
+/** A permission prompt (phase 5), as a call with one question: Allow once, or Deny, with a reason. */
+function permissionInput(value: unknown): AskInput | undefined {
+  const permission = parsePermission(value);
+  if (permission === undefined) return undefined;
+  const questions = [builtIn(PERMISSION_QUESTION, [ALLOW_ONCE, DENY])];
+  return { title: undefined, questions, plan: undefined, permission };
+}
+
+/** The one question of a built-in call, with its fixed answers. */
+function builtIn(question: string, labels: readonly string[]): Question {
+  return {
+    text: question,
     header: "",
     kind: "choice",
     description: undefined,
-    options: [{ label: KEEP_PLANNING, description: undefined }],
+    options: labels.map((label) => ({ label, description: undefined })),
     multiSelect: false,
     placeholder: undefined,
     min: undefined,
@@ -86,7 +108,6 @@ function planInput(plan: string): AskInput | undefined {
     step: undefined,
     unit: undefined,
   };
-  return { title: undefined, questions: [question], plan };
 }
 
 function parseQuestion(value: unknown): Question | undefined {
@@ -125,6 +146,8 @@ function parseQuestion(value: unknown): Question | undefined {
 /** A question's message as Markdown, which the formatter renders (D8): the question, its options, how. */
 export function questionBody(input: AskInput, index: number): string {
   if (input.plan !== undefined) return `${input.plan.trim()}\n\n${PLAN_HOW}`;
+  if (input.permission !== undefined)
+    return `${operationBody(input.permission)}\n\n${PERMISSION_HOW}`;
   const question = input.questions[index];
   if (question === undefined) return "";
   const lines: string[] = [];

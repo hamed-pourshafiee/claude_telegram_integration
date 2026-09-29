@@ -1,5 +1,6 @@
 import { messageOf } from "../shared/errors.ts";
 import type { Log } from "../shared/log.ts";
+import { ALLOW_ONCE, DENY } from "../shared/permission.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { AskMessages } from "./ask-messages.ts";
 import type { AskRelay } from "./ask-relay.ts";
@@ -16,6 +17,8 @@ export interface AskChatDeps {
   readonly presence: Pick<Presence, "snapshot">;
   readonly telegram: Pick<TelegramClient, "answerCallbackQuery">;
   readonly log: Log;
+  /** Your decisions on permission prompts (D9). */
+  readonly audit?: Log;
 }
 
 /** Which question a typed answer is for: the one replied to, or a session's first open one. */
@@ -144,6 +147,7 @@ export class AskChat {
     const outcome = this.#deps.asks.answer(ask.id, index, answer);
     this.#deps.log("ask.answer", { ask: ask.id, index, outcome, chars: answer.length });
     if (outcome === "closed") return false;
+    this.#auditAnswer(ask, answer);
     this.#deps.messages.answered(ask, index, answer).catch((error: unknown) => {
       this.#deps.log("ask.edit-failed", { ask: ask.id, error: messageOf(error) });
     });
@@ -169,6 +173,22 @@ export class AskChat {
       (error: unknown) =>
         this.#deps.log("ask.tell-failed", { ask: ask.id, error: messageOf(error) }),
     );
+  }
+
+  /** A decision on a permission prompt, in the audit log: allow, deny, or deny with a reason. */
+  #auditAnswer(ask: Ask, answer: string): void {
+    const permission = ask.input?.permission;
+    if (permission === undefined) return;
+    const decision =
+      answer === ALLOW_ONCE ? "allow" : answer === DENY ? "deny" : "deny with a reason";
+    const reason = decision === "deny with a reason" ? { reasonChars: answer.length } : {};
+    const bound = {
+      session: ask.sessionId,
+      ask: ask.id,
+      tool: permission.tool,
+      ref: permission.hash,
+    };
+    this.#deps.audit?.("permission.answered", { ...bound, decision, by: "telegram", ...reason });
   }
 
   async #toast(queryId: string, text: string | undefined): Promise<void> {
