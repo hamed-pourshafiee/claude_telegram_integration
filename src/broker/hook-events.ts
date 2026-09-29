@@ -3,6 +3,7 @@ import { type BackgroundTask, parseTasks } from "../shared/hook-input.ts";
 import { asFields, type Fields } from "../shared/json.ts";
 import type { Log } from "../shared/log.ts";
 import { type Answer, bad, ok } from "./answer.ts";
+import type { AskRelay } from "./ask-relay.ts";
 import { failureNotice, finishNotice, permissionNotice, questionNotice } from "./notices.ts";
 import type { NoticeOf, Notifier } from "./notifier.ts";
 import type { Pairing } from "./pairing.ts";
@@ -15,6 +16,8 @@ export interface HookEventsDeps {
   readonly pairing: Pick<Pairing, "pairedUser">;
   /** Waiting Stop hooks and the replies they get (plan 3.1). */
   readonly relay: Pick<Relay, "wait" | "confirm" | "end" | "cancel" | "stopped" | "ended">;
+  /** Waiting question hooks and your answers (plan 4.1). */
+  readonly asks: Pick<AskRelay, "ask" | "confirm" | "end" | "asked" | "moved" | "sessionEnded">;
   readonly log: Log;
 }
 
@@ -44,24 +47,24 @@ export class HookEvents {
     const fields = asFields(body) ?? {};
     const ref = sessionRef(fields);
     if (ref === undefined) return bad("no session");
-    // A waiting hook's calls, which don't touch the session: it may have ended meanwhile.
-    if (event === "Wait") return this.#deps.relay.wait(fields);
-    if (event === "Confirm") return this.#deps.relay.confirm(fields);
-    if (event === "End") return this.#deps.relay.end(fields);
+    const waiting = this.#waiting(event, ref, fields);
+    if (waiting !== undefined) return waiting;
     this.#deps.log("hook.event", { hook: event, session: ref.id });
-    const { sessions, relay } = this.#deps;
+    const { sessions, relay, asks } = this.#deps;
     switch (event) {
       case "SessionStart":
         sessions.touch(ref, typeof fields.branch === "string" ? fields.branch : undefined);
         return ok({ name: firstName(this.#deps.pairing.pairedUser()?.name) });
       case "UserPromptSubmit": {
         sessions.touch(ref);
+        asks.moved(ref.id);
         // When you typed, as the hook saw it: a cancel that arrives after a newer stop is late.
         const at = typeof fields.at === "number" ? fields.at : Date.now();
         return ok({ generation: relay.cancel(ref.id, at) });
       }
       case "Stop": {
         sessions.touch(ref);
+        asks.moved(ref.id);
         const generation = sessions.stop(ref.id);
         relay.stopped(ref.id, generation);
         return ok({ generation });
@@ -69,10 +72,39 @@ export class HookEvents {
       case "SessionEnd":
         sessions.end(ref.id);
         relay.ended(ref.id);
+        asks.sessionEnded(ref.id);
         this.#lastStops.delete(ref.id);
+        return ok({});
+      case "Asked":
+        if (typeof fields.tool_use_id === "string") asks.asked(ref.id, fields.tool_use_id);
         return ok({});
       default:
         return this.#notify(event, sessions.touch(ref), fields);
+    }
+  }
+
+  /**
+   * A waiting hook's calls, which don't touch the session: it may have ended meanwhile. A question
+   * hook's first Ask registers a session the broker hasn't heard of.
+   */
+  #waiting(event: string, ref: SessionRef, fields: Fields): Answer | Promise<Answer> | undefined {
+    const { relay, asks, sessions } = this.#deps;
+    switch (event) {
+      case "Wait":
+        return relay.wait(fields);
+      case "Confirm":
+        return relay.confirm(fields);
+      case "End":
+        return relay.end(fields);
+      case "Ask":
+        if (sessions.get(ref.id) === undefined) sessions.touch(ref);
+        return asks.ask(fields);
+      case "AskConfirm":
+        return asks.confirm(fields);
+      case "AskEnd":
+        return asks.end(fields);
+      default:
+        return undefined;
     }
   }
 

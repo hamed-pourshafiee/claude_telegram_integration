@@ -34,6 +34,7 @@ describe("which texts are commands", () => {
     ["/away", "away"],
     ["/auto", "auto"],
     ["/off", "off"],
+    ["/local", "local"],
     ["/status@SomeBot", "status"],
     ["  /AWAY \n", "away"],
   ] as const)("%j: %s", (text, name) => {

@@ -43,7 +43,7 @@ function main(): void {
   const token = loadBotToken(ENV_FILE);
   const db = BrokerDb.open(STATE.db);
   const shutdown = new AbortController();
-  const { routes, relay } = createApp({
+  const { routes, relay, asks } = createApp({
     token,
     db,
     log,
@@ -57,6 +57,7 @@ function main(): void {
   const stop = (reason: string) => {
     shutdown.abort();
     relay.close();
+    asks.close();
     void server.stop(true);
     db.close();
     rmSync(STATE.socket, { force: true });

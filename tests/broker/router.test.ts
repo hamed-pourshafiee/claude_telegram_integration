@@ -15,6 +15,7 @@ import type {
   AnswerCallbackQueryParams,
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
+import { noAskChat } from "../helpers/no-asks.ts";
 
 // Plan 3.2 (flow 4): where each reply goes. Sessions A and B stop and wait, or are busy.
 const dir = mkdtempSync(join(tmpdir(), "tg-router-"));
@@ -63,7 +64,17 @@ function build() {
     },
   };
   const now = () => clock;
-  const router = new Router({ relay, waiters, inbox, outbox, sessions, telegram, log: noLog, now });
+  const router = new Router({
+    relay,
+    waiters,
+    asks: noAskChat,
+    inbox,
+    outbox,
+    sessions,
+    telegram,
+    log: noLog,
+    now,
+  });
   return { sessions, relay, inbox, outbox, router };
 }
 

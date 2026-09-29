@@ -1,9 +1,10 @@
 // Every hook event runs this (design §3):
 //   bun --no-env-file --config=<repo>/bunfig.toml <repo>/src/hooks/main.ts <event> [--wait]
 // It fails safe (D5): on any error it logs and exits 0, so Claude carries on as if the hook weren't
-// there. The only other exit is 2, a Stop hook waking Claude with a Telegram reply (F2); only a Stop
-// hook installed with --wait (and asyncRewake) waits for one. It acts only for served sessions, decided
-// by where the session started (F15), never inside a subagent; each event's job is in events.ts.
+// there. The only other exit is 2, a Stop hook waking Claude with a Telegram reply (F2). Only hooks
+// installed with --wait wait: the Stop hook (asyncRewake) for a reply, the question hook for your
+// answers, which it prints for Claude (F4). It acts only for served sessions, decided by where the
+// session started (F15), never inside a subagent; each event's job is in events.ts.
 import { realpathSync } from "node:fs";
 import { join } from "node:path";
 import { BROKER_LAUNCH, callBroker, ensureBroker } from "../shared/broker-client.ts";

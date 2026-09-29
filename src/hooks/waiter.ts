@@ -5,7 +5,7 @@ import { pause } from "../shared/pause.ts";
 /** A Wait is held up to 25 s by the broker; the call allows a little more. */
 export const WAIT_CALL_MS = 30_000;
 /** How many times a reply's confirmation is tried before it is given up (and never injected). */
-const CONFIRM_TRIES = 15;
+export const CONFIRM_TRIES = 15;
 
 export interface WaiterDeps {
   /** POSTs to the broker's /hook/<name>; its answer, or undefined when none came. */
@@ -52,14 +52,22 @@ export type WaitResult =
  * disabled flag or Claude gone end the wait with no reply. With no broker, it starts one or tries again:
  * a restarted broker finds the waiter in its database.
  */
-export async function waitForReply(body: WaitBody, deps: WaiterDeps): Promise<WaitResult> {
+export function waitForReply(body: WaitBody, deps: WaiterDeps): Promise<WaitResult> {
+  return watchingClaude(deps, (signal) => loop(body, deps, signal));
+}
+
+/** Runs `work` with a signal that aborts on SIGTERM, and also once the hook's Claude is gone. */
+export async function watchingClaude<T>(
+  deps: WaiterDeps,
+  work: (signal: AbortSignal) => Promise<T>,
+): Promise<T> {
   const gone = new AbortController();
   const signal = AbortSignal.any([deps.signal, gone.signal]);
   const watch = setInterval(() => {
     if (!deps.claudeAlive()) gone.abort();
   }, deps.watchMs ?? 2000);
   try {
-    return await loop(body, deps, signal);
+    return await work(signal);
   } finally {
     clearInterval(watch);
   }
@@ -82,7 +90,8 @@ async function loop(body: WaitBody, deps: WaiterDeps, signal: AbortSignal): Prom
   }
 }
 
-function reasonToStop(deps: WaiterDeps, signal: AbortSignal): string | undefined {
+/** Why a waiting hook stops now: SIGTERM, Claude gone, or the disabled flag; undefined to go on. */
+export function reasonToStop(deps: WaiterDeps, signal: AbortSignal): string | undefined {
   if (deps.signal.aborted) return "terminated";
   if (signal.aborted || !deps.claudeAlive()) return "claude gone";
   if (deps.disabled()) return "disabled";

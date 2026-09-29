@@ -13,6 +13,7 @@ import { Relay } from "../../src/broker/relay.ts";
 import { label, type Session, Sessions } from "../../src/broker/sessions.ts";
 import { Waiters } from "../../src/broker/waiters.ts";
 import { noLog } from "../../src/shared/log.ts";
+import { noAskRelay } from "../helpers/no-asks.ts";
 import { until } from "../helpers/wait.ts";
 
 // Plan 2.7: what the broker does with the hooks' calls. A stop's ✅ goes out once, only for a real
@@ -47,7 +48,7 @@ beforeEach(() => {
     log: noLog,
   });
   const pairing = { pairedUser: () => user };
-  events = new HookEvents({ sessions, notifier, pairing, relay, log: noLog });
+  events = new HookEvents({ sessions, notifier, pairing, relay, asks: noAskRelay, log: noLog });
 });
 
 const ref = { session_id: "b1e81638", project_dir: "/work/sandbox", entrypoint: "cli" };

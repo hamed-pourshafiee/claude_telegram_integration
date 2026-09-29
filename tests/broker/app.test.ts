@@ -173,6 +173,39 @@ test("your reply-to a ✅ reaches that session: queued while it's busy, then its
   expect(answer).toMatchObject({ state: "reply", text: "now say bye", from: "Hamed" });
 });
 
+test("Claude asks while you're away: the ❓ arrives with buttons, and your tap is the answer (plan 4.1)", async () => {
+  mac = { idleSeconds: 400, locked: false, problems: [] };
+  const db = BrokerDb.open(join(dir, "ask.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
+  const { routes, presence } = app(db);
+  expect(await until(() => presence.snapshot().state === "away")).toBe(true);
+  mkdirSync(join(dir, "sandbox"), { recursive: true });
+  const ref = { session_id: "a5a5a5a5", project_dir: join(dir, "sandbox"), entrypoint: "cli" };
+  const chat = { id: you.id, type: "private" };
+  fake.fallback("sendMessage", ok({ message_id: 41, date: 0, chat, text: "❓" }));
+  fake.fallback("editMessageText", ok({ message_id: 41, date: 0, chat, text: "✅" }));
+  const options = [{ label: "Red" }, { label: "Blue" }];
+  const input = { questions: [{ question: "Which color?", header: "Color", options }] };
+  const call = { ...ref, tool_use_id: "toolu_9", input, pid: process.pid, claude_pid: process.pid };
+  const asked = Promise.resolve(routes.hook("Ask", call));
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  const sent = asFields(fake.calls("sendMessage")[0]?.body);
+  expect(String(sent?.text)).toStartWith("<b>❓ sandbox · a5a5 asks</b>");
+  const keyboard = asFields(sent?.reply_markup)?.inline_keyboard;
+  const blue = Array.isArray(keyboard) ? asFields(keyboard[1]?.[0])?.callback_data : undefined;
+  const press = { id: "cbq9", from: you, data: blue, message: { message_id: 41, chat } };
+  fake.answer("answerCallbackQuery", ok(true));
+  fake.answer("getUpdates", ok([{ update_id: 900, callback_query: press }]));
+  expect(asFields((await asked).body)).toMatchObject({
+    state: "answered",
+    answers: { "Which color?": "Blue" },
+  });
+  expect(asFields((await routes.hook("AskConfirm", call)).body)).toMatchObject({ delivered: true });
+  expect(await until(() => fake.calls("editMessageText").length === 1)).toBe(true);
+  expect(String(asFields(fake.calls("editMessageText")[0]?.body)?.text)).toEndWith("✅ Blue");
+});
+
 test("ctl pair shows the code and what to send", () => {
   const text = pairingInstructions("K7QX-M4PD", "2026-09-28T10:05:00.000Z");
   expect(text).toContain("Pairing code: K7QX-M4PD");

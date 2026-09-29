@@ -1,6 +1,7 @@
 import type { ContentMode } from "../shared/config.ts";
 import type { BackgroundTask } from "../shared/hook-input.ts";
 import { asFields, type Fields } from "../shared/json.ts";
+import { type AskInput, questionBody } from "./questions.ts";
 
 /** A notice before formatting: a header (bold, one line) and a body, which may be cut (D8). */
 export interface Notice {
@@ -8,7 +9,7 @@ export interface Notice {
   readonly body: string;
 }
 
-/** Phase 2 only notifies; answering from Telegram comes in phases 4 and 5. */
+/** Permission dialogs are answered at the Mac until phase 5; so are questions a hook can't relay. */
 const AT_THE_MAC = "Answer it at the Mac.";
 const STAYS = "Its text stays on the Mac: this folder is ping-only.";
 /** Background tasks listed by name; beyond this many, only counted. */
@@ -54,6 +55,33 @@ export function questionNotice(label: string, questions: unknown, mode: ContentM
     return [[text, ...labels].join("\n")];
   });
   return { header, body: [...parts, AT_THE_MAC].join("\n\n") };
+}
+
+/** ❓ one of Claude's questions, to answer here (plan 4.1); only folders with full content get them. */
+export function askNotice(label: string, input: AskInput, index: number): Notice {
+  const count = input.questions.length;
+  const of = count > 1 ? ` (${index + 1} of ${count})` : "";
+  return { header: `❓ ${label} asks${of}`, body: questionBody(input, index) };
+}
+
+/**
+ * ❓ a question is open in the dialog at the Mac, which no hook can answer, and you have left (flow 3).
+ * Its text comes along only for folders with full content (D8).
+ */
+export function waitingNotice(
+  label: string,
+  input: AskInput | undefined,
+  mode: ContentMode,
+): Notice {
+  const header = `❓ ${label} has a question waiting at the computer`;
+  const why = "It opened while you were at the Mac, so it can only be answered there.";
+  if (mode !== "full" || input === undefined) {
+    return { header, body: mode === "full" ? why : `${why} ${STAYS}` };
+  }
+  const questions = input.questions.map((question) =>
+    [question.text, ...question.options.map((option) => `- ${option.label}`)].join("\n"),
+  );
+  return { header, body: [...questions, why].join("\n\n") };
 }
 
 /** ⚠️ the turn ended on an API error (StopFailure). The error is a code, not Claude's text. */

@@ -153,3 +153,53 @@ describe("when the Mac can't be read", () => {
     ]);
   });
 });
+
+describe("listeners and hurrying (plan 4.1)", () => {
+  test("listeners hear of each new state, a mode's included; the first look only sets the start", async () => {
+    const looks = [
+      look(1, false),
+      look(1, false),
+      look(40, false),
+      look(200, false),
+      look(2, false),
+    ];
+    const presence = presenceOf({ read: () => Promise.resolve(looks.shift() ?? look(2, false)) });
+    const heard: string[] = [];
+    presence.watch((now, before) => heard.push(`${before}→${now.state}`));
+    for (let at = 0; at < 5; at += 1) await presence.sample();
+    presence.setMode("away");
+    presence.setMode("away");
+    presence.setMode("auto");
+    expect(heard).toEqual([
+      "active→between",
+      "between→away",
+      "away→active",
+      "active→away",
+      "away→active",
+    ]);
+  });
+
+  test("hurried, it looks every second in between, and every 5 s otherwise", async () => {
+    const times: number[] = [];
+    let idle = 40;
+    const read = () => {
+      times.push(Date.now());
+      return Promise.resolve(look(idle, false));
+    };
+    const controller = new AbortController();
+    const presence = presenceOf({ read, signal: controller.signal, intervalMs: 400, fastMs: 20 });
+    presence.start();
+    expect(await until(() => times.length === 1)).toBe(true);
+    // Hurrying cuts the current wait short, then in between looks come every 20 ms.
+    presence.hurry(true);
+    expect(await until(() => times.length >= 6, 300)).toBe(true);
+    idle = 200;
+    await Bun.sleep(60);
+    const away = times.length;
+    await Bun.sleep(150);
+    // Away, hurried or not: 400 ms between looks.
+    expect(times.length).toBeLessThanOrEqual(away + 1);
+    controller.abort();
+    expect(await until(() => !presence.running)).toBe(true);
+  });
+});

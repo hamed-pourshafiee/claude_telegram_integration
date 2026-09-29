@@ -4,7 +4,7 @@ import type { Log } from "../shared/log.ts";
 import { contentModeFor } from "../shared/scope.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import { TelegramError } from "../shared/telegram/errors.ts";
-import type { InlineKeyboardMarkup } from "../shared/telegram/types.ts";
+import type { InlineKeyboardButton, InlineKeyboardMarkup } from "../shared/telegram/types.ts";
 import { escapeHtml, formatReply } from "./format.ts";
 import type { FullTexts } from "./full-texts.ts";
 import type { Notice } from "./notices.ts";
@@ -28,6 +28,12 @@ export interface NotifierDeps {
 
 /** Builds a notice from the session's label and how much of its text may leave the Mac (D8). */
 export type NoticeOf = (label: string, mode: ContentMode) => Notice;
+
+/** A message as sent: its id, and its text as HTML, for editing it later. */
+export interface Posted {
+  readonly messageId: number;
+  readonly html: string;
+}
 
 const BUTTON_DATA = /^full:([0-9a-f]{16})$/;
 /** How long a ✅'s last message is kept for the "continued at the computer" edit, and how many. */
@@ -72,33 +78,50 @@ export class Notifier {
 
   /** Sends the notice for `session` if you are away; whether it went out. */
   async send(kind: string, session: Session, noticeOf: NoticeOf): Promise<boolean> {
-    const { config, log } = this.#deps;
     const target = this.target();
     if ("skip" in target) {
-      log("notice.skipped", { kind, session: session.id, reason: target.skip });
+      this.#deps.log("notice.skipped", { kind, session: session.id, reason: target.skip });
       return false;
     }
+    await this.post(target.chat, kind, session, noticeOf);
+    return true;
+  }
+
+  /**
+   * Sends a notice to `chat` whatever your presence: redacted, cut and formatted (D8), each message
+   * linked to its session. The last message carries `rows` of buttons, and the 📄 one when the text was
+   * cut. What was sent, in order.
+   */
+  async post(
+    chat: number,
+    kind: string,
+    session: Session,
+    noticeOf: NoticeOf,
+    rows: readonly (readonly InlineKeyboardButton[])[] = [],
+  ): Promise<Posted[]> {
+    const { config, log } = this.#deps;
     const mode = contentModeFor(config, session.projectDir);
     const notice = noticeOf(label(session), mode);
     const reply = formatReply(notice.header, notice.body, config.content.maxChars);
-    const button = reply.fullText === undefined ? undefined : this.#button(reply.fullText, session);
+    const full = reply.fullText === undefined ? [] : [this.#button(reply.fullText, session)];
+    const keyboard = [...rows, ...full];
+    const posted: Posted[] = [];
     for (const [index, html] of reply.messages.entries()) {
-      const markup = index === reply.messages.length - 1 && button ? { reply_markup: button } : {};
-      const { sent, text } = await this.#sendHtml(target.chat, html, markup);
-      this.#deps.link?.(target.chat, sent.message_id, session, kind);
-      if (kind === "finish" && index === reply.messages.length - 1) {
-        this.#keep(session, {
-          chat: target.chat,
-          messageId: sent.message_id,
-          text,
-          markup: button,
-        });
+      const last = index === reply.messages.length - 1;
+      const markup =
+        last && keyboard.length > 0 ? { reply_markup: { inline_keyboard: keyboard } } : {};
+      const { sent, text } = await this.#sendHtml(chat, html, markup);
+      this.#deps.link?.(chat, sent.message_id, session, kind);
+      posted.push({ messageId: sent.message_id, html: text });
+      if (kind === "finish" && last) {
+        const button = full.length > 0 ? { inline_keyboard: full } : undefined;
+        this.#keep(session, { chat, messageId: sent.message_id, text, markup: button });
       }
     }
     const cut = reply.fullText !== undefined;
     const counts = { messages: reply.messages.length, redacted: reply.redacted, cut, mode };
     log("notice.sent", { kind, session: session.id, ...counts });
-    return true;
+    return posted;
   }
 
   /** A press of a 📄 button: the full text as a .md file, or why it is gone. */
@@ -173,11 +196,12 @@ export class Notifier {
     }
   }
 
-  #button(fullText: string, session: Session): InlineKeyboardMarkup {
+  /** The 📄 button's row: it sends the whole text as a file. */
+  #button(fullText: string, session: Session): InlineKeyboardButton[] {
     const stamp = new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-");
     const filename = `${basename(session.projectDir)}-${session.id.slice(0, 4)}-${stamp}.md`;
     const id = this.#deps.fullTexts.put(fullText, filename);
-    return { inline_keyboard: [[{ text: "📄 Full text as a file", callback_data: `full:${id}` }]] };
+    return [{ text: "📄 Full text as a file", callback_data: `full:${id}` }];
   }
 }
 

@@ -1,9 +1,10 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 11, D8: Markdown shown as formatting (rev. 10: F2, a wake fires UserPromptSubmit; rev. 9:
-F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen
-lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3;
-rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
+Status: rev. 12, flow 3 as built in plan 4.1, F4 and F19 from 2.1.284 (rev. 11: D8, Markdown shown as
+formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and
+flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5:
+Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
+2026-09-29 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
@@ -34,7 +35,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F1 | `Stop` input carries `last_assistant_message`, `stop_hook_active` and `background_tasks`. | hooks.md § Stop input |
 | F2 | A command hook with `asyncRewake: true` runs in the background; if it exits 2, Claude wakes even when the session is idle (16 ms in the panel) and gets a user-role message, `Stop hook blocking error from command "Stop": <stderr>`, which it treats as a hook notice rather than your words. No 8-in-a-row cap; a wake during a busy turn is delivered right after it; the next Stop has `stop_hook_active: true`. A new local prompt does not stop a waiting hook. `timeout` has no maximum (43200 honoured) and is enforced with SIGTERM; closing the panel sends waiting hooks SIGTERM within 3 s. The wake also fires `UserPromptSubmit`, about 0.1 s after the hook exits. | hooks.md; S1; plan 3.3 |
 | F3 | A blocking `Stop` hook (`decision: "block"` + `reason`) continues the turn, capped at 8 in a row; `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises the cap. | hooks.md § Stop decision control |
-| F4 | `PreToolUse` on `AskUserQuestion` answers it with `permissionDecision: "allow"` + `updatedInput` = the original input + `answers` (`{question text: answer}`); no dialog appears, in the panel or the terminal. A free-text answer reaches Claude as the user's instruction. Send a multi-select answer as one string joined with `", "`: 2.1.274 passes a list through as `Bun,Biome`. Questions are `choice`, `text` or `number` (`min`, `max`, `step`, `unit`). | hooks.md; S2; 2.1.283 binary |
+| F4 | `PreToolUse` on `AskUserQuestion` answers it with `permissionDecision: "allow"` + `updatedInput` = the original input + `answers` (`{question text: answer}`); no dialog appears, in the panel or the terminal. A free-text answer reaches Claude as the user's instruction. Send a multi-select answer as one string joined with `", "`: 2.1.274 passes a list through as `Bun,Biome` (2.1.284 joins a list with `", "` itself). In 2.1.284 a call may carry a `title` above its 1–4 questions, and each question a `kind`: `choice` (the default: 2–4 `options`, `multiSelect`), `text` (`placeholder`) or `number` (`min` and `max`, and maybe `step`, `defaultValue`, `unit`), plus a `description` line. | hooks.md; S2; 2.1.283 and 2.1.284 binaries |
 | F5 | `PermissionRequest` hooks return `decision.behavior` `allow` / `deny` (+ `message`, `interrupt`); exit 2 is ignored. They fire as the dialog opens, in the panel and the terminal, also for `AskUserQuestion`, whose dialog is a permission request. | hooks.md; S3 |
 | F6 | `Notification` hooks observe only. `idle_prompt` fires 60 s after a real finish in the terminal, but **never in the VS Code panel**. `permission_prompt` came 6 s after a panel dialog opened, and not within 7 s in the terminal. | hooks.md; S3 |
 | F7 | `UserPromptSubmit` gets the prompt you typed locally and may run synchronously (default timeout 30 s); a sync Bun hook delays the prompt by about 0.1 s at most. Every event carries `session_id`; `SessionEnd` hooks share a 1.5 s budget, with reason `other` (panel tab closed, end of `claude -p`) or `prompt_input_exit` (`/exit`). `StopFailure` fires when the API rejects a request. `claude -p` has no `AskUserQuestion`. | hooks.md; S3 |
@@ -49,6 +50,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` holds non-blocking errors and often a blocking hook's reason too, so it is not the signal. A stop's own assistant entry often reaches the file only after its Stop hooks have started (28 of 30 recorded stops). Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28; recorded stops, 2026-09-29 (plan 2.8) |
 | F17 | `ioreg -n Root -d 1`: the kernel's `IOConsoleLocked` is `Yes` while the screen is locked (also at the login window and on the way to sleep), and the console session in `IOConsoleUsers` then carries `CGSSessionScreenIsLocked`=Yes and `CGSSessionScreenLockedTime`. Unlocked, the flag is `No` and both keys are gone. This Mac locks itself after 30 minutes without input. | observed 2026-09-28 (plan 2.6) |
 | F18 | A command hook runs as a direct child of the Claude Code process, with no shell in between, for synchronous and `asyncRewake` hooks alike, so a hook's parent pid is its Claude. | probed 2026-09-29 with 2.1.283 (plan 3.1) |
+| F19 | A command hook's `statusMessage` is shown in the spinner while the hook runs. The `AskUserQuestion` dialog can resolve itself after a stretch of idle, telling Claude the user may be away (`afkTimeoutMs` in its result); `PostToolUse` follows as usual. | 2.1.284 binary (plan 4.1); the idle timeout not seen live |
 
 ## 3. Architecture
 
@@ -116,11 +118,15 @@ Key flows:
    - Active (input in the last 30 s): the local dialog opens at once.
    - Away (idle ≥ 3 min, screen locked, or `/away`): the question is relayed to Telegram.
    - In between: the question is held and pinged to Telegram, and goes to the local dialog the moment
-     you touch the keyboard or mouse (the spinner says so).
+     you touch the keyboard or mouse (the spinner says so, F19).
 
-   No hook can answer a dialog that is already open locally, so if you leave while one is open, the bot
-   only tells you a question is waiting at the computer. `/away` sent from your phone as you leave makes
-   everything relay at once.
+   As built (plan 4.1): held or relayed, a question is the same in the chat, one message per question,
+   answered with its buttons or a reply; the hook gets all the answers of a call together. Either way it
+   goes to the local dialog at your first touch, unless `/away` is on (in between, presence looks every
+   second while a question waits), or when you send `/local` or tap "🖥 Answer at the Mac". Muted,
+   unpaired or ping-only (D8): the local dialog at once. No hook can answer a dialog that is already open
+   locally, so if you leave while one is open, the bot only tells you a question is waiting at the
+   computer. `/away` sent from your phone as you leave makes everything relay at once.
 4. **Routing and delivery.** Every bot message is linked to its session and request.
    - A reply-to goes to that session.
    - A plain message goes to the only waiting session; if several are waiting, the bot asks

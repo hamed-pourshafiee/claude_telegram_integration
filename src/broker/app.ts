@@ -4,6 +4,10 @@ import type { StatePaths } from "../shared/paths.ts";
 import type { Secret } from "../shared/secret.ts";
 import { TelegramClient } from "../shared/telegram/client.ts";
 import type { Update } from "../shared/telegram/types.ts";
+import { AskChat } from "./ask-chat.ts";
+import { AskMessages } from "./ask-messages.ts";
+import { AskRelay, askWhere } from "./ask-relay.ts";
+import { type Ask, Asks } from "./asks.ts";
 import { runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
 import { FullTexts } from "./full-texts.ts";
@@ -42,14 +46,15 @@ export interface App {
   readonly poller: Poller;
   readonly presence: Presence;
   readonly relay: Relay;
+  readonly asks: AskRelay;
 }
 
 /**
- * The broker's parts: the Telegram client, pairing, presence, the notifier, the relay for replies, the
- * gate for updates, the poller and the routes of its socket. The poller runs only once someone is paired
- * or a pairing is pending (plan 2.4), and only after the relay has recovered what a crash or a stopped
- * broker left (plan 3.1); presence looks at the Mac every 5 s from the start (plan 2.6); hooks' calls
- * go to HookEvents (plan 2.7).
+ * The broker's parts: the Telegram client, pairing, presence, the notifier, the relays for replies and
+ * for Claude's questions, the gate for updates, the poller and the routes of its socket. The poller runs
+ * only once someone is paired or a pairing is pending (plan 2.4), and only after the relays have
+ * recovered what a crash or a stopped broker left (plans 3.1, 4.1); presence looks at the Mac every 5 s
+ * from the start (plan 2.6); hooks' calls go to HookEvents (plan 2.7).
  */
 export function createApp(deps: AppDeps): App {
   const { token, db, log, signal, config } = deps;
@@ -65,17 +70,11 @@ export function createApp(deps: AppDeps): App {
   const link = (chat: number, messageId: number, session: Session, kind: string) =>
     outbox.link(chat, messageId, { sessionId: session.id, generation: session.generation, kind });
   const notifier = new Notifier({ telegram, pairing, presence, config, log, fullTexts, link });
-  const { relay, router } = replyParts({ db, sessions, telegram, pairing, log, outbox, notifier });
-  const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, log });
-  const gate: GateDeps = {
-    telegram,
-    pairing,
-    log,
-    command: (name) => runCommand(name, presence),
-    press: (data, chat, queryId) =>
-      data.startsWith("full:") ? notifier.press(data, chat, queryId) : router.press(data, queryId),
-    reply: (updateId) => router.route(updateId),
-  };
+  const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, notifier });
+  const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
+  const { relay, router } = replyParts(parts);
+  const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, asks: ask.relay, log });
+  const gate = gateOf({ telegram, pairing, log, presence, notifier, router, asks: ask.chat });
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
   const accept = (update: Update) => {
@@ -89,14 +88,67 @@ export function createApp(deps: AppDeps): App {
     hook: (event, body) => hookEvents.handle(event, body),
   };
   presence.start();
-  // What a crash or a stopped broker left, before any new reply: the relay's part, then the router's,
+  // What a crash or a stopped broker left, before any new reply: the relays' part, then the router's,
   // whose decisions are all made before recover() first waits.
   relay.recover(deps.paths);
+  ask.relay.recover();
   router
     .recover()
     .catch((error: unknown) => log("router.recover-failed", { error: String(error) }));
   if (pairing.pairedUser() !== undefined || pairing.pendingUntil() !== undefined) poller.start();
-  return { routes, poller, presence, relay };
+  return { routes, poller, presence, relay, asks: ask.relay };
+}
+
+interface GateParts {
+  readonly telegram: TelegramClient;
+  readonly pairing: Pairing;
+  readonly log: Log;
+  readonly presence: Presence;
+  readonly notifier: Notifier;
+  readonly router: Router;
+  readonly asks: AskChat;
+}
+
+/** What the gate does with the paired user's commands, buttons and replies. */
+function gateOf({ telegram, pairing, log, presence, notifier, router, asks }: GateParts): GateDeps {
+  return {
+    telegram,
+    pairing,
+    log,
+    command: (name) => (name === "local" ? asks.handBack() : runCommand(name, presence)),
+    press: (data, chat, queryId) => {
+      if (data.startsWith("full:")) return notifier.press(data, chat, queryId);
+      if (data.startsWith("ask:")) return asks.press(data, queryId);
+      return router.press(data, queryId);
+    },
+    reply: (updateId) => router.route(updateId),
+  };
+}
+
+interface AskParts {
+  readonly db: BrokerDb;
+  readonly sessions: Sessions;
+  readonly telegram: TelegramClient;
+  readonly pairing: Pairing;
+  readonly presence: Presence;
+  readonly config: Config;
+  readonly log: Log;
+  readonly notifier: Notifier;
+}
+
+/**
+ * The parts for Claude's questions (plan 4.1): their hooks' side, their messages, and your side, which
+ * hears of every change of presence (flow 3).
+ */
+function askParts({ db, sessions, telegram, pairing, presence, config, log, notifier }: AskParts) {
+  const asks = new Asks(db);
+  const messages = new AskMessages({ asks, notifier, telegram, log });
+  const where = askWhere({ pairing, presence, config });
+  const onLocal = (ask: Ask) => chat.localNow(ask);
+  const relay = new AskRelay({ sessions, asks, messages, where, presence, log, onLocal });
+  const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log });
+  presence.watch((now, before) => chat.presenceChanged(now, before));
+  return { relay, chat };
 }
 
 interface ReplyParts {
@@ -107,13 +159,14 @@ interface ReplyParts {
   readonly log: Log;
   readonly outbox: Outbox;
   readonly notifier: Notifier;
+  readonly asks: AskChat;
 }
 
 /**
  * The parts that take replies to sessions (plans 3.1 to 3.3). Messages about your replies go to the
  * paired user; a wait that typing at the Mac cancelled has its ✅ edited to say so.
  */
-function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier }: ReplyParts) {
+function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier, asks }: ReplyParts) {
   const tell = async (text: string) => {
     const user = pairing.pairedUser();
     if (user !== undefined) await telegram.sendMessage({ chat_id: user.id, text });
@@ -127,7 +180,7 @@ function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier }: 
   const waiters = new Waiters(db);
   const inbox = new Inbox(db);
   const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log, onCancelled });
-  const router = new Router({ relay, waiters, inbox, outbox, sessions, telegram, log });
+  const router = new Router({ relay, waiters, asks, inbox, outbox, sessions, telegram, log });
   return { relay, router };
 }
 

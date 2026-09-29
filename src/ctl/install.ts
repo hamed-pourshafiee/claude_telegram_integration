@@ -25,14 +25,18 @@ type Json = Record<string, unknown>;
 /** The command runs through a shell, so every path in it must be safe unquoted. */
 const SAFE_PATH = /^\/[A-Za-z0-9/._-]+$/;
 
-/** A Stop hook waits for a reply up to 12 h, then gets SIGTERM (F2). */
-const STOP_WAIT_SECONDS = 43_200;
+/** A Stop hook waits for a reply up to 12 h, and a question hook for your answers; then SIGTERM (F2). */
+const WAIT_SECONDS = 43_200;
+
+/** The spinner while a question hook waits: your answer may come from the chat (flow 3). */
+const QUESTION_STATUS = "Question sent to Telegram · touch the keyboard or mouse to answer here";
 
 /**
  * Our hook groups, event by event (design §3): each calls Bun by absolute path with --no-env-file and
  * our bunfig.toml (F13, F14). Since phase 3 the Stop hook waits for a reply (--wait) and wakes Claude
- * with it (asyncRewake, F2); the two go together, so only this install makes a Stop hook wait. The
- * question hook doesn't wait yet, so its timeout stays short until phase 4.
+ * with it (asyncRewake, F2); since phase 4 the question hook waits for your answers (--wait), with a
+ * spinner that says so. The flag and the long timeout go together, so only this install makes a hook
+ * wait.
  */
 export function hookGroups(bun: string, repoRoot: string): Readonly<Record<string, Json[]>> {
   for (const path of [bun, repoRoot]) {
@@ -54,11 +58,17 @@ export function hookGroups(bun: string, repoRoot: string): Readonly<Record<strin
   return {
     SessionStart: group("SessionStart", { timeout: 5 }),
     UserPromptSubmit: group("UserPromptSubmit", { timeout: 3 }),
-    Stop: group("Stop", { timeout: STOP_WAIT_SECONDS, asyncRewake: true }, undefined, " --wait"),
+    Stop: group("Stop", { timeout: WAIT_SECONDS, asyncRewake: true }, undefined, " --wait"),
     Notification: group("Notification", { timeout: 10, async: true }, "idle_prompt"),
     PermissionRequest: group("PermissionRequest", { timeout: 10, async: true }),
     StopFailure: group("StopFailure", { timeout: 10, async: true }),
-    PreToolUse: group("PreToolUse", { timeout: 10 }, "AskUserQuestion"),
+    PreToolUse: group(
+      "PreToolUse",
+      { timeout: WAIT_SECONDS, statusMessage: QUESTION_STATUS },
+      "AskUserQuestion",
+      " --wait",
+    ),
+    PostToolUse: group("PostToolUse", { timeout: 10, async: true }, "AskUserQuestion"),
     SessionEnd: group("SessionEnd", { timeout: 5, async: true }),
   };
 }

@@ -85,6 +85,13 @@ export interface EditMessageTextParams {
   readonly link_preview_options?: { readonly is_disabled: boolean };
 }
 
+/** Replaces a message's buttons; without reply_markup, removes them. */
+export interface EditMessageReplyMarkupParams {
+  readonly chat_id: number;
+  readonly message_id: number;
+  readonly reply_markup?: InlineKeyboardMarkup;
+}
+
 export interface AnswerCallbackQueryParams {
   readonly callback_query_id: string;
   readonly text?: string;

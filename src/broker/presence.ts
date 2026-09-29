@@ -53,7 +53,12 @@ export interface PresenceDeps {
   readonly read?: () => Promise<Reading>;
   /** Time between looks; default 5 s (plan 2.6). */
   readonly intervalMs?: number;
+  /** …and while hurried in between; default 1 s (plan 4.1). */
+  readonly fastMs?: number;
 }
+
+/** Told when the state changes, the mode's part included: the state now, and the one before. */
+export type PresenceListener = (now: Snapshot, before: State) => void;
 
 const MODE_KEY = "presence.mode";
 
@@ -69,6 +74,12 @@ export class Presence {
   #logged = "";
   #problems = "";
   #running = false;
+  readonly #listeners: PresenceListener[] = [];
+  /** The state the listeners last heard of. */
+  #told: State | undefined;
+  #hurried = false;
+  /** Ends the current pause between looks. */
+  #wake = new AbortController();
 
   constructor(deps: PresenceDeps) {
     this.#deps = deps;
@@ -90,6 +101,22 @@ export class Presence {
   setMode(mode: Mode): void {
     this.#deps.db.setMeta(MODE_KEY, mode);
     this.#deps.log("presence.mode", { mode });
+    this.#tell();
+  }
+
+  /** Calls `listener` whenever the state changes, by a look at the Mac or by a mode (flow 3). */
+  watch(listener: PresenceListener): void {
+    this.#listeners.push(listener);
+  }
+
+  /**
+   * While a question waits on Telegram (plan 4.1): in between, the Mac is looked at every second, so
+   * that your first touch hands it to the local dialog at once. Away, 5 s is soon enough, and cheaper.
+   */
+  hurry(on: boolean): void {
+    if (on === this.#hurried) return;
+    this.#hurried = on;
+    if (on) this.#wake.abort();
   }
 
   snapshot(): Snapshot {
@@ -122,13 +149,32 @@ export class Presence {
     }
     this.#reading = reading;
     this.#logChanges(reading);
+    this.#tell();
   }
 
   async #loop(): Promise<void> {
     const { signal } = this.#deps;
     while (!signal.aborted) {
       await this.sample();
-      await pause(this.#deps.intervalMs ?? 5000, signal);
+      this.#wake = new AbortController();
+      const fast = this.#hurried && this.snapshot().state === "between";
+      const wait = fast ? (this.#deps.fastMs ?? 1000) : (this.#deps.intervalMs ?? 5000);
+      await pause(wait, AbortSignal.any([signal, this.#wake.signal]));
+    }
+  }
+
+  /** Tells the listeners of a new state; the first look only sets where things start. */
+  #tell(): void {
+    const now = this.snapshot();
+    const before = this.#told;
+    this.#told = now.state;
+    if (before === undefined || before === now.state) return;
+    for (const listener of this.#listeners) {
+      try {
+        listener(now, before);
+      } catch (error) {
+        this.#deps.log("presence.listener-failed", { error: messageOf(error) });
+      }
     }
   }
 

@@ -1,8 +1,8 @@
 import type { Mode, Presence, Snapshot, State, Thresholds } from "./presence.ts";
 
-/** The bot's commands (D4). */
-export type CommandName = Mode | "status";
-const NAMES: readonly CommandName[] = ["away", "auto", "off", "status"];
+/** The bot's commands (D4), and /local, which hands Claude's questions back to the Mac (plan 4.1). */
+export type CommandName = Mode | "status" | "local";
+const NAMES: readonly CommandName[] = ["away", "auto", "off", "status", "local"];
 
 /** The command in `text` ("/status", or "/status@SomeBot"), or undefined when it holds none. */
 export function parseCommand(text: string): CommandName | undefined {
@@ -10,8 +10,8 @@ export function parseCommand(text: string): CommandName | undefined {
   return NAMES.find((known) => known === name);
 }
 
-/** Carries out a command of the paired user and returns the answer for the chat. */
-export function runCommand(name: CommandName, presence: Presence): string {
+/** Carries out a presence command of the paired user and returns the answer for the chat. */
+export function runCommand(name: Mode | "status", presence: Presence): string {
   if (name === "status") return statusText(presence.snapshot(), presence.limits);
   presence.setMode(name);
   switch (name) {

@@ -14,6 +14,7 @@ import { noLog } from "../../src/shared/log.ts";
 import { statePaths } from "../../src/shared/paths.ts";
 import { writePending } from "../../src/shared/pending.ts";
 import type { SendMessageParams } from "../../src/shared/telegram/types.ts";
+import { noAskChat } from "../helpers/no-asks.ts";
 
 // Plan 3.1: the waiter protocol through the relay (flows 1, 2 and 4). A "restart" is a new relay on the
 // same database, as a broker that crashed and came back.
@@ -64,8 +65,8 @@ function broker(onCancelled?: (waiter: Waiter) => void) {
     },
     answerCallbackQuery: () => Promise.resolve(),
   };
-  const outbox = new Outbox(db);
-  const router = new Router({ relay, waiters, inbox, outbox, sessions, telegram, log: noLog });
+  const parts = { relay, waiters, asks: noAskChat, inbox, outbox: new Outbox(db), sessions };
+  const router = new Router({ ...parts, telegram, log: noLog });
   const touch = () => sessions.touch({ id: ID, projectDir: "/work/sandbox", entrypoint: "cli" });
   const stop = () => {
     touch();

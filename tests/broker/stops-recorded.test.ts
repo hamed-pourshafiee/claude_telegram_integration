@@ -11,6 +11,7 @@ import { Relay } from "../../src/broker/relay.ts";
 import { label, type Session, Sessions } from "../../src/broker/sessions.ts";
 import { Waiters } from "../../src/broker/waiters.ts";
 import { noLog } from "../../src/shared/log.ts";
+import { noAskRelay } from "../helpers/no-asks.ts";
 import {
   classifiedAt,
   named,
@@ -55,7 +56,14 @@ function broker(): { readonly sent: string[]; readonly call: Call } {
     senderName: () => null,
     log: noLog,
   });
-  const events = new HookEvents({ sessions, notifier, pairing, relay, log: noLog });
+  const events = new HookEvents({
+    sessions,
+    notifier,
+    pairing,
+    relay,
+    asks: noAskRelay,
+    log: noLog,
+  });
   const ref = { session_id: "5e551011", project_dir: "/work/sandbox", entrypoint: "claude-vscode" };
   const call: Call = (event, fields = {}) => {
     const answer: Answer | Promise<Answer> = events.handle(event, { ...ref, ...fields });

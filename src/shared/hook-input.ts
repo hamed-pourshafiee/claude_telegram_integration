@@ -25,6 +25,8 @@ export interface HookInput {
   readonly notificationType: string | undefined;
   readonly toolName: string | undefined;
   readonly toolInput: Fields | undefined;
+  /** Names one tool call in PreToolUse and PostToolUse (not in PermissionRequest). */
+  readonly toolUseId: string | undefined;
   /** StopFailure's error, such as model_not_found or rate_limit. */
   readonly error: string | undefined;
   /** SessionEnd's reason, such as other or prompt_input_exit. */
@@ -47,6 +49,7 @@ export function parseHookInput(value: unknown): HookInput | undefined {
     notificationType: text(fields.notification_type),
     toolName: text(fields.tool_name),
     toolInput: asFields(fields.tool_input),
+    toolUseId: text(fields.tool_use_id) || undefined,
     error: text(fields.error),
     reason: text(fields.reason),
   };

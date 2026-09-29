@@ -24,8 +24,10 @@ const theirs = {
   type: "command",
   command: "/Users/someone/.claude/hooks/codex-checkpoint-code.sh",
 };
+// An empty list of an event we don't use stays. (One of ours, left empty by uninstall, goes: the same
+// thing to Claude Code.)
 const ORIGINAL = `${JSON.stringify(
-  { theme: "dark", hooks: { Stop: [{ hooks: [theirs] }], PostToolUse: [] } },
+  { theme: "dark", hooks: { Stop: [{ hooks: [theirs] }], SubagentStop: [] } },
   null,
   2,
 )}\n`;
@@ -51,10 +53,11 @@ describe("our entries (design §3)", () => {
       "PermissionRequest",
       "StopFailure",
       "PreToolUse",
+      "PostToolUse",
       "SessionEnd",
     ]);
     for (const [event, [group]] of Object.entries(groups)) {
-      const flag = event === "Stop" ? " --wait" : "";
+      const flag = event === "Stop" || event === "PreToolUse" ? " --wait" : "";
       expect(group?.hooks).toEqual([
         expect.objectContaining({
           type: "command",
@@ -67,8 +70,22 @@ describe("our entries (design §3)", () => {
       expect.objectContaining({ asyncRewake: true, timeout: 43_200 }),
     ]);
     expect(groups.Stop?.[0]?.hooks).not.toEqual([expect.objectContaining({ async: true })]);
-    expect(groups.PreToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
     expect(groups.Notification?.[0]).toMatchObject({ matcher: "idle_prompt" });
+  });
+
+  test("phase 4: the question hook waits for your answers, and PostToolUse closes a question", () => {
+    const groups = hookGroups(bun, repoRoot);
+    expect(groups.PreToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
+    // Sync, so Claude waits for its answers; up to 12 h, with a spinner saying where they may come from.
+    expect(groups.PreToolUse?.[0]?.hooks).toEqual([
+      expect.objectContaining({
+        timeout: 43_200,
+        statusMessage: expect.stringContaining("Telegram"),
+      }),
+    ]);
+    expect(groups.PreToolUse?.[0]?.hooks).not.toEqual([expect.objectContaining({ async: true })]);
+    expect(groups.PostToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
+    expect(groups.PostToolUse?.[0]?.hooks).toEqual([expect.objectContaining({ async: true })]);
   });
 
   test("a path that would need shell quoting is refused", () => {
@@ -83,7 +100,7 @@ describe("install and uninstall", () => {
     expect(installHooks(paths, false, noLog)).toMatchObject({
       text: expect.stringContaining("already"),
     });
-    expect(countOurs(settings(), repoRoot)).toBe(8);
+    expect(countOurs(settings(), repoRoot)).toBe(9);
     expect(settings().hooks.Stop[0]).toEqual({ hooks: [theirs] });
     expect(settings().theme).toBe("dark");
     const backups = readdirSync(paths.backupDir);
@@ -140,6 +157,6 @@ describe("refusals", () => {
   test("no settings file yet: install creates one", () => {
     rmSync(paths.settingsFile);
     expect(installHooks(paths, false, noLog)).toMatchObject({ ok: true });
-    expect(countOurs(settings(), repoRoot)).toBe(8);
+    expect(countOurs(settings(), repoRoot)).toBe(9);
   });
 });

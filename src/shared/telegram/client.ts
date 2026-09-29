@@ -6,6 +6,7 @@ import { refuseVerboseFetch, TelegramError, type TelegramErrorKind } from "./err
 import {
   type Answer,
   type AnswerCallbackQueryParams,
+  type EditMessageReplyMarkupParams,
   type EditMessageTextParams,
   type GetUpdatesParams,
   type Message,
@@ -94,6 +95,11 @@ export class TelegramClient {
   /** Edits one of the bot's messages in a chat. */
   editMessageText(params: EditMessageTextParams): Promise<Message> {
     return this.#message("editMessageText", json(params));
+  }
+
+  /** Replaces the buttons of one of the bot's messages, or removes them. */
+  editMessageReplyMarkup(params: EditMessageReplyMarkupParams): Promise<Message> {
+    return this.#message("editMessageReplyMarkup", json(params));
   }
 
   async answerCallbackQuery(params: AnswerCallbackQueryParams): Promise<void> {

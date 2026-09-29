@@ -5,6 +5,7 @@ import type { Log } from "../shared/log.ts";
 import type { Pending } from "../shared/pending.ts";
 import { gitBranch } from "./branch.ts";
 import { type ClassifyOptions, classifyStop } from "./finish.ts";
+import { postToolUse, preToolUse } from "./question.ts";
 import { type WaiterDeps, waitForReply } from "./waiter.ts";
 
 /** Who the hook runs for, as every broker call names it. */
@@ -30,7 +31,10 @@ export interface HookContext {
   ) => Promise<unknown>;
   /** The hook's output for Claude Code, on stdout. */
   readonly print: (text: string) => void;
-  /** Whether the Stop hook waits for a reply: installed with --wait and asyncRewake (plan 3.1). */
+  /**
+   * Installed with --wait: the Stop hook waits for a reply (asyncRewake, plan 3.1), the question hook
+   * for your answers (plan 4.1).
+   */
   readonly wait: boolean;
   /** Aborted on SIGTERM: the panel closed, or the hook's timeout came. */
   readonly signal: AbortSignal;
@@ -52,8 +56,9 @@ export interface HookContext {
 type Handler = (context: HookContext) => Promise<void>;
 
 /**
- * What each hook event does (design §3, plans 2.7 and 3.1). Nothing here decides for Claude: handlers
- * return without output, except SessionStart's note and a Stop hook that wakes Claude with a reply.
+ * What each hook event does (design §3, plans 2.7, 3.1 and 4.1). Nothing here decides for Claude:
+ * handlers return without output, except SessionStart's note, a Stop hook that wakes Claude with a
+ * reply, and a question hook that hands Claude your answers.
  */
 export const HANDLERS: Readonly<Record<string, Handler>> = {
   SessionStart: sessionStart,
@@ -62,6 +67,7 @@ export const HANDLERS: Readonly<Record<string, Handler>> = {
   Notification: notification,
   PermissionRequest: permissionRequest,
   PreToolUse: preToolUse,
+  PostToolUse: postToolUse,
   StopFailure: stopFailure,
   SessionEnd: sessionEnd,
 };
@@ -176,14 +182,6 @@ async function permissionRequest(context: HookContext): Promise<void> {
   if (toolName === undefined || toolName === "AskUserQuestion") return;
   if (!(await context.ensureBroker())) return;
   await context.call("PermissionRequest", { ...context.session, tool: toolName, input: toolInput });
-}
-
-/** The ❓ ping for AskUserQuestion (phase 2); the dialog opens at the Mac as usual. */
-async function preToolUse(context: HookContext): Promise<void> {
-  if (context.input.toolName !== "AskUserQuestion") return;
-  if (!(await context.ensureBroker())) return;
-  const questions = context.input.toolInput?.questions ?? [];
-  await context.call("Question", { ...context.session, questions });
 }
 
 async function stopFailure(context: HookContext): Promise<void> {

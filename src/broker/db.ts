@@ -57,6 +57,35 @@ const MIGRATIONS: readonly (readonly string[])[] = [
       PRIMARY KEY (chat_id, message_id)
     ) STRICT`,
   ],
+  // 4 (plan 4.1): Claude's questions (AskUserQuestion), each asked by one waiting PreToolUse hook, and
+  // the chat message of each question. `input` holds the questions as Claude wrote them, and `html` a
+  // message as sent, until the question is settled (D8).
+  [
+    `CREATE TABLE asks (
+      id TEXT PRIMARY KEY,
+      session_id TEXT NOT NULL REFERENCES sessions (id),
+      tool_use_id TEXT NOT NULL,
+      pid INTEGER NOT NULL,
+      claude_pid INTEGER NOT NULL,
+      state TEXT NOT NULL
+        CHECK (state IN ('remote', 'answered', 'delivered', 'local', 'closed', 'ended')),
+      input TEXT NOT NULL,
+      told INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      UNIQUE (session_id, tool_use_id)
+    ) STRICT`,
+    `CREATE TABLE ask_questions (
+      ask_id TEXT NOT NULL REFERENCES asks (id),
+      idx INTEGER NOT NULL,
+      chat_id INTEGER,
+      message_id INTEGER,
+      html TEXT NOT NULL DEFAULT '',
+      picked TEXT NOT NULL DEFAULT '[]',
+      answer TEXT,
+      PRIMARY KEY (ask_id, idx)
+    ) STRICT`,
+    "CREATE INDEX ask_messages ON ask_questions (chat_id, message_id)",
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;

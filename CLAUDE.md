@@ -8,7 +8,7 @@ replies come back into the same session.
 
 Read these completely before doing anything in a new session:
 
-1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F18, architecture
+1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F19, architecture
    and flows 1–4, decisions D1–D8, open questions O2–O3, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
@@ -75,7 +75,8 @@ bun scripts/record-stops.ts [claude]  # re-records tests/fixtures/transcripts/ (
 ```
 
 In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/away` relays
-everything until `/auto`, `/auto` decides from the idle time and the screen lock, `/off` mutes.
+everything until `/auto`, `/auto` decides from the idle time and the screen lock, `/off` mutes, and
+`/local` hands Claude's questions waiting in the chat back to the dialog at the Mac (plan 4.1).
 
 Tests that need a real broker, hook or ctl process run them in a throwaway copy of the repo
 (`tests/helpers/repo-copy.ts`), never against this repo's `.state/` or `.env`.
