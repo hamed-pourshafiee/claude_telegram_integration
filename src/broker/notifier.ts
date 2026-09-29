@@ -12,7 +12,10 @@ import type { Presence } from "./presence.ts";
 import { label, type Session } from "./sessions.ts";
 
 export interface NotifierDeps {
-  readonly telegram: Pick<TelegramClient, "sendMessage" | "sendDocument" | "answerCallbackQuery">;
+  readonly telegram: Pick<
+    TelegramClient,
+    "sendMessage" | "sendDocument" | "answerCallbackQuery" | "editMessageText"
+  >;
   readonly pairing: Pick<Pairing, "pairedUser">;
   readonly presence: Pick<Presence, "snapshot">;
   readonly config: Config;
@@ -26,6 +29,21 @@ export interface NotifierDeps {
 export type NoticeOf = (label: string, mode: ContentMode) => Notice;
 
 const BUTTON_DATA = /^full:([0-9a-f]{16})$/;
+/** How long a ✅'s last message is kept for the "continued at the computer" edit, and how many. */
+const KEEP_MS = 24 * 60 * 60_000;
+const MAX_KEPT = 100;
+const CONTINUED = "\n\n↩️ continued at the computer";
+/** Telegram's limit for a message's text. */
+const MAX_TEXT = 4096;
+
+/** A ✅'s last message as sent, kept in memory only (D8), so typing at the Mac can edit it. */
+interface Sent {
+  readonly chat: number;
+  readonly messageId: number;
+  readonly text: string;
+  readonly markup: InlineKeyboardMarkup | undefined;
+  readonly until: number;
+}
 
 /**
  * Sends notices to the paired user's chat, only while they are away and haven't muted the bridge
@@ -34,6 +52,8 @@ const BUTTON_DATA = /^full:([0-9a-f]{16})$/;
  */
 export class Notifier {
   readonly #deps: NotifierDeps;
+  /** By session and generation. */
+  readonly #finishes = new Map<string, Sent>();
 
   constructor(deps: NotifierDeps) {
     this.#deps = deps;
@@ -72,6 +92,14 @@ export class Notifier {
         ...markup,
       });
       this.#deps.link?.(target.chat, sent.message_id, session, kind);
+      if (kind === "finish" && index === reply.messages.length - 1) {
+        this.#keep(session, {
+          chat: target.chat,
+          messageId: sent.message_id,
+          text,
+          markup: button,
+        });
+      }
     }
     const cut = reply.fullText !== undefined;
     const counts = { messages: reply.messages.length, redacted: reply.redacted, cut, mode };
@@ -93,6 +121,38 @@ export class Notifier {
     await telegram.answerCallbackQuery({ callback_query_id: queryId });
     await telegram.sendDocument({ chat_id: chat, filename: kept.filename, content: kept.text });
     log("button.full-text", { chars: kept.text.length });
+  }
+
+  /**
+   * You typed at the Mac while that stop's hook waited (flow 2, plan 3.3): its ✅ is edited to say so,
+   * silently (Telegram doesn't notify an edit). Nothing to edit if none went out, or the broker restarted.
+   */
+  async continuedAtMac(sessionId: string, generation: number): Promise<void> {
+    const key = `${sessionId}#${generation}`;
+    const sent = this.#finishes.get(key);
+    this.#finishes.delete(key);
+    if (sent === undefined || sent.until <= Date.now()) return;
+    if (sent.text.length + CONTINUED.length > MAX_TEXT) return;
+    await this.#deps.telegram.editMessageText({
+      chat_id: sent.chat,
+      message_id: sent.messageId,
+      text: `${sent.text}${CONTINUED}`,
+      parse_mode: "HTML",
+      link_preview_options: { is_disabled: true },
+      ...(sent.markup === undefined ? {} : { reply_markup: sent.markup }),
+    });
+    this.#deps.log("notice.continued", { session: sessionId, generation });
+  }
+
+  #keep(session: Session, sent: Omit<Sent, "until">): void {
+    this.#finishes.set(`${session.id}#${session.generation}`, {
+      ...sent,
+      until: Date.now() + KEEP_MS,
+    });
+    for (const old of this.#finishes.keys()) {
+      if (this.#finishes.size <= MAX_KEPT) break;
+      this.#finishes.delete(old);
+    }
   }
 
   #button(fullText: string, session: Session): InlineKeyboardMarkup {

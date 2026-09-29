@@ -25,6 +25,8 @@ export interface RelayDeps {
   readonly holdMs?: number;
   /** Whether a process runs; default: a signal-0 kill. */
   readonly alive?: (pid: number) => boolean;
+  /** A waiter that typing at the Mac stopped (its ✅ says so, plan 3.3). */
+  readonly onCancelled?: (waiter: Waiter) => void;
 }
 
 interface Parked {
@@ -110,7 +112,10 @@ export class Relay {
       const generation = late ? (session?.generation ?? 0) : sessions.advance(sessionId);
       return { generation, late, ...waiters.cancel(sessionId, at) };
     });
-    for (const waiter of done.cancelled) this.#answer(waiter, ok({ state: "cancelled" }));
+    for (const waiter of done.cancelled) {
+      this.#answer(waiter, ok({ state: "cancelled" }));
+      this.#deps.onCancelled?.(waiter);
+    }
     for (const waiter of done.crossed) this.#tell(waiter.sessionId, TEXTS.crossed);
     const { cancelled, crossed, late } = done;
     const counts = { cancelled: cancelled.length, crossed: crossed.length, late };

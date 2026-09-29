@@ -11,6 +11,7 @@ import { parseConfig } from "../../src/shared/config.ts";
 import type { LogFields } from "../../src/shared/log.ts";
 import type {
   AnswerCallbackQueryParams,
+  EditMessageTextParams,
   SendDocumentParams,
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
@@ -47,10 +48,11 @@ let documents: SendDocumentParams[];
 let answers: AnswerCallbackQueryParams[];
 let logged: string[];
 let links: string[];
+let edits: EditMessageTextParams[];
 let snapshot: Snapshot;
 let user: PairedUser | undefined;
 beforeEach(() => {
-  [sent, documents, answers, logged, links] = [[], [], [], [], []];
+  [sent, documents, answers, logged, links, edits] = [[], [], [], [], [], []];
   snapshot = away;
   user = { id: 4242, name: "Hamed (@someone)" };
 });
@@ -69,6 +71,10 @@ const notifier = new Notifier({
     answerCallbackQuery: (params) => {
       answers.push(params);
       return Promise.resolve();
+    },
+    editMessageText: (params) => {
+      edits.push(params);
+      return Promise.resolve({ message_id: params.message_id, date: 0, chat });
     },
   },
   pairing: { pairedUser: () => user },
@@ -140,6 +146,22 @@ test("each message sent is linked to its session and generation, for a reply-to 
   snapshot = { ...away, state: "active", because: "input" };
   await notifier.send("finish", session("sandbox"), finish("Not sent."));
   expect(links).toEqual([`4242/${sent.length} b1e81638-e169#1 finish`]);
+});
+
+test("typing at the Mac mid-wait: that stop's ✅ is edited, once, keeping its button (plan 3.3)", async () => {
+  const long = `${"word ".repeat(200)}END`;
+  await notifier.send("finish", session("sandbox"), finish(long));
+  const last = sent.at(-1);
+  await notifier.continuedAtMac("b1e81638-e169", 1);
+  await notifier.continuedAtMac("b1e81638-e169", 1);
+  await notifier.continuedAtMac("b1e81638-e169", 2);
+  expect(edits).toHaveLength(1);
+  expect(edits[0]).toMatchObject({
+    message_id: sent.length,
+    text: `${last?.text}\n\n↩️ continued at the computer`,
+    parse_mode: "HTML",
+    reply_markup: last?.reply_markup,
+  });
 });
 
 describe("what leaves the Mac (D8)", () => {

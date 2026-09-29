@@ -9,7 +9,7 @@ import { Outbox } from "../../src/broker/outbox.ts";
 import { Relay } from "../../src/broker/relay.ts";
 import { Router } from "../../src/broker/router.ts";
 import { Sessions } from "../../src/broker/sessions.ts";
-import { Waiters } from "../../src/broker/waiters.ts";
+import { type Waiter, Waiters } from "../../src/broker/waiters.ts";
 import { noLog } from "../../src/shared/log.ts";
 import { statePaths } from "../../src/shared/paths.ts";
 import { writePending } from "../../src/shared/pending.ts";
@@ -36,7 +36,7 @@ const ID = "b1e81638";
 const HOOK = { pid: 5001, claude_pid: 5000 };
 
 /** A broker's relay and router on this test's database; call it again for a restarted broker. */
-function broker() {
+function broker(onCancelled?: (waiter: Waiter) => void) {
   const db = BrokerDb.open(file);
   const sessions = new Sessions(db);
   const waiters = new Waiters(db);
@@ -55,6 +55,7 @@ function broker() {
     log: noLog,
     holdMs: 60_000,
     alive: (pid) => !dead.has(pid),
+    ...(onCancelled === undefined ? {} : { onCancelled }),
   });
   const telegram = {
     sendMessage: async (params: SendMessageParams) => {
@@ -120,6 +121,22 @@ describe("a reply and typing at the Mac race (flow 2)", () => {
     await tick();
     expect(told).toEqual([expect.stringContaining("Nobody is waiting")]);
   });
+});
+
+test("typing stops a waiter: the relay says which, for its ✅ to be edited; a crossed one isn't", async () => {
+  const cancelled: string[] = [];
+  const { relay, stop, wait, reply, route } = broker((waiter) => {
+    cancelled.push(`${waiter.sessionId}#${waiter.generation}`);
+  });
+  const generation = stop();
+  void wait(generation);
+  relay.cancel(ID, Date.now());
+  expect(cancelled).toEqual([`${ID}#${generation}`]);
+  const next = stop();
+  void wait(next);
+  await route(reply());
+  relay.cancel(ID, Date.now());
+  expect(cancelled).toHaveLength(1);
 });
 
 describe("the right waiter", () => {

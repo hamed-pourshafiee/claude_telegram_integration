@@ -20,7 +20,7 @@ import { Relay } from "./relay.ts";
 import { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
 import { type Session, Sessions } from "./sessions.ts";
-import { Waiters } from "./waiters.ts";
+import { type Waiter, Waiters } from "./waiters.ts";
 
 export interface AppDeps {
   readonly token: Secret;
@@ -60,10 +60,12 @@ export function createApp(deps: AppDeps): App {
   const presence = new Presence({ db, log, signal, limits: config.presence, ...read });
   const fullTexts = new FullTexts();
   const sessions = new Sessions(db);
-  const { relay, router, outbox } = replyParts(db, sessions, telegram, pairing, log);
+  const outbox = new Outbox(db);
+  outbox.prune();
   const link = (chat: number, messageId: number, session: Session, kind: string) =>
     outbox.link(chat, messageId, { sessionId: session.id, generation: session.generation, kind });
   const notifier = new Notifier({ telegram, pairing, presence, config, log, fullTexts, link });
+  const { relay, router } = replyParts({ db, sessions, telegram, pairing, log, outbox, notifier });
   const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, log });
   const gate: GateDeps = {
     telegram,
@@ -97,26 +99,36 @@ export function createApp(deps: AppDeps): App {
   return { routes, poller, presence, relay };
 }
 
-/** The parts that take replies to sessions (plans 3.1, 3.2); messages about them go to the paired user. */
-function replyParts(
-  db: BrokerDb,
-  sessions: Sessions,
-  telegram: TelegramClient,
-  pairing: Pairing,
-  log: Log,
-) {
+interface ReplyParts {
+  readonly db: BrokerDb;
+  readonly sessions: Sessions;
+  readonly telegram: TelegramClient;
+  readonly pairing: Pairing;
+  readonly log: Log;
+  readonly outbox: Outbox;
+  readonly notifier: Notifier;
+}
+
+/**
+ * The parts that take replies to sessions (plans 3.1 to 3.3). Messages about your replies go to the
+ * paired user; a wait that typing at the Mac cancelled has its ✅ edited to say so.
+ */
+function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier }: ReplyParts) {
   const tell = async (text: string) => {
     const user = pairing.pairedUser();
     if (user !== undefined) await telegram.sendMessage({ chat_id: user.id, text });
   };
   const senderName = () => firstName(pairing.pairedUser()?.name);
+  const onCancelled = (waiter: Waiter) => {
+    notifier.continuedAtMac(waiter.sessionId, waiter.generation).catch((error: unknown) => {
+      log("notice.continued-failed", { session: waiter.sessionId, error: String(error) });
+    });
+  };
   const waiters = new Waiters(db);
   const inbox = new Inbox(db);
-  const outbox = new Outbox(db);
-  outbox.prune();
-  const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log });
+  const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log, onCancelled });
   const router = new Router({ relay, waiters, inbox, outbox, sessions, telegram, log });
-  return { relay, router, outbox };
+  return { relay, router };
 }
 
 /** `ctl pair` (plan 2.4): a new code, and polling from now on to hear it. */
