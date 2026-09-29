@@ -1222,6 +1222,59 @@ Committed as `756758f` (2026-09-29).
 
 ## Next
 
-Two decisions for the user before the next step: 4.2 (optional), relaying `ExitPlanMode`; and O2, whether
-permission prompts may be approved from Telegram at all (phase 5). Without either, phase 6: hardening and
-handover.
+Committed as `6ea4260` (2026-09-29). The user then decided: 4.2 is built, and O2 is yes, as the design
+recommends (now D9: phase 5 is on).
+
+## 4.2 Plans reviewed from the phone
+
+- **Date:** 2026-09-30 (the live checks ran around midnight)
+- **Result:** passed, after a change of design found live, with the user one small step at a time.
+  A plan waiting for approval comes to the chat; from there it can be sent back for more planning, and
+  it is approved in its dialog at the Mac.
+- **Built first** (on `dev`, `13a7373`; design rev. 13, plan rev. 10): a plan relayed like a question
+  (4.1's machinery), with Approve (the hook allows the call) and Keep planning (the hook denies it with
+  the user's words).
+  - The question hook matches `AskUserQuestion|ExitPlanMode`; the 🔐 ping skips ExitPlanMode.
+  - After the user's OK, they ran `ctl install`; compared with the backup
+    `settings.2026-09-29T18-37-34-251Z.json`, only our two matchers and the spinner text changed.
+- **Found live:** Approve didn't approve.
+  - The sandbox's plan came to the phone ("📋 … has a plan ready"), and the hook got it in its input
+    (`hook.plan {from: "input", keys: "plan,planFilePath"}`, logged by `396315c`).
+  - The user tapped Approve at 20:06:11.726, and the hook printed `allow` 3 ms later, but Claude Code
+    opened its "Accept this plan?" dialog at the Mac anyway.
+  - The 2.1.284 code shows why. After a hook's allow, Claude Code runs the tool's own permission check,
+    and ExitPlanMode's always asks. A `PermissionRequest` hook's allow is ignored without `updatedInput`
+    and re-asked with one. So no hook can approve a plan (F20); a deny still stops the call.
+  - Following CLAUDE.md, this was stopped and put to the user: they chose to test the other hook. Its
+    code path answered that (above), and they then chose "review on phone".
+- **Built then** (`342d517`; design rev. 14, F20; plan rev. 11): the plan's only answer is Keep planning,
+  or a reply with what to change, and the hook denies the call with those words. "🖥 Approve at the Mac"
+  hands the plan to its dialog. No settings change was needed.
+  - Gate: typecheck exit 0, "Checked 127 files", "546 pass, 0 fail", twice.
+  - Positive controls, 8, each caught: a plan's answer allowed (1), a plan's Mac button as a question's
+    (2), the plan dialog pinged too (1), a plan file read from anywhere (1, once its test used a real
+    file), a plan shown as a question (1), one left open told as a question (1), a plan not read as one
+    (5), a plan kept as questions (4).
+- **Evidence** (`/away` on; broker log and the sandbox's transcript):
+  - The user replied "Also print a second line: done" to the 📋 (stored at 20:29:59.673; a reply-to, so
+    it answered that plan). The hook denied the call, and Claude got "PreToolUse:ExitPlanMode hook error:
+    The user wants changes to the plan before approving it: Also print a second line: done".
+  - Claude kept planning; the revised plan (361 characters, from 302) was in the chat at 20:30:05.
+  - "🖥 Approve at the Mac" at 20:31:02.250: the hook stepped aside 1 ms later, the dialog opened at the
+    Mac, and the user approved there. `PostToolUse` closed the call at 20:31:10.681.
+  - `s.py` prints "s" and then "done". The stop's Codex ❓ was answered from the phone ("Skip"), and the
+    ✅ went out at 20:31:26.783.
+- **Decisions (the user's):** build 4.2; O2 yes, as D9; after F20, plans reviewed from the phone and
+  approved at the Mac.
+- **Learned:**
+  - F20; and the hook's input does carry `plan` and `planFilePath` (2.1.284).
+  - A denied call gets no `PostToolUse`: its record stays delivered until the session's next stop closes
+    it.
+  - The global CLAUDE.md's Codex checkpoints make Claude ask twice per planned change: before it presents
+    a plan and at the stop after the change. In away mode each is a ❓ on the phone.
+
+## Next
+
+Phase 5 (D9): 5.1 relays permission prompts for Bash, Edit and Write, with the presence states of flow 3.
+F20 doesn't stand in its way: for tools that don't need the user's interaction, a `PermissionRequest`
+hook's allow is taken (2.1.284 code); the live check will show it.
