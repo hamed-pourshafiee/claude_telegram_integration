@@ -1009,6 +1009,62 @@ Committed on `dev` as `925a6f9` (2026-09-29).
 
 ## Next
 
-3.3, live: phase 3 goes to `main` with `ctl install` (the Stop entry becomes `asyncRewake` with
-`--wait`), then "now say bye" from Telegram continues a VS Code session, 10 round-trips, and typing
-locally mid-wait injects nothing.
+Committed on `dev` as `c917760` (2026-09-29).
+
+## 3.3 Live
+
+- **Date:** 2026-09-29
+- **Result:** passed, with the user one small step at a time. Phase 3 is live for every session under `~`.
+  - A reply from Telegram continued a VS Code session, which answered.
+  - Ten round trips in a row worked.
+  - Typing at the Mac while a hook waited edited that stop's ✅ to "↩️ continued at the computer" and
+    injected nothing.
+- **Built first** (on `dev`, `b3d5b26`): the ✅ edit.
+  - The notifier keeps each ✅'s last message in memory only (D8), for a day.
+  - A cancel of a waiting hook edits that ✅ (an edit, so the phone stays quiet).
+  - A reply that crossed the typing keeps its own message.
+  - Gate: typecheck exit 0, "Checked 107 files … No fixes applied", "470 pass, 0 fail", twice.
+  - Positive controls, each caught: the ✅ never edited (1 failing test), a cancelled waiter not
+    reported (1), a crossed one reported as cancelled (2).
+- **Going live:**
+  - The live database was backed up at schema 2 (`VACUUM INTO`, 11 sessions):
+    `.state/backups/broker.pre-schema3.2026-09-29T11-19-27Z.db` (0600).
+  - `main` was fast-forwarded to `b3d5b26`, and the broker restarted on it: pid 9778, schema 3, polling.
+  - After the user's OK, they ran `bun run ctl install`: `hooks.installed {hooks: 8, replaced: 8}`.
+  - Compared with the backup `settings.2026-09-29T11-25-04-494Z.json`: nothing outside `hooks` changed,
+    the other hooks are the same, and ours are exactly the phase 3 entries. Only the Stop entry changed:
+    `Stop` → `Stop --wait`, and `timeout 60, async` → `timeout 43200, asyncRewake`.
+- **Evidence** (broker log; `/away` on):
+  - **A reply that continues a session:** "now say bye", sent as a plain message.
+    - Stored at 13:58:40.315.
+    - Two sessions were waiting (the sandbox's and this build session's), so the picker asked.
+    - The sandbox's button at 13:58:47.148 → handed over, and confirmed 11 ms later.
+    - The sandbox woke at 13:58:47.284 and answered; its ✅ went out at 13:58:52.235.
+  - **Just before that**, the user replied to this build session's ✅ by mistake (it was the newest
+    message). The reply-to took "say bye" to this session, which woke with "📨 Telegram reply from Hamed:
+    say bye": routing as designed.
+  - **Ten round trips**, "say 1" to "say 10", 14:11:40 to 14:15:23:
+    - each reply was a reply-to the sandbox's newest ✅;
+    - each was routed to `0253`, handed over and confirmed within 16 ms;
+    - each answer's ✅ came 2.4 to 7.9 s later. No failures.
+  - **Typing at the Mac mid-wait:** the prompt at 14:17:19.489 cancelled the waiter (generation 24).
+    `editMessageText` 200 at 14:17:19.863, `notice.continued`. Nothing was injected.
+  - **Meanwhile, in the user's other work:** a session in `agent-panel-frontend` had waits registered after
+    its finishes, each cancelled when they typed there. This build session's ✅s were edited each time
+    the user answered here.
+- **Learned:**
+  - A wake fires `UserPromptSubmit`, about 0.1 s after the hook exits (13:57:31.294, 13:58:47.284). The
+    cancel it causes finds nothing, since the woken waiter has just delivered. Now in F2 (design rev. 10).
+  - With `/away` on, this build session's ✅s interleave with the sandbox's on the phone, so "the newest
+    message" can belong to another session. A reply-to goes where its message came from; the labels tell
+    them apart.
+  - This build session started before 2.7, so it has no SessionStart note. Its harness showed the wake as
+    a hook message, not your words, and it didn't act on it: the note matters.
+  - A 12-step live check went through one small step at a time. Ten round trips as one step didn't
+    happen; one round trip, then "carry on up to 10", did.
+
+## Next
+
+Phase 4, "answer Claude's questions from Telegram": 4.1 relays `AskUserQuestion` with flow 3's three
+presence states. Built on `dev`. Still open with the user: what was noisy during the day of use, and the
+Markdown question from 2.8.

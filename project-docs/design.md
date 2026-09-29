@@ -1,9 +1,9 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 9, F18 the hook's parent (rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7:
-F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4:
-spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 10, F2: a wake fires UserPromptSubmit (rev. 9: F18 the hook's parent; rev. 8: F16 and
+flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5:
+Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
+2026-09-29 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -31,7 +31,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | # | Fact | Source |
 |---|---|---|
 | F1 | `Stop` input carries `last_assistant_message`, `stop_hook_active` and `background_tasks`. | hooks.md § Stop input |
-| F2 | A command hook with `asyncRewake: true` runs in the background; if it exits 2, Claude wakes even when the session is idle (16 ms in the panel) and gets a user-role message, `Stop hook blocking error from command "Stop": <stderr>`, which it treats as a hook notice rather than your words. No 8-in-a-row cap; a wake during a busy turn is delivered right after it; the next Stop has `stop_hook_active: true`. A new local prompt does not stop a waiting hook. `timeout` has no maximum (43200 honoured) and is enforced with SIGTERM; closing the panel sends waiting hooks SIGTERM within 3 s. | hooks.md; S1 |
+| F2 | A command hook with `asyncRewake: true` runs in the background; if it exits 2, Claude wakes even when the session is idle (16 ms in the panel) and gets a user-role message, `Stop hook blocking error from command "Stop": <stderr>`, which it treats as a hook notice rather than your words. No 8-in-a-row cap; a wake during a busy turn is delivered right after it; the next Stop has `stop_hook_active: true`. A new local prompt does not stop a waiting hook. `timeout` has no maximum (43200 honoured) and is enforced with SIGTERM; closing the panel sends waiting hooks SIGTERM within 3 s. The wake also fires `UserPromptSubmit`, about 0.1 s after the hook exits. | hooks.md; S1; plan 3.3 |
 | F3 | A blocking `Stop` hook (`decision: "block"` + `reason`) continues the turn, capped at 8 in a row; `CLAUDE_CODE_STOP_HOOK_BLOCK_CAP` raises the cap. | hooks.md § Stop decision control |
 | F4 | `PreToolUse` on `AskUserQuestion` answers it with `permissionDecision: "allow"` + `updatedInput` = the original input + `answers` (`{question text: answer}`); no dialog appears, in the panel or the terminal. A free-text answer reaches Claude as the user's instruction. Send a multi-select answer as one string joined with `", "`: 2.1.274 passes a list through as `Bun,Biome`. Questions are `choice`, `text` or `number` (`min`, `max`, `step`, `unit`). | hooks.md; S2; 2.1.283 binary |
 | F5 | `PermissionRequest` hooks return `decision.behavior` `allow` / `deny` (+ `message`, `interrupt`); exit 2 is ignored. They fire as the dialog opens, in the panel and the terminal, also for `AskUserQuestion`, whose dialog is a permission request. | hooks.md; S3 |
