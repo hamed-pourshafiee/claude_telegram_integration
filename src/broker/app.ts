@@ -12,12 +12,14 @@ import { firstName, HookEvents } from "./hook-events.ts";
 import { Inbox } from "./inbox.ts";
 import type { Reading } from "./ioreg.ts";
 import { Notifier } from "./notifier.ts";
+import { Outbox } from "./outbox.ts";
 import { Pairing } from "./pairing.ts";
 import { Poller } from "./poller.ts";
 import { Presence } from "./presence.ts";
 import { Relay } from "./relay.ts";
+import { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
-import { Sessions } from "./sessions.ts";
+import { type Session, Sessions } from "./sessions.ts";
 import { Waiters } from "./waiters.ts";
 
 export interface AppDeps {
@@ -57,17 +59,20 @@ export function createApp(deps: AppDeps): App {
   const read = deps.readPresence === undefined ? {} : { read: deps.readPresence };
   const presence = new Presence({ db, log, signal, limits: config.presence, ...read });
   const fullTexts = new FullTexts();
-  const notifier = new Notifier({ telegram, pairing, presence, config, log, fullTexts });
   const sessions = new Sessions(db);
-  const relay = relayOf(db, sessions, telegram, pairing, log);
+  const { relay, router, outbox } = replyParts(db, sessions, telegram, pairing, log);
+  const link = (chat: number, messageId: number, session: Session, kind: string) =>
+    outbox.link(chat, messageId, { sessionId: session.id, generation: session.generation, kind });
+  const notifier = new Notifier({ telegram, pairing, presence, config, log, fullTexts, link });
   const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, log });
   const gate: GateDeps = {
     telegram,
     pairing,
     log,
     command: (name) => runCommand(name, presence),
-    press: (data, chat, queryId) => notifier.press(data, chat, queryId),
-    reply: (updateId) => relay.route(updateId),
+    press: (data, chat, queryId) =>
+      data.startsWith("full:") ? notifier.press(data, chat, queryId) : router.press(data, queryId),
+    reply: (updateId) => router.route(updateId),
   };
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
@@ -82,19 +87,24 @@ export function createApp(deps: AppDeps): App {
     hook: (event, body) => hookEvents.handle(event, body),
   };
   presence.start();
+  // What a crash or a stopped broker left, before any new reply: the relay's part, then the router's,
+  // whose decisions are all made before recover() first waits.
   relay.recover(deps.paths);
+  router
+    .recover()
+    .catch((error: unknown) => log("router.recover-failed", { error: String(error) }));
   if (pairing.pairedUser() !== undefined || pairing.pendingUntil() !== undefined) poller.start();
   return { routes, poller, presence, relay };
 }
 
-/** The relay, which tells the paired user about their replies in their chat with the bot. */
-function relayOf(
+/** The parts that take replies to sessions (plans 3.1, 3.2); messages about them go to the paired user. */
+function replyParts(
   db: BrokerDb,
   sessions: Sessions,
   telegram: TelegramClient,
   pairing: Pairing,
   log: Log,
-): Relay {
+) {
   const tell = async (text: string) => {
     const user = pairing.pairedUser();
     if (user !== undefined) await telegram.sendMessage({ chat_id: user.id, text });
@@ -102,7 +112,11 @@ function relayOf(
   const senderName = () => firstName(pairing.pairedUser()?.name);
   const waiters = new Waiters(db);
   const inbox = new Inbox(db);
-  return new Relay({ db, sessions, waiters, inbox, tell, senderName, log });
+  const outbox = new Outbox(db);
+  outbox.prune();
+  const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log });
+  const router = new Router({ relay, waiters, inbox, outbox, sessions, telegram, log });
+  return { relay, router, outbox };
 }
 
 /** `ctl pair` (plan 2.4): a new code, and polling from now on to hear it. */

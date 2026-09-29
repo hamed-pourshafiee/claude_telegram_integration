@@ -18,6 +18,8 @@ export interface NotifierDeps {
   readonly config: Config;
   readonly log: Log;
   readonly fullTexts: FullTexts;
+  /** Records a sent notice, so a reply-to it finds its session (flow 4, plan 3.2). */
+  readonly link?: (chatId: number, messageId: number, session: Session, kind: string) => void;
 }
 
 /** Builds a notice from the session's label and how much of its text may leave the Mac (D8). */
@@ -62,13 +64,14 @@ export class Notifier {
     for (const [index, text] of reply.messages.entries()) {
       const markup = index === reply.messages.length - 1 && button ? { reply_markup: button } : {};
       const quiet = { link_preview_options: { is_disabled: true } };
-      await telegram.sendMessage({
+      const sent = await telegram.sendMessage({
         chat_id: target.chat,
         text,
         parse_mode: "HTML",
         ...quiet,
         ...markup,
       });
+      this.#deps.link?.(target.chat, sent.message_id, session, kind);
     }
     const cut = reply.fullText !== undefined;
     const counts = { messages: reply.messages.length, redacted: reply.redacted, cut, mode };

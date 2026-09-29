@@ -19,8 +19,9 @@ const MIGRATIONS: readonly (readonly string[])[] = [
       generation INTEGER NOT NULL DEFAULT 0
     ) STRICT`,
   ],
-  // 3 (plan 3.1): Stop hooks waiting for a reply, and the replies from Telegram, stored before the offset
-  // moves on (D7). Times are ms since the epoch: a cancel is matched against them.
+  // 3 (plans 3.1, 3.2): Stop hooks waiting for a reply, the replies from Telegram, stored before the
+  // offset moves on (D7), and the bot's notices, so a reply-to finds its session (flow 4). Times are ms
+  // since the epoch: a cancel is matched against them.
   [
     "ALTER TABLE sessions ADD COLUMN stopped_at INTEGER NOT NULL DEFAULT 0",
     `CREATE TABLE waiters (
@@ -41,10 +42,19 @@ const MIGRATIONS: readonly (readonly string[])[] = [
       reply_to INTEGER,
       text TEXT NOT NULL,
       received_at INTEGER NOT NULL,
-      state TEXT NOT NULL
-        CHECK (state IN ('new', 'handed', 'delivered', 'unconfirmed', 'unrouted')),
+      state TEXT NOT NULL CHECK (state IN
+        ('new', 'choosing', 'queued', 'handed', 'delivered', 'unconfirmed', 'unrouted')),
       session_id TEXT,
       generation INTEGER
+    ) STRICT`,
+    `CREATE TABLE outbox (
+      chat_id INTEGER NOT NULL,
+      message_id INTEGER NOT NULL,
+      session_id TEXT NOT NULL,
+      generation INTEGER NOT NULL,
+      kind TEXT NOT NULL,
+      sent_at INTEGER NOT NULL,
+      PRIMARY KEY (chat_id, message_id)
     ) STRICT`,
   ],
 ];

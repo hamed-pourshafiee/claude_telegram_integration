@@ -14,7 +14,7 @@ export interface GateDeps {
   /** Answers the paired user's press of a button, such as 📄 (plan 2.7). */
   readonly press: (data: string, chat: number, queryId: string) => Promise<void>;
   /** Routes a reply for Claude, which the poller stored before the offset moved on (plan 3.1). */
-  readonly reply: (updateId: number) => void;
+  readonly reply: (updateId: number) => Promise<void>;
 }
 
 const REPLIES = {
@@ -47,8 +47,7 @@ export async function handleUpdate(update: Update, deps: GateDeps): Promise<void
   if (command !== undefined) return answer(update, command, chat, deps);
   if (replyOf(update, paired.id) !== undefined) {
     deps.log("reply.received", { update: update.update_id });
-    deps.reply(update.update_id);
-    return;
+    return deps.reply(update.update_id);
   }
   deps.log("update.accepted", { update: update.update_id, kind: update.kind });
 }

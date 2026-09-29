@@ -15,7 +15,7 @@ test("an update Telegram sends again is stored once", () => {
   expect(inbox.store(reply)).toBe(true);
   expect(inbox.store({ ...reply, text: "changed" })).toBe(false);
   expect(inbox.get(900)).toMatchObject({ ...reply, receivedAt: 123, state: "new" });
-  expect(inbox.unrouted().map((stored) => stored.updateId)).toEqual([900]);
+  expect(inbox.inState("new").map((stored) => stored.updateId)).toEqual([900]);
 });
 
 test("handed keeps the text; delivered, unconfirmed and unrouted drop it", () => {
@@ -29,5 +29,5 @@ test("handed keeps the text; delivered, unconfirmed and unrouted drop it", () =>
     inbox.mark(updateId, state);
     expect(inbox.get(updateId)).toMatchObject({ state, text: "", ...to });
   }
-  expect(inbox.unrouted()).toEqual([]);
+  expect(inbox.inState("new")).toEqual([]);
 });

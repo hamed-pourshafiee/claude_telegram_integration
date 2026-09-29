@@ -33,23 +33,22 @@ interface Parked {
 }
 
 const TEXTS = {
-  nobody: "Nobody is waiting for a reply right now, so your message wasn't delivered.",
-  several:
-    "Several sessions are waiting for a reply, and I can't tell which one you mean yet, so your " +
-    "message wasn't delivered.",
   crossed: (name: string) =>
     `↩️ Your message to ${name} crossed with typing at the Mac. It was already on its way, so ` +
     "Claude still gets it.",
   unconfirmed: (name: string) =>
     `⚠️ Your message to ${name} was handed over but never confirmed, so it may not have arrived. ` +
     "It wasn't sent again.",
+  lostQueue: (name: string) =>
+    `⚠️ ${name} ended before your queued message went in, so it wasn't delivered.`,
 } as const;
 
 /**
- * Replies from Telegram to waiting Stop hooks (flows 1, 2 and 4; plan 3.1). The database decides every
- * race; this class keeps the waiters' open Wait calls and answers them when there is news. A reply is
- * stored before the offset moves on, handed to one waiter, and delivered once that waiter confirms, so
- * nothing is injected twice (D7). What a crash leaves behind is sorted out by recover() at start.
+ * Replies from Telegram to waiting Stop hooks (flows 1, 2 and 4; plans 3.1 and 3.2). The database decides
+ * every race; this class keeps the waiters' open Wait calls and answers them when there is news. A
+ * session's replies go to its waiter together, and are delivered once that waiter confirms, so nothing
+ * is injected twice (D7). What a crash leaves behind is sorted out by recover() at start. Which session
+ * a reply is for is the router's business.
  */
 export class Relay {
   readonly #deps: RelayDeps;
@@ -59,7 +58,7 @@ export class Relay {
     this.#deps = deps;
   }
 
-  /** A Stop hook waits: registered, then answered when there is news for it or after the hold. */
+  /** A Stop hook waits: registered, then answered at once with its queue, or when there is news. */
   wait(fields: Fields): Answer | Promise<Answer> {
     const ref = refOf(fields);
     const { pid, claude_pid: claudePid } = fields;
@@ -68,12 +67,14 @@ export class Relay {
     }
     const waiter = this.#deps.waiters.register({ ...ref, pid, claudePid });
     if (waiter === "stale") return ok({ state: "stale" });
+    // Replies queued while the session was busy go in at its next stop (flow 4).
+    if (waiter.state === "waiting" && this.#handOver(waiter, [])) return this.#replyFor(ref);
     if (waiter.state === "waiting") return this.#park(ref);
-    if (waiter.state === "handed") return this.#replyFor(waiter);
+    if (waiter.state === "handed") return this.#replyFor(ref);
     return ok({ state: waiter.state });
   }
 
-  /** The hook has the reply and injects it now: delivered, once. */
+  /** The hook has its replies and injects them now: delivered, once. */
   confirm(fields: Fields): Answer {
     const ref = refOf(fields);
     const updateId = fields.update_id;
@@ -81,7 +82,7 @@ export class Relay {
     const { db, waiters, inbox, log } = this.#deps;
     const delivered = db.transaction(() => {
       const done = waiters.confirm(ref, updateId);
-      if (done) inbox.mark(updateId, "delivered", ref);
+      if (done) inbox.settleHanded(ref, "delivered");
       return done;
     });
     log("reply.confirmed", { ...logRef(ref), update: updateId, delivered });
@@ -109,31 +110,31 @@ export class Relay {
       const generation = late ? (session?.generation ?? 0) : sessions.advance(sessionId);
       return { generation, late, ...waiters.cancel(sessionId, at) };
     });
-    for (const waiter of done.cancelled) this.#settle(waiter, { state: "cancelled" });
-    for (const waiter of done.crossed) this.#tell(waiter, TEXTS.crossed);
+    for (const waiter of done.cancelled) this.#answer(waiter, ok({ state: "cancelled" }));
+    for (const waiter of done.crossed) this.#tell(waiter.sessionId, TEXTS.crossed);
     const { cancelled, crossed, late } = done;
-    log("waiters.cancelled", {
-      session: sessionId,
-      cancelled: cancelled.length,
-      crossed: crossed.length,
-      late,
-    });
+    const counts = { cancelled: cancelled.length, crossed: crossed.length, late };
+    log("waiters.cancelled", { session: sessionId, ...counts });
     return done.generation;
   }
 
   /** A Stop started `generation`: the session's older waiters are over. */
   stopped(sessionId: string, generation: number): void {
     for (const waiter of this.#deps.waiters.supersede(sessionId, generation)) {
-      this.#settle(waiter, { state: "stale" });
+      this.#answer(waiter, ok({ state: "stale" }));
     }
   }
 
-  /** SessionEnd: none of its waiters will get a reply. */
+  /** SessionEnd: none of its waiters will get a reply, and its queue won't go in. */
   ended(sessionId: string): void {
-    const generation = this.#deps.sessions.get(sessionId)?.generation ?? 0;
-    for (const waiter of this.#deps.waiters.supersede(sessionId, generation + 1)) {
-      this.#settle(waiter, { state: "ended" });
+    const { sessions, waiters, inbox } = this.#deps;
+    const generation = sessions.get(sessionId)?.generation ?? 0;
+    for (const waiter of waiters.supersede(sessionId, generation + 1)) {
+      this.#answer(waiter, ok({ state: "ended" }));
     }
+    const queued = inbox.inState("queued", sessionId);
+    for (const reply of queued) inbox.mark(reply.updateId, "unrouted");
+    if (queued.length > 0) this.#tell(sessionId, TEXTS.lostQueue);
   }
 
   /** Stores a reply before the poller moves the offset on (D7); whether it is new. */
@@ -143,37 +144,24 @@ export class Relay {
     return stored;
   }
 
-  /** Hands a stored reply to the one session listening (plan 3.2 adds reply-to, the picker, a queue). */
-  route(updateId: number): void {
-    const { db, waiters, inbox, log } = this.#deps;
-    for (let attempt = 0; attempt < 3; attempt += 1) {
-      if (inbox.get(updateId)?.state !== "new") return;
-      const listening = waiters.listening();
-      const [target] = listening;
-      if (target === undefined || listening.length > 1) {
-        inbox.mark(updateId, "unrouted");
-        log("reply.unrouted", { update: updateId, listening: listening.length });
-        this.#say(target === undefined ? TEXTS.nobody : TEXTS.several);
-        return;
-      }
-      const handed = db.transaction(() => {
-        if (!waiters.handOver(target, updateId)) return false;
-        inbox.mark(updateId, "handed", target);
-        return true;
-      });
-      // Lost the race to a cancel or a newer stop: look again.
-      if (!handed) continue;
-      log("reply.handed", { ...logRef(target), update: updateId });
-      const waiter = waiters.get(target);
-      if (waiter !== undefined) this.#answer(waiter, this.#replyFor(waiter));
-      return;
-    }
+  /**
+   * Gives replies to a session (flow 4): to its waiter, with any it has queued, if it is waiting;
+   * otherwise they join its queue for its next stop. "ended" when the session is gone.
+   */
+  deliver(sessionId: string, updateIds: readonly number[]): "handed" | "queued" | "ended" {
+    const { sessions, waiters, inbox } = this.#deps;
+    const session = sessions.get(sessionId);
+    if (session === undefined || session.ended) return "ended";
+    const waiter = waiters.listening().find((each) => each.sessionId === sessionId);
+    if (waiter !== undefined && this.#handOver(waiter, updateIds)) return "handed";
+    for (const updateId of updateIds) inbox.mark(updateId, "queued", { sessionId });
+    return "queued";
   }
 
   /**
    * At start, before the broker takes replies: applies the cancels and ends written while no broker ran,
-   * ends waiters whose hook or Claude is gone (a reply handed to one is reported, never resent), and
-   * routes replies that a crash left unrouted.
+   * and ends waiters whose hook or Claude is gone (replies handed to one are reported, never resent).
+   * The router then routes replies a crash left unrouted.
    */
   recover(paths: StatePaths): void {
     this.#applyPending(paths);
@@ -183,7 +171,6 @@ export class Relay {
       this.#deps.log("waiter.gone", logRef(waiter));
       this.#end(waiter);
     }
-    for (const reply of this.#deps.inbox.unrouted()) this.route(reply.updateId);
   }
 
   /** Answers every open Wait (the broker is stopping); the hooks reconnect to the next broker. */
@@ -205,13 +192,30 @@ export class Relay {
     }
   }
 
+  /** Hands the session's queued replies and `updateIds` to its waiting waiter, all or none. */
+  #handOver(waiter: Waiter, updateIds: readonly number[]): boolean {
+    const { db, waiters, inbox, log } = this.#deps;
+    const queued = inbox.inState("queued", waiter.sessionId).map((reply) => reply.updateId);
+    const ids = [...new Set([...queued, ...updateIds])].sort((a, b) => a - b);
+    const last = ids.at(-1);
+    if (last === undefined) return false;
+    const handed = db.transaction(() => {
+      if (!waiters.handOver(waiter, last)) return false;
+      for (const updateId of ids) inbox.mark(updateId, "handed", waiter);
+      return true;
+    });
+    if (!handed) return false;
+    log("reply.handed", { ...logRef(waiter), update: last, replies: ids.length });
+    this.#answer(waiter, this.#replyFor(waiter));
+    return true;
+  }
+
   #end(ref: WaiterRef): void {
-    const waiter = this.#deps.waiters.get(ref);
     const was = this.#deps.waiters.end(ref);
     this.#deps.log("waiter.ended", { ...logRef(ref), was: was ?? "unknown" });
-    if (was === "handed" && waiter?.updateId !== undefined) {
-      this.#deps.inbox.mark(waiter.updateId, "unconfirmed", ref);
-      this.#tell(waiter, TEXTS.unconfirmed);
+    if (was === "handed") {
+      this.#deps.inbox.settleHanded(ref, "unconfirmed");
+      this.#tell(ref.sessionId, TEXTS.unconfirmed);
     }
     this.#resolve(waiterKey(ref), ok({ state: "ended" }));
   }
@@ -227,18 +231,15 @@ export class Relay {
     });
   }
 
-  #replyFor(waiter: Waiter): Answer {
-    const reply = waiter.updateId === undefined ? undefined : this.#deps.inbox.get(waiter.updateId);
+  /** The replies handed to this waiter, as one text, oldest first. */
+  #replyFor(ref: WaiterRef): Answer {
+    const replies = this.#deps.inbox.handedTo(ref);
     return ok({
       state: "reply",
-      update_id: waiter.updateId ?? 0,
-      text: reply?.text ?? "",
+      update_id: this.#deps.waiters.get(ref)?.updateId ?? 0,
+      text: replies.map((reply) => reply.text).join("\n\n"),
       from: this.#deps.senderName(),
     });
-  }
-
-  #settle(ref: WaiterRef, fields: object): void {
-    this.#resolve(waiterKey(ref), ok(fields));
   }
 
   #answer(ref: WaiterRef, answer: Answer): void {
@@ -253,13 +254,9 @@ export class Relay {
     parked.resolve(answer);
   }
 
-  #tell(ref: WaiterRef, text: (name: string) => string): void {
-    const session = this.#deps.sessions.get(ref.sessionId);
-    this.#say(text(session === undefined ? "a session" : label(session)));
-  }
-
-  #say(text: string): void {
-    this.#deps.tell(text).catch((error: unknown) => {
+  #tell(sessionId: string, text: (name: string) => string): void {
+    const session = this.#deps.sessions.get(sessionId);
+    this.#deps.tell(text(session === undefined ? "a session" : label(session))).catch((error) => {
       this.#deps.log("reply.tell-failed", { error: messageOf(error) });
     });
   }

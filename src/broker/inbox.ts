@@ -1,6 +1,13 @@
 import type { BrokerDb } from "./db.ts";
 
-export type InboxState = "new" | "handed" | "delivered" | "unconfirmed" | "unrouted";
+export type InboxState =
+  | "new"
+  | "choosing"
+  | "queued"
+  | "handed"
+  | "delivered"
+  | "unconfirmed"
+  | "unrouted";
 
 /** A reply from Telegram, as the poller stores it. */
 export interface IncomingReply {
@@ -31,13 +38,20 @@ interface Row {
   readonly generation: number | null;
 }
 
+/** A waiter: the session and generation a reply was handed to. */
+interface Target {
+  readonly sessionId: string;
+  readonly generation: number;
+}
+
 /** States after which nothing reads a reply's text again: it is dropped from disk. */
 const SETTLED: ReadonlySet<InboxState> = new Set(["delivered", "unconfirmed", "unrouted"]);
 
 /**
  * Replies from Telegram (flow 4, D7), stored before the offset moves on, so a crash can't lose one, and
  * keyed by update_id, so an update Telegram sends again is stored once. A reply is new until it is
- * routed: handed to a waiter, then delivered, or unconfirmed (its waiter never confirmed), or unrouted.
+ * routed: choosing (the bot asked which session), queued (its session is busy), handed to a waiter with
+ * the session's other queued replies, then delivered, or unconfirmed (never confirmed), or unrouted.
  */
 export class Inbox {
   readonly #db: BrokerDb;
@@ -68,18 +82,43 @@ export class Inbox {
     return row === undefined ? undefined : fromRow(row);
   }
 
-  /** Replies stored but never routed: a crash came between storing and routing. */
-  unrouted(): StoredReply[] {
+  /** Replies in `state`, oldest first; for one session, if given. */
+  inState(state: InboxState, sessionId?: string): StoredReply[] {
+    const bySession = sessionId === undefined ? "" : " AND session_id = ?";
+    const params = sessionId === undefined ? [state] : [state, sessionId];
     return this.#db
-      .all<Row>("SELECT * FROM inbox WHERE state = 'new' ORDER BY update_id")
+      .all<Row>(`SELECT * FROM inbox WHERE state = ?${bySession} ORDER BY update_id`, ...params)
       .map(fromRow);
+  }
+
+  /** The replies handed to one waiter together (its session's queue and the latest), oldest first. */
+  handedTo(to: Target): StoredReply[] {
+    return this.#db
+      .all<Row>(
+        `SELECT * FROM inbox WHERE state = 'handed' AND session_id = ? AND generation = ?
+         ORDER BY update_id`,
+        to.sessionId,
+        to.generation,
+      )
+      .map(fromRow);
+  }
+
+  /** Settles every reply handed to that waiter: delivered, or unconfirmed. Their text goes. */
+  settleHanded(to: Target, state: "delivered" | "unconfirmed"): void {
+    this.#db.run(
+      `UPDATE inbox SET state = ?, text = '' WHERE state = 'handed' AND session_id = ?
+       AND generation = ?`,
+      state,
+      to.sessionId,
+      to.generation,
+    );
   }
 
   /** Records where the reply went. Its text goes once it is settled. */
   mark(
     updateId: number,
     state: InboxState,
-    to?: { readonly sessionId: string; readonly generation: number },
+    to?: { readonly sessionId: string; readonly generation?: number },
   ): void {
     this.#db.run(
       `UPDATE inbox SET state = ?, session_id = coalesce(?, session_id),

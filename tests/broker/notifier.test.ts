@@ -46,10 +46,11 @@ let sent: SendMessageParams[];
 let documents: SendDocumentParams[];
 let answers: AnswerCallbackQueryParams[];
 let logged: string[];
+let links: string[];
 let snapshot: Snapshot;
 let user: PairedUser | undefined;
 beforeEach(() => {
-  [sent, documents, answers, logged] = [[], [], [], []];
+  [sent, documents, answers, logged, links] = [[], [], [], [], []];
   snapshot = away;
   user = { id: 4242, name: "Hamed (@someone)" };
 });
@@ -75,6 +76,9 @@ const notifier = new Notifier({
   config,
   log: (event: string, fields: LogFields) => logged.push(JSON.stringify({ event, ...fields })),
   fullTexts: new FullTexts(),
+  link: (chatId, messageId, linked, kind) => {
+    links.push(`${chatId}/${messageId} ${linked.id}#${linked.generation} ${kind}`);
+  },
 });
 const finish = (text: string) => (name: string, mode: "full" | "ping-only") =>
   finishNotice(name, text, [], mode);
@@ -129,6 +133,13 @@ describe("who gets a notice, and when", () => {
     ]);
     expect(logged.join("\n")).not.toContain("Say");
   });
+});
+
+test("each message sent is linked to its session and generation, for a reply-to (plan 3.2)", async () => {
+  await notifier.send("finish", session("sandbox"), finish("Done."));
+  snapshot = { ...away, state: "active", because: "input" };
+  await notifier.send("finish", session("sandbox"), finish("Not sent."));
+  expect(links).toEqual([`4242/${sent.length} b1e81638-e169#1 finish`]);
 });
 
 describe("what leaves the Mac (D8)", () => {

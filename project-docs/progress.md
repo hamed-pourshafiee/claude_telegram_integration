@@ -953,5 +953,62 @@ of use goes on meanwhile; its feedback may change phase 2's notices first.
 
 ## Next
 
-3.2, routing and queue (flow 4): reply-to, the single waiting session, the picker, nobody listening,
-queued-while-busy, a repeated `update_id`, and an answer for an expired request. On `dev`, like 3.1.
+Committed on `dev` as `925a6f9` (2026-09-29).
+
+## 3.2 Routing and queue
+
+- **Date:** 2026-09-29
+- **Result:** passed (automated; the live check is 3.3). On `dev`, like 3.1.
+- **Evidence:**
+  - `bun run typecheck` exit 0 · `bun run lint` "Checked 107 files … No fixes applied." · `bun test`
+    "468 pass, 0 fail", twice.
+  - The plan's cases, each a test (`router.test.ts`):
+    - A reply-to goes to its notice's session, even with another session waiting.
+    - The single waiting session gets a plain message.
+    - With several waiting, the picker asks "Which one", with a button per session and "Don't send it";
+      the chosen session gets the reply.
+    - Nobody listening: you're told, in the thread of your message, and nothing is kept.
+    - Queued while busy: two replies-to a busy session are queued ("is busy"), and its next stop's Wait
+      gets both, as "first", a blank line, "second".
+    - A repeated `update_id` is stored once and routed once.
+    - An answer for an expired request: a second press, or one 10 minutes on, sends nothing ("That choice
+      has expired").
+    - Also: a session that ends with a queue loses it, and you're told; a reply-to an ended session too.
+  - End to end in the broker, against the stand-in Bot API (`app.test.ts`): a ✅ goes out and is linked;
+    your reply-to it comes in through `getUpdates`, is stored, routed and queued (the session had no
+    waiter yet); its Wait then gets it, "from Hamed".
+  - Positive controls, each caught (failing tests):
+    - a reply-to ignored (4);
+    - no picker, the first of several sessions taking it (3);
+    - a picker answer after 10 minutes accepted (1);
+    - a second picker answer accepted (1);
+    - a repeated update routed again (1);
+    - the queue not handed over at the next stop (2);
+    - only the newest reply handed over, not the queue (1);
+    - a lost queue not reported (1);
+    - notices not linked (2).
+- **Built:**
+  - Schema 3, amended before it went anywhere: the inbox's states `choosing` and `queued`, and `outbox`,
+    which links each notice's message id to its session and generation (kept a week).
+  - `src/broker/router.ts`: where a reply goes. Every decision is made in the database at once; only the
+    messages about it are sent afterwards, so at start all stored replies are placed before the poller
+    runs.
+  - `relay.ts`: `deliver()` hands a session's queued replies and the new one to its waiter together, or
+    queues them. A session's next waiter gets its queue the moment it registers. Confirming or ending
+    settles the whole group.
+  - The notifier links every message it sends; the gate routes replies through the router; a press of a
+    picker button goes to the router, a 📄 press to the notifier.
+- **Decisions (mine, open to change):**
+  - A reply-to any notice of a session (✅, 🔐, ❓, ⚠️) goes to that session, whatever its generation:
+    the session is the conversation. A reply-to an unknown or week-old message counts as a plain one.
+  - "Busy" means the session exists, hasn't ended, and has no waiting hook: Claude is working, or its
+    last stop continued, or the hook isn't waiting yet. Queued replies go in at its next real finish,
+    joined by a blank line, as one "📨 Telegram reply".
+  - A plain message with nobody waiting isn't queued anywhere: the bot says so and suggests a reply-to.
+  - The picker's buttons work 10 minutes, once. They name the sessions by label.
+
+## Next
+
+3.3, live: phase 3 goes to `main` with `ctl install` (the Stop entry becomes `asyncRewake` with
+`--wait`), then "now say bye" from Telegram continues a VS Code session, 10 round-trips, and typing
+locally mid-wait injects nothing.

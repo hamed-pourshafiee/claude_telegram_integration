@@ -65,7 +65,10 @@ const press = (data: string, chat: number, queryId: string) => {
   presses.push(`${data} ${chat} ${queryId}`);
   return Promise.resolve();
 };
-const reply = (updateId: number) => void replies.push(updateId);
+const reply = (updateId: number) => {
+  replies.push(updateId);
+  return Promise.resolve();
+};
 const handle = (update: Update) =>
   handleUpdate(update, { telegram, pairing, log, command, press, reply });
 const reasons = () =>

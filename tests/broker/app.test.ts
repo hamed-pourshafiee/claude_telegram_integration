@@ -142,6 +142,37 @@ test("a finished turn while you're away: the ✅ arrives, and 📄 sends the who
   expect(String(file?.content)).toEndWith("END");
 });
 
+test("your reply-to a ✅ reaches that session: queued while it's busy, then its next Wait (plan 3.2)", async () => {
+  mac = { idleSeconds: 400, locked: false, problems: [] };
+  const db = BrokerDb.open(join(dir, "reply.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
+  const { routes, presence } = app(db);
+  expect(await until(() => presence.snapshot().state === "away")).toBe(true);
+  mkdirSync(join(dir, "sandbox"), { recursive: true });
+  const ref = { session_id: "c0ffee00", project_dir: join(dir, "sandbox"), entrypoint: "cli" };
+  const generation = asFields((await routes.hook("Stop", ref)).body)?.generation;
+  const chat = { id: you.id, type: "private" };
+  fake.fallback("sendMessage", ok({ message_id: 21, date: 0, chat, text: "sent" }));
+  await routes.hook("StopResult", {
+    ...ref,
+    generation,
+    outcome: "finish",
+    text: "Done.",
+    tasks: [],
+  });
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  // You reply to the ✅ (message 21) before the hook waits: the session counts as busy.
+  const message = { message_id: 30, date: 0, chat, from: you, text: "now say bye" };
+  const replyTo = { ...message, reply_to_message: { message_id: 21, date: 0, chat } };
+  fake.answer("getUpdates", ok([{ update_id: 800, message: replyTo }]));
+  expect(await until(() => fake.calls("sendMessage").length === 2)).toBe(true);
+  expect(String(asFields(fake.calls("sendMessage")[1]?.body)?.text)).toContain("is busy");
+  const wait = { ...ref, generation, pid: process.pid, claude_pid: process.pid };
+  const answer = asFields((await routes.hook("Wait", wait)).body);
+  expect(answer).toMatchObject({ state: "reply", text: "now say bye", from: "Hamed" });
+});
+
 test("ctl pair shows the code and what to send", () => {
   const text = pairingInstructions("K7QX-M4PD", "2026-09-28T10:05:00.000Z");
   expect(text).toContain("Pairing code: K7QX-M4PD");
