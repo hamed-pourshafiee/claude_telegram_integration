@@ -100,14 +100,26 @@ function outputFor(tool: string, toolInput: Fields, answers: Readonly<Record<str
  * reads from its plan file (a .md file under `claudeDir`, ~/.claude). No plan: the dialog opens.
  */
 function planInput(toolInput: Fields, claudeDir: string, log: Log): Fields | undefined {
+  // Which way the plan came, and the input's field names (never its text): F4 and F19 in practice.
+  const keys = Object.keys(toolInput).sort().join(",");
   const { plan, planFilePath: file } = toolInput;
-  if (typeof plan === "string" && plan.trim() !== "") return { plan };
-  if (typeof file !== "string" || !file.endsWith(".md")) return undefined;
-  if (!isInside(file, claudeDir)) return undefined;
+  if (typeof plan === "string" && plan.trim() !== "") {
+    log("hook.plan", { from: "input", keys, chars: plan.length });
+    return { plan };
+  }
+  const text = planFile(file, claudeDir, log);
+  log("hook.plan", { from: text === undefined ? "none" : "file", keys });
+  return text === undefined ? undefined : { plan: text };
+}
+
+function planFile(file: unknown, claudeDir: string, log: Log): string | undefined {
+  if (typeof file !== "string" || !file.endsWith(".md") || !isInside(file, claudeDir)) {
+    return undefined;
+  }
   try {
     if (statSync(file).size > MAX_PLAN_BYTES) return undefined;
     const text = readFileSync(file, "utf8");
-    return text.trim() === "" ? undefined : { plan: text };
+    return text.trim() === "" ? undefined : text;
   } catch (error) {
     log("hook.plan-unreadable", { error: errorCode(error) });
     return undefined;
