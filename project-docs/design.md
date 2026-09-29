@@ -161,9 +161,9 @@ Taken (say so before the step if you disagree):
   full text, redacted, as a `.md` file. Folders listed in `config.json` (`content.pingOnly`) get pings
   only. Bot chats are Telegram cloud chats, not end-to-end encrypted, so that text is stored by
   Telegram. The chat shows Claude's Markdown as Telegram formatting (bold, italics, code, code blocks,
-  tables as preformatted text, web links), with file names and paths as code so that Telegram doesn't
-  turn them into links (decided with you on 2026-09-29, at the phase 2 checkpoint). Markup that Telegram
-  refuses goes again as plain text.
+  tables as preformatted text with their columns lined up, web links), with file names and paths as code
+  so that Telegram doesn't turn them into links (decided with you on 2026-09-29, at the phase 2
+  checkpoint). Markup that Telegram refuses goes again as plain text.
 
 Open, needed at the plan step shown:
 

@@ -1,3 +1,5 @@
+import { alignedTable } from "./table.ts";
+
 /** Telegram's HTML mode needs these three escaped in text (Bot API, formatting options). */
 export function escapeHtml(text: string): string {
   return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -36,7 +38,9 @@ export function renderUnits(text: string, limit: number): string[] {
     const open =
       block.kind === "code" && block.lang ? `<pre><code class="language-${block.lang}">` : "<pre>";
     const close = open === "<pre>" ? "</pre>" : "</code></pre>";
-    return preUnits(block.lines, open, close, limit);
+    // Lined up before escaping, so that "&lt;" counts as the one column it shows.
+    const lines = block.kind === "table" ? alignedTable(block.lines) : block.lines;
+    return preUnits(lines, open, close, limit);
   });
 }
 

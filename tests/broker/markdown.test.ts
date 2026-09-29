@@ -59,7 +59,7 @@ describe("lines and blocks", () => {
     ]);
   });
 
-  test("a code block is one unit, in its language, escaped; a table keeps its columns", () => {
+  test("a code block is one unit, in its language, escaped; a table is lined up, then escaped", () => {
     expect(units("Before:\n```ts\nconst a = 1 < 2;\n\nlet b;\n```\nAfter.")).toEqual([
       "Before:",
       '<pre><code class="language-ts">const a = 1 &lt; 2;\n\nlet b;</code></pre>',
@@ -68,6 +68,7 @@ describe("lines and blocks", () => {
     expect(units("| a | b |\n|---|---|\n| 1 | 2 |")).toEqual([
       "<pre>| a | b |\n|---|---|\n| 1 | 2 |</pre>",
     ]);
+    expect(units("| a<b | c |\n|---|---|")).toEqual(["<pre>| a&lt;b | c |\n|-----|---|</pre>"]);
   });
 
   test("a reply cut inside a code block ends in code", () => {
