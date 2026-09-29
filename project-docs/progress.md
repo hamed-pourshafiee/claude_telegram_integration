@@ -1065,6 +1065,61 @@ Committed on `dev` as `c917760` (2026-09-29).
 
 ## Next
 
+Committed as `279a93f` (2026-09-29). Then the user settled the two open questions: Claude's Markdown is
+rendered (D8, design rev. 11), which became step 3.4 (plan rev. 9), and nothing in the day of use was
+noisy ("Nothing so far").
+
+## 3.4 Claude's Markdown in Telegram
+
+- **Date:** 2026-09-29
+- **Result:** passed, with the user one small step at a time. Every ✅ shows Claude's Markdown as
+  Telegram formatting.
+- **Built** (on `dev`, `7eeeffc`):
+  - `src/broker/markdown.ts`: Claude's Markdown as Telegram HTML, in whole units (a line of text, a code
+    block, a table), each one closing its tags and short enough for a message.
+    - Headings go bold, list items get bullets.
+    - Bold, italics, strikethrough and inline code; code blocks in their language.
+    - A web link stays a link; a link to anything else shows its label as code.
+    - File names and paths are code, so Telegram doesn't make links of them (`hello.py` is a domain).
+  - `format.ts` packs the units into messages. The notifier sends a message Telegram refuses ("can't
+    parse entities") again as plain text, and logs `notice.plain`.
+  - Gate: typecheck exit 0, "Checked 109 files", "481 pass, 0 fail", twice.
+  - Positive controls, each caught: file names left as text (1 failing test), no plain resend (1),
+    messages packed past the limit (2), italics, strikethrough or underscores wrapping tags (2 each). The
+    italics control missed at first; the tests now include marks that cross (`~~a **b~~ c**`).
+- **Going live:** `main` was fast-forwarded to `7eeeffc` and the broker stopped (pid 9778). A waiting hook
+  started it again within a second: pid 18156 at 18:41:07, a second after the commit, schema 3. The two
+  waiting hooks (`219e`, `0253`) stayed connected.
+- **Evidence** (`/away` on at 15:14:14; broker log):
+  - **A Markdown-rich ✅:** the sandbox was asked for a heading, bold, `hello.py`, a table and a python
+    block. Its ✅ went out with `sendMessage` 200 at 15:16:41.362 (`notice.sent`, 1 message). On the
+    phone (screenshot): heading and phrase bold, `hello.py` as code (from a `[hello.py](hello.py)` link
+    too), the table in a monospace block, the python block highlighted.
+  - **The table's columns didn't line up:** Claude doesn't pad its cells. Fixed on `dev` (`811e1e0`,
+    `src/broker/table.ts`): each cell padded to its column, emoji and East Asian wide characters counted
+    as two columns, code and bold marks dropped in cells.
+    - Gate: "Checked 111 files", "485 pass, 0 fail", twice.
+    - Controls, each caught (1 failing test each): emoji as one column, widths of the escaped text,
+      alignment colons ignored, marks kept, no delimiter row needed.
+  - **Live again**, in this build session's own ✅ (away mode relays it too): the text lined up, but each
+    emoji pushed its row's closing pipe out. Telegram draws an emoji about 2.4 columns wide.
+    - Fixed (`5aca60a`): tables drawn as psql draws them, without pipes at either end.
+    - One more control: trailing spaces kept (2).
+  - **Live a third time**, the same table: every pipe straight but one, half a character right in the
+    row with an emoji before it, as predicted.
+  - 7 ✅s went out from 3.4's start to the end of the check; no `notice.plain`. Then the user went back to
+    `/auto` (15:35:12).
+- **Learned:**
+  - Telegram draws an emoji in a code block about 2.4 columns wide (in the user's app), not 2, and the
+    width differs between apps and text sizes: no padding lines an emoji up exactly. Without pipes at the
+    ends, an emoji in the last column doesn't matter, and that's where Claude puts most of them.
+  - Telegram shows a code block with no language under a "copy" header; one with a language is
+    highlighted under its name.
+  - `ctl stop` is no pause: a waiting hook starts the broker again within a second, on the code in the
+    working copy at that moment. So `main` is fast-forwarded first, then the broker stopped.
+  - With `/away` on, this build session's own ✅ can carry a live check's sample, so the user only looks.
+
+## Next
+
 Phase 4, "answer Claude's questions from Telegram": 4.1 relays `AskUserQuestion` with flow 3's three
-presence states. Built on `dev`. Still open with the user: what was noisy during the day of use, and the
-Markdown question from 2.8.
+presence states. Built on `dev`.
