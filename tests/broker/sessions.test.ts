@@ -17,7 +17,7 @@ const ref = { id: "b1e81638-e169", projectDir: "/work/sandbox", entrypoint: "cla
 
 test("a session is recorded on its first hook, SessionStart or not, and keeps its branch", () => {
   const all = sessions();
-  expect(all.touch(ref)).toEqual({ ...ref, branch: "", generation: 0, ended: false });
+  expect(all.touch(ref)).toEqual({ ...ref, branch: "", generation: 0, ended: false, stoppedAt: 0 });
   expect(all.touch(ref, "main").branch).toBe("main");
   expect(all.touch(ref).branch).toBe("main");
 });

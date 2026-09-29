@@ -13,6 +13,8 @@ export interface Session extends SessionRef {
   readonly branch: string;
   readonly generation: number;
   readonly ended: boolean;
+  /** When its latest Stop came, in ms since the epoch; 0 before the first. */
+  readonly stoppedAt: number;
 }
 
 interface Row {
@@ -22,6 +24,7 @@ interface Row {
   readonly branch: string;
   readonly ended_at: string | null;
   readonly generation: number;
+  readonly stopped_at: number;
 }
 
 /**
@@ -52,7 +55,15 @@ export class Sessions {
     );
     if (branch !== undefined)
       this.#db.run("UPDATE sessions SET branch = ? WHERE id = ?", branch, ref.id);
-    return this.get(ref.id) ?? { ...ref, branch: branch ?? "", generation: 0, ended: false };
+    return (
+      this.get(ref.id) ?? {
+        ...ref,
+        branch: branch ?? "",
+        generation: 0,
+        ended: false,
+        stoppedAt: 0,
+      }
+    );
   }
 
   get(id: string): Session | undefined {
@@ -65,6 +76,14 @@ export class Sessions {
     return this.#db.transaction(() => {
       this.#db.run("UPDATE sessions SET generation = generation + 1 WHERE id = ?", id);
       return this.get(id)?.generation ?? 0;
+    });
+  }
+
+  /** A Stop: its generation starts, and the session remembers when (a later cancel is late, plan 3.1). */
+  stop(id: string): number {
+    return this.#db.transaction(() => {
+      this.#db.run("UPDATE sessions SET stopped_at = ? WHERE id = ?", this.#now().getTime(), id);
+      return this.advance(id);
     });
   }
 
@@ -92,5 +111,6 @@ function fromRow(row: Row): Session {
     branch: row.branch,
     generation: row.generation,
     ended: row.ended_at !== null,
+    stoppedAt: row.stopped_at,
   };
 }

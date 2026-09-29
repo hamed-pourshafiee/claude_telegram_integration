@@ -8,7 +8,7 @@ replies come back into the same session.
 
 Read these completely before doing anything in a new session:
 
-1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F17, architecture
+1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F18, architecture
    and flows 1–4, decisions D1–D8, open questions O2–O3, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
@@ -29,6 +29,8 @@ Read these completely before doing anything in a new session:
   - New work happens in a git worktree, `../claude_telegram_integration-dev` on branch `dev`, tested there.
   - When its gate passes, fast-forward `main` here to it and restart the broker; then the live check.
   - A live check that fails is fixed in the worktree and fast-forwarded again.
+  - Phase 3 moves `main` only at 3.3, with its install and live check: its schema 3 would stop phase 2's
+    code from opening the broker's database, so a half-built phase 3 must not reach the live broker.
 - When the user has to act, give one small step per message and wait for them before the next.
 - Strict TypeScript with no `any`; files ≤ 300 lines, functions ≤ 50; an `unhandledRejection` handler in
   every entry point; no silent catches (log with context).

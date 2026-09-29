@@ -65,15 +65,19 @@ export async function brokerHealth(
   return parseHealth(await request(paths, "/health", undefined, log, timeoutMs));
 }
 
-/** POSTs `body` to the broker: its JSON answer, or undefined when it didn't answer. */
+/**
+ * POSTs `body` to the broker: its JSON answer, or undefined when it didn't answer in time or `signal`
+ * aborted the call (a waiting hook's SIGTERM, plan 3.1).
+ */
 export function callBroker(
   paths: StatePaths,
   path: string,
   body: unknown,
   log: Log,
   timeoutMs = 2000,
+  signal?: AbortSignal,
 ): Promise<unknown> {
-  return request(paths, path, JSON.stringify(body), log, timeoutMs);
+  return request(paths, path, JSON.stringify(body), log, timeoutMs, signal);
 }
 
 /**
@@ -140,11 +144,13 @@ async function request(
   body: string | undefined,
   log: Log,
   timeoutMs: number,
+  abort?: AbortSignal,
 ): Promise<unknown> {
-  if (!existsSync(paths.socket)) return undefined;
+  if (!existsSync(paths.socket) || abort?.aborted) return undefined;
   const init = body === undefined ? {} : { method: "POST", body, headers: JSON_HEADERS };
   try {
-    const signal = AbortSignal.timeout(timeoutMs);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = abort === undefined ? timeout : AbortSignal.any([timeout, abort]);
     const response = await fetch(`http://broker${path}`, { ...init, unix: paths.socket, signal });
     return await response.json();
   } catch (error) {

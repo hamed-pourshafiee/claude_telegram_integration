@@ -2,8 +2,10 @@ import { errorCode } from "../shared/errors.ts";
 import type { HookInput } from "../shared/hook-input.ts";
 import { asFields } from "../shared/json.ts";
 import type { Log } from "../shared/log.ts";
+import type { Pending } from "../shared/pending.ts";
 import { gitBranch } from "./branch.ts";
 import { type ClassifyOptions, classifyStop } from "./finish.ts";
+import { type WaiterDeps, waitForReply } from "./waiter.ts";
 
 /** Who the hook runs for, as every broker call names it. */
 export interface SessionRef {
@@ -19,19 +21,39 @@ export interface HookContext {
   readonly log: Log;
   /** Starts the broker unless one answers; whether one answers now. */
   readonly ensureBroker: () => Promise<boolean>;
-  /** POSTs to the broker's /hook/<name>; its answer, or undefined when none came. */
-  readonly call: (name: string, body: object, timeoutMs?: number) => Promise<unknown>;
+  /** POSTs to the broker's /hook/<name>; its answer, or undefined when none came (or `signal` aborted). */
+  readonly call: (
+    name: string,
+    body: object,
+    timeoutMs?: number,
+    signal?: AbortSignal,
+  ) => Promise<unknown>;
   /** The hook's output for Claude Code, on stdout. */
   readonly print: (text: string) => void;
-  /** Tests wait less for a stop's summary. */
+  /** Whether the Stop hook waits for a reply: installed with --wait and asyncRewake (plan 3.1). */
+  readonly wait: boolean;
+  /** Aborted on SIGTERM: the panel closed, or the hook's timeout came. */
+  readonly signal: AbortSignal;
+  /** Wakes Claude with `text`: the hook exits 2 with it on stderr (F2). */
+  readonly rewake: (text: string) => void;
+  /** The Claude Code process the hook serves (its parent), and whether it still runs. */
+  readonly claudePid: number;
+  readonly claudeAlive: () => boolean;
+  /** The disabled flag (D3). */
+  readonly disabled: () => boolean;
+  /** Leaves a cancel or a waiter's end on disk for the next broker, when none answered. */
+  readonly pending: (item: Pending) => void;
+  /** Tests wait less for a stop's summary… */
   readonly classify?: ClassifyOptions;
+  /** …and retry sooner while waiting. */
+  readonly waiting?: Pick<WaiterDeps, "retryMs" | "watchMs">;
 }
 
 type Handler = (context: HookContext) => Promise<void>;
 
 /**
- * What each hook event does (design §3, plan 2.7). Phase 2 only notifies: nothing here decides for
- * Claude, and every handler returns without output except SessionStart's note.
+ * What each hook event does (design §3, plans 2.7 and 3.1). Nothing here decides for Claude: handlers
+ * return without output, except SessionStart's note and a Stop hook that wakes Claude with a reply.
  */
 export const HANDLERS: Readonly<Record<string, Handler>> = {
   SessionStart: sessionStart,
@@ -69,9 +91,16 @@ async function sessionStart(context: HookContext): Promise<void> {
   context.print(JSON.stringify(output));
 }
 
-/** The cancel barrier (flow 2): typing at the Mac cancels the stop before it. No broker, no stop. */
+/**
+ * The cancel barrier (flow 2): typing at the Mac cancels the stop before it, and its waiter. With no
+ * broker to tell, the cancel waits on disk; the next broker applies it before it takes replies.
+ */
 async function userPromptSubmit(context: HookContext): Promise<void> {
-  await context.call("UserPromptSubmit", context.session, 1000);
+  const at = Date.now();
+  const answer = await context.call("UserPromptSubmit", { ...context.session, at }, 1000);
+  if (answer === undefined) {
+    context.pending({ kind: "cancel", sessionId: context.session.session_id, at });
+  }
 }
 
 /** Registers the stop, tells a real finish from a continuation (F16) and reports it. */
@@ -97,6 +126,41 @@ async function stop(context: HookContext): Promise<void> {
   });
   const result = { ...context.session, generation, outcome, text, tasks: input.backgroundTasks };
   await context.call("StopResult", result);
+  if (context.wait && outcome !== "continuing") await replyAfter(context, generation);
+}
+
+/** Why a wait ended without the broker knowing: it hears of it, now or from disk (plan 3.1). */
+const UNTOLD: ReadonlySet<string> = new Set([
+  "terminated",
+  "claude gone",
+  "stopped before confirming",
+  "confirm failed",
+  "bad reply",
+  "bad answer",
+]);
+
+/** Waits for a reply to this stop and wakes Claude with it (flow 1). */
+async function replyAfter(context: HookContext, generation: number): Promise<void> {
+  const { session, log } = context;
+  const body = { ...session, generation, pid: process.pid, claude_pid: context.claudePid };
+  const result = await waitForReply(body, {
+    call: (name, fields, timeoutMs, signal) => context.call(name, fields, timeoutMs, signal),
+    ensureBroker: context.ensureBroker,
+    disabled: context.disabled,
+    claudeAlive: context.claudeAlive,
+    signal: context.signal,
+    log,
+    ...context.waiting,
+  });
+  log("hook.waited", { generation, result: result.kind === "reply" ? "reply" : result.why });
+  if (result.kind === "reply") {
+    context.rewake(`📨 Telegram reply from ${result.from ?? "the user"}: ${result.text}`);
+    return;
+  }
+  if (!UNTOLD.has(result.why)) return;
+  // Not with the aborted signal: SIGTERM leaves a moment for this.
+  if ((await context.call("End", { ...session, generation }, 1000)) !== undefined) return;
+  context.pending({ kind: "end", sessionId: session.session_id, generation, at: Date.now() });
 }
 
 /** idle_prompt, terminal only (F6): a second sign that the session finished. */

@@ -48,6 +48,7 @@ const text = (update_id: number) => ({
 
 function poller(
   handle: (update: Update) => Promise<void> = async (u) => void handled.push(u.update_id),
+  accept: (update: Update) => void = () => undefined,
 ) {
   const { signal } = controller;
   const telegram = new TelegramClient({ token: new Secret(FAKE_TOKEN), apiBase: fake.url, signal });
@@ -55,7 +56,8 @@ function poller(
     sleeps.push(ms);
     return Promise.resolve();
   };
-  return new Poller({ telegram, db, log, handle, signal, sleep, botId: BOT_ID, pollSeconds: 1 });
+  const deps = { telegram, db, log, accept, handle, signal, sleep };
+  return new Poller({ ...deps, botId: BOT_ID, pollSeconds: 1 });
 }
 
 describe("the poller", () => {
@@ -86,7 +88,40 @@ describe("the poller", () => {
     expect(db.getMeta(offsetKey(BOT_ID))).toBe("22");
     expect(logged.some((line) => line.includes('"event":"update.failed"'))).toBe(true);
   });
+});
 
+describe("storing replies before the offset moves on (plan 3.1, D7)", () => {
+  test("a reply is stored before the offset moves on, and handled after", async () => {
+    fake.answer("getUpdates", ok([text(50)]));
+    const offsets: (string | undefined)[] = [];
+    const accept = () => void offsets.push(db.getMeta(offsetKey(BOT_ID)));
+    const handle = async (update: Update) => {
+      offsets.push(db.getMeta(offsetKey(BOT_ID)));
+      handled.push(update.update_id);
+    };
+    poller(handle, accept).start();
+    expect(await until(() => handled.length === 1)).toBe(true);
+    expect(offsets).toEqual([undefined, "51"]);
+  });
+
+  test("a crash after fetching, before storing: the offset stays, and the update comes again", async () => {
+    fake.answer("getUpdates", ok([text(60)]), ok([text(60)]));
+    let fails = 1;
+    const stored: number[] = [];
+    const accept = (update: Update) => {
+      if (fails-- > 0) throw new Error("disk full");
+      stored.push(update.update_id);
+    };
+    poller(undefined, accept).start();
+    expect(await until(() => handled.length === 1)).toBe(true);
+    expect(stored).toEqual([60]);
+    expect(fake.calls("getUpdates")[1]?.body).not.toHaveProperty("offset");
+    expect(db.getMeta(offsetKey(BOT_ID))).toBe("61");
+    expect(sleeps).toEqual([1000]);
+  });
+});
+
+describe("the poller, failing and stopping", () => {
   test("failures wait: a 409 60 s, a 401 5 minutes, then it carries on", async () => {
     fake.answer(
       "getUpdates",
@@ -114,7 +149,8 @@ test("the offset belongs to its bot: another bot starts afresh, the same bot car
     const signal = controller.signal;
     const telegram = new TelegramClient({ token: new Secret(token), apiBase: fake.url, signal });
     const handle = async (update: Update) => void handled.push(update.update_id);
-    new Poller({ telegram, db, log, handle, signal, botId, pollSeconds: 1 }).start();
+    const accept = () => undefined;
+    new Poller({ telegram, db, log, accept, handle, signal, botId, pollSeconds: 1 }).start();
     const before = fake.calls("getUpdates").length;
     expect(await until(() => fake.calls("getUpdates").length > before)).toBe(true);
     controller.abort();

@@ -10,6 +10,7 @@ import { pairingInstructions } from "../../src/ctl/pair.ts";
 import { parseConfig } from "../../src/shared/config.ts";
 import { asFields } from "../../src/shared/json.ts";
 import { noLog } from "../../src/shared/log.ts";
+import { statePaths } from "../../src/shared/paths.ts";
 import { Secret } from "../../src/shared/secret.ts";
 import { FakeTelegram, ok } from "../helpers/fake-telegram.ts";
 import { FAKE_TOKEN } from "../helpers/secrets.ts";
@@ -42,7 +43,8 @@ function app(db?: BrokerDb) {
   const deps = { token: new Secret(FAKE_TOKEN), db: opened, log: noLog, signal: controller.signal };
   const config = parseConfig({}, { repoRoot: dir, home: dir });
   const readPresence = () => Promise.resolve(mac);
-  return { db: opened, ...createApp({ ...deps, config, readPresence, apiBase: fake.url }) };
+  const paths = statePaths(join(dir, `state-${files}`));
+  return { db: opened, ...createApp({ ...deps, config, paths, readPresence, apiBase: fake.url }) };
 }
 
 const you = { id: 4242, is_bot: false, first_name: "Hamed", username: "hamed" };
@@ -120,7 +122,7 @@ test("a finished turn while you're away: the ✅ arrives, and 📄 sends the who
   expect(await until(() => presence.snapshot().state === "away")).toBe(true);
   mkdirSync(join(dir, "sandbox"), { recursive: true });
   const ref = { session_id: "b1e81638", project_dir: join(dir, "sandbox"), entrypoint: "cli" };
-  const generation = asFields(routes.hook("Stop", ref).body)?.generation;
+  const generation = asFields((await routes.hook("Stop", ref)).body)?.generation;
   const chat = { id: you.id, type: "private" };
   fake.fallback("sendMessage", ok({ message_id: 11, date: 0, chat, text: "✅" }));
   const reply = `${"word ".repeat(1000)}END`;

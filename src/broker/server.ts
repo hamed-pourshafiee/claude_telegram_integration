@@ -1,12 +1,17 @@
 import { chmodSync, rmSync } from "node:fs";
+import type { Answer } from "./answer.ts";
 
 /** What the broker answers on its socket. */
 export interface Routes {
   health(): unknown;
   /** Starts a pairing (plan 2.4): the answer holds the one-time code, for `ctl pair` to show. */
   pair(): unknown;
-  hook(event: string, body: unknown): { readonly status: number; readonly body: unknown };
+  /** A hook's call; a waiting Stop hook's Wait is answered later (plan 3.1). */
+  hook(event: string, body: unknown): Answer | Promise<Answer>;
 }
+
+/** Seconds a connection may stay quiet: longer than a Wait is held (25 s), under Bun's cap of 255. */
+const IDLE_SECONDS = 60;
 
 /** macOS allows 104 bytes for a Unix socket path, the final NUL included. */
 const MAX_SOCKET_PATH = 103;
@@ -23,7 +28,14 @@ export function startServer(socket: string, routes: Routes): Bun.Server<undefine
     );
   }
   rmSync(socket, { force: true });
-  const server = Bun.serve({ unix: socket, fetch: (request) => route(request, routes) });
+  // Bun 1.4.1 cuts a request on a Unix socket after 10 s unless idleTimeout says otherwise, which would
+  // cut a held Wait; its types allow idleTimeout only for TCP, hence the cast (tested in plan 3.1).
+  const options = {
+    unix: socket,
+    idleTimeout: IDLE_SECONDS,
+    fetch: (request: Request) => route(request, routes),
+  };
+  const server = Bun.serve(options as unknown as Parameters<typeof Bun.serve<undefined>>[0]);
   chmodSync(socket, 0o600);
   return server;
 }
@@ -34,7 +46,7 @@ async function route(request: Request, routes: Routes): Promise<Response> {
   if (request.method === "POST" && pathname === "/pair") return Response.json(routes.pair());
   const event = /^\/hook\/([A-Za-z]{1,40})$/.exec(pathname)?.[1];
   if (request.method === "POST" && event !== undefined) {
-    const { status, body } = routes.hook(event, await readJson(request));
+    const { status, body } = await routes.hook(event, await readJson(request));
     return Response.json(body, { status });
   }
   return Response.json({ ok: false, error: "not found" }, { status: 404 });

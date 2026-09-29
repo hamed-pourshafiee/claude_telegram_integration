@@ -878,5 +878,80 @@ Committed as `426a330` (2026-09-29).
 
 ## Next
 
-Phase 3, step 3.1 (waiter protocol), built in the worktree. The day of use goes on meanwhile; its
-feedback may change phase 2's notices first.
+Committed as `1342b1b` (2026-09-29). Phase 3, step 3.1 (waiter protocol), built in the worktree. The day
+of use goes on meanwhile; its feedback may change phase 2's notices first.
+
+## 3.1 Waiter protocol
+
+- **Date:** 2026-09-29
+- **Result:** passed (automated; plan 3.1 has no live check). Built on branch `dev` in the worktree.
+  `main` stays on phase 2 until 3.3 (see Decisions).
+- **Evidence:**
+  - `bun run typecheck` exit 0 · `bun run lint` "Checked 104 files … No fixes applied." · `bun test`
+    "456 pass, 0 fail", twice.
+  - The plan's cases, each a test:
+    - Both race orders (`relay.test.ts`): a reply first is handed over, and your typing then only says it
+      crossed; typing first cancels the waiter, and the reply finds nobody waiting.
+    - A late cancel, typed before a newer stop, leaves that stop's generation and waiter alone.
+    - An old waiter that ends after its replacement registered leaves the session listening.
+    - A waiter that ends while the broker is down: its end waits on disk, and the next broker applies it.
+    - A broker crash after fetching an update (`poller.test.ts`: storing fails, the offset stays, the
+      update comes again), after storing it (the next broker routes it), and after handing it over (the
+      waiter confirms to the next broker; or, its hook gone too, you're told and it isn't resent).
+  - Real processes (`wait-process.test.ts`, a throwaway repo copy):
+    - A Stop hook with `--wait` waits; SIGTERM ends it with exit 0 in under 2 s, and its waiter is ended.
+    - A reply stored before the broker was killed with SIGKILL: the hook started a second broker, got
+      the reply, confirmed it, and exited 2 with "📨 Telegram reply from the user: now say bye".
+  - Positive controls, each caught (failing tests):
+    - a reply handed to a waiter that isn't waiting (1);
+    - a cancel that reaches waiters registered after it (2);
+    - a late cancel that moves the generation on (1);
+    - a newer stop that leaves the older waiter waiting (1);
+    - cancels and ends on disk never applied (2);
+    - dead waiters never swept (1);
+    - stored replies never routed after a crash (3);
+    - the offset moved before the reply is stored (2);
+    - an unknown command taken as a reply (1);
+    - a reply injected without confirming (6);
+    - a SIGTERM'd waiter that never reports its end (2);
+    - typing with no broker leaves no cancel (1);
+    - every Stop waits, `--wait` or not (2).
+- **Built:**
+  - Schema 3: `waiters` (one per session and generation: waiting → handed → delivered, or cancelled or
+    ended), `inbox` (replies by `update_id`), and `sessions.stopped_at`.
+  - `src/broker/waiters.ts`, `inbox.ts`, `relay.ts`: every race is one SQL update on a waiting row. The
+    relay holds each waiter's Wait up to 25 s and answers it when there is news. At start, before the
+    poller, it applies what hooks left on disk, ends waiters whose hook or Claude is gone (reporting a
+    reply handed to one), and routes replies a crash left unrouted.
+  - The poller stores a reply before it moves the offset, then handles the update. The gate takes the
+    paired user's text as a reply, never a command (not even an unknown one such as `/start`).
+  - Hooks: `src/hooks/waiter.ts` long-polls Wait, confirms a reply before returning it, and stops on
+    SIGTERM, the disabled flag or Claude gone. The Stop hook waits only when installed with `--wait`,
+    and wakes Claude by exiting 2 with "📨 Telegram reply from <name>: …". UserPromptSubmit sends when
+    you typed. With no broker, a cancel or a waiter's end is written to `.state/pending/`.
+  - `ctl install`: the Stop entry becomes `asyncRewake`, 12 h, with `--wait` (installed at 3.3).
+  - Design rev. 9: F18.
+- **Decisions (mine, open to change):**
+  - Waiting is tied to the install: only a Stop hook installed with `--wait` (and `asyncRewake`) waits.
+    Code that reaches `main` before its install never swallows a reply Claude couldn't be woken for.
+  - A reply that can't be confirmed is never injected: the broker reports it, and doesn't resend it
+    (plan 3.1). "Unknown" stops wait too: a reply to them is still useful, and the next stop ends them.
+  - For now a reply goes to the one session listening; with none or several, you're told it wasn't
+    delivered. Plan 3.2 adds reply-to, the picker and the queue.
+  - Messages about your replies (crossed, unconfirmed, nobody listening) are sent whatever the presence
+    or `/off`: they answer something you just did.
+  - A reply's text is on disk (the inbox) only until it is delivered or given up; then it is erased.
+  - `main` moves to phase 3 only at 3.3: schema 3 would stop phase 2's code from opening the broker's
+    database, so a half-built phase 3 must not reach the live broker. CLAUDE.md says so.
+- **Learned:**
+  - Hooks run as direct children of the Claude Code process, for sync and `asyncRewake` hooks alike
+    (F18, probed with a real `claude -p`). So a waiter watches its parent pid.
+  - Bun 1.4.1 cuts a request on a Unix-socket server after 10 s unless `idleTimeout` is set (seen: the
+    14 s request failed at 12 s). Its types allow `idleTimeout` only for TCP, but it works on a Unix
+    socket (the 14 s request was answered); `server.timeout(request, …)` did not help. The server
+    passes it through a typed cast, with a comment.
+
+## Next
+
+3.2, routing and queue (flow 4): reply-to, the single waiting session, the picker, nobody listening,
+queued-while-busy, a repeated `update_id`, and an answer for an expired request. On `dev`, like 3.1.

@@ -2,10 +2,14 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Answer } from "../../src/broker/answer.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { HookEvents } from "../../src/broker/hook-events.ts";
+import { Inbox } from "../../src/broker/inbox.ts";
 import type { NoticeOf } from "../../src/broker/notifier.ts";
+import { Relay } from "../../src/broker/relay.ts";
 import { label, type Session, Sessions } from "../../src/broker/sessions.ts";
+import { Waiters } from "../../src/broker/waiters.ts";
 import { noLog } from "../../src/shared/log.ts";
 import {
   classifiedAt,
@@ -36,11 +40,29 @@ function broker(): { readonly sent: string[]; readonly call: Call } {
       return Promise.resolve(true);
     },
   };
-  const sessions = new Sessions(BrokerDb.open(join(dir, `stops-${files}.db`)));
+  const db = BrokerDb.open(join(dir, `stops-${files}.db`));
+  const sessions = new Sessions(db);
   const pairing = { pairedUser: () => undefined };
-  const events = new HookEvents({ sessions, notifier, pairing, log: noLog });
+  const waiters = new Waiters(db);
+  const inbox = new Inbox(db);
+  const tell = () => Promise.resolve();
+  const relay = new Relay({
+    db,
+    sessions,
+    waiters,
+    inbox,
+    tell,
+    senderName: () => null,
+    log: noLog,
+  });
+  const events = new HookEvents({ sessions, notifier, pairing, relay, log: noLog });
   const ref = { session_id: "5e551011", project_dir: "/work/sandbox", entrypoint: "claude-vscode" };
-  return { sent, call: (event, fields = {}) => events.handle(event, { ...ref, ...fields }) };
+  const call: Call = (event, fields = {}) => {
+    const answer: Answer | Promise<Answer> = events.handle(event, { ...ref, ...fields });
+    if (answer instanceof Promise) throw new Error(`${event} answered later`);
+    return answer;
+  };
+  return { sent, call };
 }
 
 /**

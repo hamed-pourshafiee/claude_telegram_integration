@@ -54,13 +54,19 @@ describe("our entries (design §3)", () => {
       "SessionEnd",
     ]);
     for (const [event, [group]] of Object.entries(groups)) {
+      const flag = event === "Stop" ? " --wait" : "";
       expect(group?.hooks).toEqual([
         expect.objectContaining({
           type: "command",
-          command: `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${repoRoot}/src/hooks/main.ts ${event}`,
+          command: `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${repoRoot}/src/hooks/main.ts ${event}${flag}`,
         }),
       ]);
     }
+    // Phase 3: only a Stop hook that can wake Claude (asyncRewake) waits for a reply (--wait).
+    expect(groups.Stop?.[0]?.hooks).toEqual([
+      expect.objectContaining({ asyncRewake: true, timeout: 43_200 }),
+    ]);
+    expect(groups.Stop?.[0]?.hooks).not.toEqual([expect.objectContaining({ async: true })]);
     expect(groups.PreToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
     expect(groups.Notification?.[0]).toMatchObject({ matcher: "idle_prompt" });
   });

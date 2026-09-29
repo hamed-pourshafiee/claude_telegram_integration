@@ -10,6 +10,11 @@ export interface PollerDeps {
   readonly telegram: Pick<TelegramClient, "getUpdates">;
   readonly db: BrokerDb;
   readonly log: Log;
+  /**
+   * Stores what must survive a crash, a reply for Claude, before the offset moves on (D7). If it throws,
+   * the offset stays, so Telegram sends the update again after the pause.
+   */
+  readonly accept: (update: Update) => void;
   readonly handle: (update: Update) => Promise<void>;
   /** Whose updates these are: offsets are kept per bot, so another bot in .env starts afresh. */
   readonly botId: number;
@@ -26,12 +31,12 @@ export function offsetKey(botId: number): string {
 }
 
 /**
- * The only Telegram poller (F8). It long-polls getUpdates, hands each update to `handle`, and records
- * the offset after each one, so a restart carries on after the last update handled. A crash between
- * handling an update and recording it would hand that one update over again; plan 3.2's inbox, which
- * stores each update before handling it, makes delivery at-most-once (D7). A failure waits before the
- * next try: 1 s, doubling up to 60 s; 60 s after a 409 (another poller on this token); 5 minutes after
- * a 401 (a revoked token).
+ * The only Telegram poller (F8). It long-polls getUpdates; for each update it first lets `accept` store
+ * a reply, then records the offset, then hands the update to `handle` (plan 3.1, D7). A crash before the
+ * offset is recorded gets the update again, which the inbox stores once; a crash after it leaves a stored
+ * reply for the next broker, and a command unanswered. A failure waits before the next try: 1 s,
+ * doubling up to 60 s; 60 s after a 409 (another poller on this token); 5 minutes after a 401 (a revoked
+ * token).
  */
 export class Poller {
   readonly #deps: PollerDeps;
@@ -80,12 +85,13 @@ export class Poller {
   }
 
   async #one(update: Update): Promise<void> {
+    this.#deps.accept(update);
+    this.#deps.db.setMeta(offsetKey(this.#deps.botId), String(update.update_id + 1));
     try {
       await this.#deps.handle(update);
     } catch (error) {
       this.#deps.log("update.failed", { update: update.update_id, error: messageOf(error) });
     }
-    this.#deps.db.setMeta(offsetKey(this.#deps.botId), String(update.update_id + 1));
   }
 }
 

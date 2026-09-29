@@ -43,12 +43,20 @@ function main(): void {
   const token = loadBotToken(ENV_FILE);
   const db = BrokerDb.open(STATE.db);
   const shutdown = new AbortController();
-  const { routes } = createApp({ token, db, log, config, signal: shutdown.signal });
+  const { routes, relay } = createApp({
+    token,
+    db,
+    log,
+    config,
+    paths: STATE,
+    signal: shutdown.signal,
+  });
   const server = startServer(STATE.socket, routes);
   writeFileSync(STATE.pid, `${process.pid}\n`);
   log("broker.started", { schema: db.schemaVersion });
   const stop = (reason: string) => {
     shutdown.abort();
+    relay.close();
     void server.stop(true);
     db.close();
     rmSync(STATE.socket, { force: true });

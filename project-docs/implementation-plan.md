@@ -4,7 +4,7 @@ Status: rev. 8 (§1: steps follow on their own, Codex reviews paused; rev. 7: O1
 Codex review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per
 waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F17), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F18), architecture and
 flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 

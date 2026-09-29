@@ -32,6 +32,7 @@ const session = (folder: string) => ({
   branch: "main",
   generation: 1,
   ended: false,
+  stoppedAt: 0,
 });
 const away: Snapshot = {
   mode: "auto",

@@ -24,6 +24,8 @@ export interface StatePaths {
   /** While this file exists, hooks do nothing and nothing starts the broker (D3). */
   readonly disabled: string;
   readonly logs: string;
+  /** Cancels and waiter ends written while no broker answered, for the next broker to apply (plan 3.1). */
+  readonly pending: string;
 }
 
 export function statePaths(repoRoot: string): StatePaths {
@@ -36,6 +38,7 @@ export function statePaths(repoRoot: string): StatePaths {
     pid: join(dir, "broker.pid"),
     disabled: join(dir, "disabled"),
     logs: join(dir, "logs"),
+    pending: join(dir, "pending"),
   };
 }
 

@@ -2,19 +2,21 @@ import { messageOf } from "../shared/errors.ts";
 import { type BackgroundTask, parseTasks } from "../shared/hook-input.ts";
 import { asFields, type Fields } from "../shared/json.ts";
 import type { Log } from "../shared/log.ts";
+import { type Answer, bad, ok } from "./answer.ts";
 import { failureNotice, finishNotice, permissionNotice, questionNotice } from "./notices.ts";
 import type { NoticeOf, Notifier } from "./notifier.ts";
 import type { Pairing } from "./pairing.ts";
+import type { Relay } from "./relay.ts";
 import type { Session, SessionRef, Sessions } from "./sessions.ts";
 
 export interface HookEventsDeps {
   readonly sessions: Sessions;
   readonly notifier: Pick<Notifier, "send">;
   readonly pairing: Pick<Pairing, "pairedUser">;
+  /** Waiting Stop hooks and the replies they get (plan 3.1). */
+  readonly relay: Pick<Relay, "wait" | "confirm" | "end" | "cancel" | "stopped" | "ended">;
   readonly log: Log;
 }
-
-type Answer = { readonly status: number; readonly body: unknown };
 
 /** A session's latest stop, kept in memory for idle_prompt, which may come a minute later (F6). */
 interface LastStop {
@@ -26,9 +28,9 @@ interface LastStop {
 }
 
 /**
- * What the broker does with each hook's call (design §3, plan 2.7). A stop's result counts only in its
- * own generation, so typing at the Mac first cancels it (flow 2). Notices are sent in the background:
- * a hook never waits for Telegram.
+ * What the broker does with each hook's call (design §3, plans 2.7 and 3.1). A stop's result counts only
+ * in its own generation, so typing at the Mac first cancels it, and its waiter too (flow 2). Notices are
+ * sent in the background: a hook never waits for Telegram. A waiting hook's calls go to the relay.
  */
 export class HookEvents {
   readonly #deps: HookEventsDeps;
@@ -38,24 +40,35 @@ export class HookEvents {
     this.#deps = deps;
   }
 
-  handle(event: string, body: unknown): Answer {
+  handle(event: string, body: unknown): Answer | Promise<Answer> {
     const fields = asFields(body) ?? {};
     const ref = sessionRef(fields);
-    if (ref === undefined) return { status: 400, body: { ok: false, error: "no session" } };
+    if (ref === undefined) return bad("no session");
+    // A waiting hook's calls, which don't touch the session: it may have ended meanwhile.
+    if (event === "Wait") return this.#deps.relay.wait(fields);
+    if (event === "Confirm") return this.#deps.relay.confirm(fields);
+    if (event === "End") return this.#deps.relay.end(fields);
     this.#deps.log("hook.event", { hook: event, session: ref.id });
-    const { sessions } = this.#deps;
+    const { sessions, relay } = this.#deps;
     switch (event) {
       case "SessionStart":
         sessions.touch(ref, typeof fields.branch === "string" ? fields.branch : undefined);
         return ok({ name: firstName(this.#deps.pairing.pairedUser()?.name) });
-      case "UserPromptSubmit":
+      case "UserPromptSubmit": {
         sessions.touch(ref);
-        return ok({ generation: sessions.advance(ref.id) });
-      case "Stop":
+        // When you typed, as the hook saw it: a cancel that arrives after a newer stop is late.
+        const at = typeof fields.at === "number" ? fields.at : Date.now();
+        return ok({ generation: relay.cancel(ref.id, at) });
+      }
+      case "Stop": {
         sessions.touch(ref);
-        return ok({ generation: sessions.advance(ref.id) });
+        const generation = sessions.stop(ref.id);
+        relay.stopped(ref.id, generation);
+        return ok({ generation });
+      }
       case "SessionEnd":
         sessions.end(ref.id);
+        relay.ended(ref.id);
         this.#lastStops.delete(ref.id);
         return ok({});
       default:
@@ -96,7 +109,7 @@ export class HookEvents {
   #stopResult(session: Session, fields: Fields): Answer {
     const { generation, outcome, text } = fields;
     if (typeof generation !== "number" || typeof outcome !== "string" || typeof text !== "string") {
-      return { status: 400, body: { ok: false, error: "bad stop result" } };
+      return bad("bad stop result");
     }
     const current = generation === session.generation;
     this.#deps.log("stop.result", { session: session.id, generation, outcome, current });
@@ -138,10 +151,6 @@ export class HookEvents {
         this.#deps.log("notice.failed", { kind, session: session.id, error: messageOf(error) });
       });
   }
-}
-
-function ok(fields: object): Answer {
-  return { status: 200, body: { ok: true, pid: process.pid, ...fields } };
 }
 
 function sessionRef(fields: Fields): SessionRef | undefined {

@@ -25,23 +25,27 @@ type Json = Record<string, unknown>;
 /** The command runs through a shell, so every path in it must be safe unquoted. */
 const SAFE_PATH = /^\/[A-Za-z0-9/._-]+$/;
 
+/** A Stop hook waits for a reply up to 12 h, then gets SIGTERM (F2). */
+const STOP_WAIT_SECONDS = 43_200;
+
 /**
- * Our hook groups, event by event (design §3), as phase 2 needs them: each calls Bun by absolute path
- * with --no-env-file and our bunfig.toml (F13, F14). Stop and the question hook don't wait for a reply
- * yet, so their timeouts stay short; phases 3 and 4 raise them.
+ * Our hook groups, event by event (design §3): each calls Bun by absolute path with --no-env-file and
+ * our bunfig.toml (F13, F14). Since phase 3 the Stop hook waits for a reply (--wait) and wakes Claude
+ * with it (asyncRewake, F2); the two go together, so only this install makes a Stop hook wait. The
+ * question hook doesn't wait yet, so its timeout stays short until phase 4.
  */
 export function hookGroups(bun: string, repoRoot: string): Readonly<Record<string, Json[]>> {
   for (const path of [bun, repoRoot]) {
     if (!SAFE_PATH.test(path)) throw new Error(`refusing a path that needs shell quoting: ${path}`);
   }
   const main = `${repoRoot}/src/hooks/main.ts`;
-  const group = (event: string, options: Json, matcher?: string): Json[] => [
+  const group = (event: string, options: Json, matcher?: string, flag = ""): Json[] => [
     {
       ...(matcher === undefined ? {} : { matcher }),
       hooks: [
         {
           type: "command",
-          command: `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${main} ${event}`,
+          command: `${bun} --no-env-file --config=${repoRoot}/bunfig.toml ${main} ${event}${flag}`,
           ...options,
         },
       ],
@@ -50,7 +54,7 @@ export function hookGroups(bun: string, repoRoot: string): Readonly<Record<strin
   return {
     SessionStart: group("SessionStart", { timeout: 5 }),
     UserPromptSubmit: group("UserPromptSubmit", { timeout: 3 }),
-    Stop: group("Stop", { timeout: 60, async: true }),
+    Stop: group("Stop", { timeout: STOP_WAIT_SECONDS, asyncRewake: true }, undefined, " --wait"),
     Notification: group("Notification", { timeout: 10, async: true }, "idle_prompt"),
     PermissionRequest: group("PermissionRequest", { timeout: 10, async: true }),
     StopFailure: group("StopFailure", { timeout: 10, async: true }),

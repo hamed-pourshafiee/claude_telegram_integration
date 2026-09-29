@@ -19,6 +19,34 @@ const MIGRATIONS: readonly (readonly string[])[] = [
       generation INTEGER NOT NULL DEFAULT 0
     ) STRICT`,
   ],
+  // 3 (plan 3.1): Stop hooks waiting for a reply, and the replies from Telegram, stored before the offset
+  // moves on (D7). Times are ms since the epoch: a cancel is matched against them.
+  [
+    "ALTER TABLE sessions ADD COLUMN stopped_at INTEGER NOT NULL DEFAULT 0",
+    `CREATE TABLE waiters (
+      session_id TEXT NOT NULL REFERENCES sessions (id),
+      generation INTEGER NOT NULL,
+      pid INTEGER NOT NULL,
+      claude_pid INTEGER NOT NULL,
+      state TEXT NOT NULL
+        CHECK (state IN ('waiting', 'handed', 'delivered', 'cancelled', 'ended')),
+      update_id INTEGER,
+      created_at INTEGER NOT NULL,
+      PRIMARY KEY (session_id, generation)
+    ) STRICT`,
+    `CREATE TABLE inbox (
+      update_id INTEGER PRIMARY KEY,
+      chat_id INTEGER NOT NULL,
+      message_id INTEGER NOT NULL,
+      reply_to INTEGER,
+      text TEXT NOT NULL,
+      received_at INTEGER NOT NULL,
+      state TEXT NOT NULL
+        CHECK (state IN ('new', 'handed', 'delivered', 'unconfirmed', 'unrouted')),
+      session_id TEXT,
+      generation INTEGER
+    ) STRICT`,
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;
@@ -77,8 +105,14 @@ export class BrokerDb {
     return this.#db.query<Row, Binding[]>(sql).get(...params) ?? undefined;
   }
 
-  run(sql: string, ...params: Binding[]): void {
-    this.#db.query<unknown, Binding[]>(sql).run(...params);
+  /** Every row `sql` selects. */
+  all<Row>(sql: string, ...params: Binding[]): Row[] {
+    return this.#db.query<Row, Binding[]>(sql).all(...params);
+  }
+
+  /** Runs a statement; how many rows it changed, which tells a racing update whether it won. */
+  run(sql: string, ...params: Binding[]): number {
+    return this.#db.query<unknown, Binding[]>(sql).run(...params).changes;
   }
 
   /** Runs `work` in one transaction: all of its writes happen, or none. */

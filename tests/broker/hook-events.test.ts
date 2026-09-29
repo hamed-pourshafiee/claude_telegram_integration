@@ -2,12 +2,16 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import type { Answer } from "../../src/broker/answer.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { firstName, HookEvents } from "../../src/broker/hook-events.ts";
+import { Inbox } from "../../src/broker/inbox.ts";
 import type { Notice } from "../../src/broker/notices.ts";
 import type { NoticeOf } from "../../src/broker/notifier.ts";
 import type { PairedUser } from "../../src/broker/pairing.ts";
+import { Relay } from "../../src/broker/relay.ts";
 import { label, type Session, Sessions } from "../../src/broker/sessions.ts";
+import { Waiters } from "../../src/broker/waiters.ts";
 import { noLog } from "../../src/shared/log.ts";
 import { until } from "../helpers/wait.ts";
 
@@ -31,12 +35,28 @@ beforeEach(() => {
       return Promise.resolve(goesOut);
     },
   };
-  const sessions = new Sessions(BrokerDb.open(join(dir, `events-${files}.db`)));
-  events = new HookEvents({ sessions, notifier, pairing: { pairedUser: () => user }, log: noLog });
+  const db = BrokerDb.open(join(dir, `events-${files}.db`));
+  const sessions = new Sessions(db);
+  const relay = new Relay({
+    db,
+    sessions,
+    waiters: new Waiters(db),
+    inbox: new Inbox(db),
+    tell: () => Promise.resolve(),
+    senderName: () => "Hamed",
+    log: noLog,
+  });
+  const pairing = { pairedUser: () => user };
+  events = new HookEvents({ sessions, notifier, pairing, relay, log: noLog });
 });
 
 const ref = { session_id: "b1e81638", project_dir: "/work/sandbox", entrypoint: "cli" };
-const call = (event: string, fields: object = {}) => events.handle(event, { ...ref, ...fields });
+/** The answer to a hook's call; only a Wait is answered later, and these tests make none. */
+const call = (event: string, fields: object = {}): Answer => {
+  const answer = events.handle(event, { ...ref, ...fields });
+  if (answer instanceof Promise) throw new Error(`${event} answered later`);
+  return answer;
+};
 const stop = () => (call("Stop").body as { generation: number }).generation;
 const result = (generation: number, outcome: string, text = "All done.") =>
   call("StopResult", { generation, outcome, text, tasks: [] });
@@ -115,8 +135,8 @@ describe("the other events", () => {
     expect(sends[0]?.notice.body).toStartWith("Bash: make");
   });
 
-  test("no session, or a bad stop result: 400", () => {
-    expect(events.handle("Stop", { entrypoint: "cli" }).status).toBe(400);
+  test("no session, or a bad stop result: 400", async () => {
+    expect(await events.handle("Stop", { entrypoint: "cli" })).toMatchObject({ status: 400 });
     expect(call("StopResult", { generation: "one" }).status).toBe(400);
   });
 });

@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CommandName } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
-import { handleUpdate } from "../../src/broker/gate.ts";
+import { handleUpdate, replyOf } from "../../src/broker/gate.ts";
 import { MAX_ATTEMPTS, Pairing } from "../../src/broker/pairing.ts";
 import type { Log } from "../../src/shared/log.ts";
 import type { SendMessageParams, Update } from "../../src/shared/telegram/types.ts";
@@ -24,6 +24,7 @@ let sent: SendMessageParams[] = [];
 let logged: string[] = [];
 let commands: CommandName[] = [];
 let presses: string[] = [];
+let replies: number[] = [];
 let pairing: Pairing;
 let nextId = 0;
 beforeEach(() => {
@@ -31,6 +32,7 @@ beforeEach(() => {
   logged = [];
   commands = [];
   presses = [];
+  replies = [];
   pairing = new Pairing(BrokerDb.open(join(dir, `gate-${Date.now()}-${nextId}.db`)));
 });
 
@@ -63,7 +65,9 @@ const press = (data: string, chat: number, queryId: string) => {
   presses.push(`${data} ${chat} ${queryId}`);
   return Promise.resolve();
 };
-const handle = (update: Update) => handleUpdate(update, { telegram, pairing, log, command, press });
+const reply = (updateId: number) => void replies.push(updateId);
+const handle = (update: Update) =>
+  handleUpdate(update, { telegram, pairing, log, command, press, reply });
 const reasons = () =>
   logged.filter((line) => line.includes("update.dropped")).map((line) => JSON.parse(line).reason);
 
@@ -109,13 +113,14 @@ describe("pairing through /pair", () => {
 });
 
 describe("after pairing, only the paired user in a private chat is heard", () => {
-  test("the paired user is accepted; another user, a group and a bot are dropped", async () => {
+  test("the paired user's text is a reply; another user, a group and a bot are dropped", async () => {
     pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
-    await handle(message(you, privateChat(you.id), SECRET_TEXT));
+    const yours = message(you, privateChat(you.id), SECRET_TEXT);
+    await handle(yours);
     await handle(message(stranger, privateChat(stranger.id), SECRET_TEXT));
     await handle(message(you, group, SECRET_TEXT));
     await handle(message(bot, privateChat(bot.id), SECRET_TEXT));
-    expect(logged.filter((line) => line.includes("update.accepted"))).toHaveLength(1);
+    expect(replies).toEqual([yours.update_id]);
     expect(reasons()).toEqual(["not the paired user", "not a private chat", "sent by a bot"]);
     expect(sent).toEqual([]);
     expect(logged.join("\n")).not.toContain(SECRET_TEXT);
@@ -176,13 +181,24 @@ describe("commands of the paired user (plan 2.6)", () => {
     expect(reasons()).toEqual(["not the paired user", "not a private chat"]);
   });
 
-  test("before pairing /status is dropped; after it, a plain message is only accepted", async () => {
+  test("before pairing /status is dropped; after it, a plain message is a reply, not a command", async () => {
     await handle(message(you, privateChat(you.id), "/status"));
     expect(reasons()).toEqual(["not paired yet"]);
     pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
     await handle(message(you, privateChat(you.id), "status please"));
     expect(commands).toEqual([]);
     expect(sent).toEqual([]);
-    expect(logged.filter((line) => line.includes("update.accepted"))).toHaveLength(1);
+    expect(replies).toHaveLength(1);
+  });
+
+  test("replyOf: the paired user's text; never a command, known or not, nor anyone else's", () => {
+    const reply = replyOf(message(you, privateChat(you.id), "now say bye"), you.id);
+    expect(reply).toMatchObject({ chatId: you.id, text: "now say bye", replyTo: undefined });
+    for (const text of ["/start", " /status", "/pair 123", "   "]) {
+      expect(replyOf(message(you, privateChat(you.id), text), you.id)).toBeUndefined();
+    }
+    expect(replyOf(message(stranger, privateChat(stranger.id), "hi"), you.id)).toBeUndefined();
+    expect(replyOf(message(you, group, "hi"), you.id)).toBeUndefined();
+    expect(replyOf(message(you, privateChat(you.id), "hi"), undefined)).toBeUndefined();
   });
 });

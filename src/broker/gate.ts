@@ -2,6 +2,7 @@ import type { Log } from "../shared/log.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { CallbackQuery, Chat, Update, User } from "../shared/telegram/types.ts";
 import { type CommandName, parseCommand } from "./commands.ts";
+import type { IncomingReply } from "./inbox.ts";
 import type { Pairing, PairingResult } from "./pairing.ts";
 
 export interface GateDeps {
@@ -12,6 +13,8 @@ export interface GateDeps {
   readonly command: (name: CommandName) => string;
   /** Answers the paired user's press of a button, such as 📄 (plan 2.7). */
   readonly press: (data: string, chat: number, queryId: string) => Promise<void>;
+  /** Routes a reply for Claude, which the poller stored before the offset moved on (plan 3.1). */
+  readonly reply: (updateId: number) => void;
 }
 
 const REPLIES = {
@@ -25,8 +28,8 @@ const REPLIES = {
 
 /**
  * Decides what happens to each update (design §5). `/pair <code>` in a private chat pairs its sender.
- * After that only the paired user, in a private chat, is heard, and their commands are answered;
- * everything else is dropped and logged, with ids only, never text.
+ * After that only the paired user, in a private chat, is heard: their commands are answered and their
+ * text goes to Claude as a reply; everything else is dropped and logged, with ids only, never text.
  */
 export async function handleUpdate(update: Update, deps: GateDeps): Promise<void> {
   if (update.kind === "other") return drop(update, deps, "not a message or a button press");
@@ -42,7 +45,34 @@ export async function handleUpdate(update: Update, deps: GateDeps): Promise<void
   if (update.kind === "callback_query") return pressed(update.callback_query, chat, deps);
   const command = text === undefined ? undefined : parseCommand(text);
   if (command !== undefined) return answer(update, command, chat, deps);
+  if (replyOf(update, paired.id) !== undefined) {
+    deps.log("reply.received", { update: update.update_id });
+    deps.reply(update.update_id);
+    return;
+  }
   deps.log("update.accepted", { update: update.update_id, kind: update.kind });
+}
+
+/**
+ * A reply for Claude (flow 4): a text message from the paired user in a private chat. A command, known
+ * or not (such as /start), never is.
+ */
+export function replyOf(update: Update, paired: number | undefined): IncomingReply | undefined {
+  if (update.kind !== "message" || paired === undefined) return undefined;
+  const { message } = update;
+  const text = message.text;
+  if (message.from?.id !== paired || message.from.is_bot || message.chat.type !== "private") {
+    return undefined;
+  }
+  if (text === undefined || text.trim() === "" || text.trimStart().startsWith("/"))
+    return undefined;
+  return {
+    updateId: update.update_id,
+    chatId: message.chat.id,
+    messageId: message.message_id,
+    replyTo: message.reply_to_message_id,
+    text,
+  };
 }
 
 async function pressed(query: CallbackQuery, chat: Chat, deps: GateDeps) {

@@ -1,8 +1,9 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 8, F16 and flow 1 from the recorded stops of plan 2.8 (rev. 7: F17 the screen lock; rev. 6:
-O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14;
-rev. 2: Codex review) · 2026-09-29 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 9, F18 the hook's parent (rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7:
+F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4:
+spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -46,6 +47,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F15 | `CLAUDE_PROJECT_DIR` is the directory the session started in and stays there after a `cd`; the input's `cwd` follows the `cd`. | S3 |
 | F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` holds non-blocking errors and often a blocking hook's reason too, so it is not the signal. A stop's own assistant entry often reaches the file only after its Stop hooks have started (28 of 30 recorded stops). Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28; recorded stops, 2026-09-29 (plan 2.8) |
 | F17 | `ioreg -n Root -d 1`: the kernel's `IOConsoleLocked` is `Yes` while the screen is locked (also at the login window and on the way to sleep), and the console session in `IOConsoleUsers` then carries `CGSSessionScreenIsLocked`=Yes and `CGSSessionScreenLockedTime`. Unlocked, the flag is `No` and both keys are gone. This Mac locks itself after 30 minutes without input. | observed 2026-09-28 (plan 2.6) |
+| F18 | A command hook runs as a direct child of the Claude Code process, with no shell in between, for synchronous and `asyncRewake` hooks alike, so a hook's parent pid is its Claude. | probed 2026-09-29 with 2.1.283 (plan 3.1) |
 
 ## 3. Architecture
 
