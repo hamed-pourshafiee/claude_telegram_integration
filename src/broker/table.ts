@@ -11,8 +11,8 @@ type Align = "left" | "right" | "center";
 
 /**
  * A Markdown table with its columns lined up, for a monospace block (D8): Claude doesn't pad its cells.
- * Code and bold marks in cells go, as the block can't show them. Rows that aren't a table (a header row,
- * then a delimiter row with as many cells) stay as written.
+ * It's drawn as psql draws one. Code and bold marks in cells go, as the block can't show them. Rows that
+ * aren't a table (a header row, then a delimiter row with as many cells) stay as written.
  */
 export function alignedTable(rows: readonly string[]): readonly string[] {
   const [header, delimiter, ...body] = rows.map(cellsOf);
@@ -22,9 +22,14 @@ export function alignedTable(rows: readonly string[]): readonly string[] {
   const widths = Array.from({ length: Math.max(...table.map((cells) => cells.length)) }, (_, at) =>
     Math.max(...table.map((cells) => columns(cells[at] ?? ""))),
   );
+  // No pipes at either end: an emoji, drawn a little wider than two columns, then shifts nothing after
+  // it when it's in the last column, where Claude puts most of them.
   const line = (cells: readonly string[]) =>
-    `| ${widths.map((width, at) => pad(cells[at] ?? "", width, aligns[at] ?? "left")).join(" | ")} |`;
-  const rule = `|${widths.map((width) => "-".repeat(width + 2)).join("|")}|`;
+    widths
+      .map((width, at) => pad(cells[at] ?? "", width, aligns[at] ?? "left"))
+      .join(" | ")
+      .trimEnd();
+  const rule = widths.map((width) => "-".repeat(width)).join("-+-");
   const [head = [], ...rest] = table;
   return [line(head), rule, ...rest.map(line)];
 }

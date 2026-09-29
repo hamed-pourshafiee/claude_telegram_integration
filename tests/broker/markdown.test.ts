@@ -65,10 +65,8 @@ describe("lines and blocks", () => {
       '<pre><code class="language-ts">const a = 1 &lt; 2;\n\nlet b;</code></pre>',
       "After.",
     ]);
-    expect(units("| a | b |\n|---|---|\n| 1 | 2 |")).toEqual([
-      "<pre>| a | b |\n|---|---|\n| 1 | 2 |</pre>",
-    ]);
-    expect(units("| a<b | c |\n|---|---|")).toEqual(["<pre>| a&lt;b | c |\n|-----|---|</pre>"]);
+    expect(units("| a | b |\n|---|---|\n| 1 | 2 |")).toEqual(["<pre>a | b\n--+--\n1 | 2</pre>"]);
+    expect(units("| a<b | c |\n|---|---|")).toEqual(["<pre>a&lt;b | c\n----+--</pre>"]);
   });
 
   test("a reply cut inside a code block ends in code", () => {
