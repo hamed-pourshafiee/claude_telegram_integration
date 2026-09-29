@@ -212,3 +212,35 @@ describe("answers", () => {
     }
   });
 });
+
+describe("a plan waiting for approval (plan 4.2)", () => {
+  test("one question, Approve or Keep planning; its message is the plan, then how to answer", () => {
+    const input = parsed({ plan: "# Plan\n\n1. Add q.py.\n" });
+    expect(input.plan).toBe("# Plan\n\n1. Add q.py.\n");
+    expect(input.questions).toEqual([
+      expect.objectContaining({
+        text: "Approve this plan?",
+        kind: "choice",
+        multiSelect: false,
+        options: [
+          { label: "Approve", description: undefined },
+          { label: "Keep planning", description: undefined },
+        ],
+      }),
+    ]);
+    expect(questionBody(input, 0)).toBe(
+      "# Plan\n\n1. Add q.py.\n\nApprove it, or tap Keep planning. To say what to change, reply to this message.",
+    );
+    const [question] = input.questions;
+    if (question === undefined) throw new Error("no question");
+    expect(questionButtons("0a1b2c3d", 0, question, []).map((row) => row[0]?.text)).toEqual([
+      "Approve",
+      "Keep planning",
+      "🖥 Answer at the Mac",
+    ]);
+  });
+
+  test("an empty plan is left to the dialog", () => {
+    expect(parseAskInput({ plan: " \n" })).toBeUndefined();
+  });
+});

@@ -29,7 +29,9 @@ const SAFE_PATH = /^\/[A-Za-z0-9/._-]+$/;
 const WAIT_SECONDS = 43_200;
 
 /** The spinner while a question hook waits: your answer may come from the chat (flow 3). */
-const QUESTION_STATUS = "Question sent to Telegram · touch the keyboard or mouse to answer here";
+const QUESTION_STATUS = "Sent to Telegram · touch the keyboard or mouse to answer here";
+/** Claude's questions (plan 4.1) and its plans waiting for approval (plan 4.2). */
+const QUESTION_TOOLS = "AskUserQuestion|ExitPlanMode";
 
 /**
  * Our hook groups, event by event (design §3): each calls Bun by absolute path with --no-env-file and
@@ -65,10 +67,10 @@ export function hookGroups(bun: string, repoRoot: string): Readonly<Record<strin
     PreToolUse: group(
       "PreToolUse",
       { timeout: WAIT_SECONDS, statusMessage: QUESTION_STATUS },
-      "AskUserQuestion",
+      QUESTION_TOOLS,
       " --wait",
     ),
-    PostToolUse: group("PostToolUse", { timeout: 10, async: true }, "AskUserQuestion"),
+    PostToolUse: group("PostToolUse", { timeout: 10, async: true }, QUESTION_TOOLS),
     SessionEnd: group("SessionEnd", { timeout: 5, async: true }),
   };
 }

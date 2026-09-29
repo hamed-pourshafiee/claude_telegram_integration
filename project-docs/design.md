@@ -1,10 +1,10 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 12, flow 3 as built in plan 4.1, F4 and F19 from 2.1.284 (rev. 11: D8, Markdown shown as
-formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and
-flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5:
-Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
-2026-09-29 · Repo:
+Status: rev. 13, O2 decided as D9, plans in flow 3 (plan 4.2) (rev. 12: flow 3 as built in plan 4.1,
+F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires
+UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops;
+rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8;
+rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
@@ -83,10 +83,10 @@ by the directory the session started in, `CLAUDE_PROJECT_DIR`, never by the inpu
 | `UserPromptSubmit` | — | sync, ≤ 3 s | Cancel barrier: you typed locally, so this session's waiters are cancelled before the new turn starts |
 | `Stop` | — | `asyncRewake`, timeout 12 h | Register a waiter; tell a real finish from a continuation by the stop's transcript entries (F16); on a Telegram reply, exit 2 with it |
 | `Notification` | `idle_prompt` | `async` | Terminal only (F6): a second sign that the session is idle |
-| `PermissionRequest` | — | `async` | "🔐 waiting for your permission" ping until phase 5; skips `AskUserQuestion` (F5, F6) |
+| `PermissionRequest` | — | `async` | "🔐 waiting for your permission" ping until phase 5; skips `AskUserQuestion` and `ExitPlanMode`, relayed by `PreToolUse` (F5, F6) |
 | `StopFailure` | — | `async` | "⚠️ stopped on an API error" |
-| `PreToolUse` | `AskUserQuestion` | sync, timeout 12 h | Ping (phase 2); relay and return the answers (phase 4) |
-| `PostToolUse` | `AskUserQuestion` | `async` | Close a question that was answered at the computer |
+| `PreToolUse` | `AskUserQuestion\|ExitPlanMode` | sync, timeout 12 h | Ping (phase 2); relay a question and return the answers, or a plan and approve or deny it (phase 4) |
+| `PostToolUse` | `AskUserQuestion\|ExitPlanMode` | `async` | Close a question or plan that was answered |
 | `PermissionRequest` | per policy | sync, timeout 12 h | Phase 5 only; never `AskUserQuestion` |
 | `SessionEnd` | — | `async` | Mark the session ended, cancel its waiters |
 
@@ -127,6 +127,11 @@ Key flows:
    unpaired or ping-only (D8): the local dialog at once. No hook can answer a dialog that is already open
    locally, so if you leave while one is open, the bot only tells you a question is waiting at the
    computer. `/away` sent from your phone as you leave makes everything relay at once.
+
+   A plan waiting for approval (`ExitPlanMode`, plan 4.2) goes the same way, as one question: the plan in
+   the chat (a long one cut, with the 📄 file), Approve or Keep planning, and a reply says what to change.
+   Approve allows the call, so Claude leaves plan mode for the mode it was in before; anything else denies
+   it with your words, so Claude keeps planning.
 4. **Routing and delivery.** Every bot message is linked to its session and request.
    - A reply-to goes to that session.
    - A plain message goes to the only waiting session; if several are waiting, the bot asks
@@ -170,11 +175,12 @@ Taken (say so before the step if you disagree):
   tables as preformatted text with their columns lined up, web links), with file names and paths as code
   so that Telegram doesn't turn them into links (decided with you on 2026-09-29, at the phase 2
   checkpoint). Markup that Telegram refuses goes again as plain text.
+- **D9 Permission prompts may be approved from Telegram** (O2, decided with you on 2026-09-29 after plan
+  step 4.1): Allow once only, for Bash, Edit and Write; never for MCP tools or WebFetch; the complete
+  operation shown; every decision in an audit log (phase 5).
 
 Open, needed at the plan step shown:
 
-- **O2 (phase 5) Remote permission approval at all.** If yes, recommended: Allow once only, for Bash, Edit
-  and Write; never for MCP tools or WebFetch; the complete operation shown; every decision in an audit log.
 - **O3 (step 1.1) Git remote** for this repo: company GitLab, personal, or local only.
 
 ## 5. Security
@@ -188,7 +194,7 @@ Open, needed at the plan step shown:
   (F13, F14).
 - Outbound text is redacted and capped (D8). Logs hold ids and sizes, not message text.
 - Relayed replies are labelled as coming from Telegram, and only our hook can produce them.
-- Remote approvals are opt-in, Allow once only, bound to what you saw, and audited (O2).
+- Remote approvals (D9) are Allow once only, bound to what you saw, and audited.
 - Two-step verification on Telegram (plan step 0.2): a hijacked Telegram account would mean remote control
   of this Mac through Claude.
 

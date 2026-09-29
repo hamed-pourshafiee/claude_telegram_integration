@@ -59,6 +59,9 @@ export function questionNotice(label: string, questions: unknown, mode: ContentM
 
 /** ❓ one of Claude's questions, to answer here (plan 4.1); only folders with full content get them. */
 export function askNotice(label: string, input: AskInput, index: number): Notice {
+  if (input.plan !== undefined) {
+    return { header: `📋 ${label} has a plan ready`, body: questionBody(input, index) };
+  }
   const count = input.questions.length;
   const of = count > 1 ? ` (${index + 1} of ${count})` : "";
   return { header: `❓ ${label} asks${of}`, body: questionBody(input, index) };
@@ -73,9 +76,11 @@ export function waitingNotice(
   input: AskInput | undefined,
   mode: ContentMode,
 ): Notice {
-  const header = `❓ ${label} has a question waiting at the computer`;
-  const why = "It opened while you were at the Mac, so it can only be answered there.";
-  if (mode !== "full" || input === undefined) {
+  const plan = input?.plan !== undefined;
+  const what = plan ? "a plan" : "a question";
+  const header = `${plan ? "📋" : "❓"} ${label} has ${what} waiting at the computer`;
+  const why = `It opened while you were at the Mac, so it can only be ${plan ? "approved" : "answered"} there.`;
+  if (mode !== "full" || input === undefined || plan) {
     return { header, body: mode === "full" ? why : `${why} ${STAYS}` };
   }
   const questions = input.questions.map((question) =>

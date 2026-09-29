@@ -3,6 +3,7 @@ import type { HookInput } from "../shared/hook-input.ts";
 import { asFields } from "../shared/json.ts";
 import type { Log } from "../shared/log.ts";
 import type { Pending } from "../shared/pending.ts";
+import { PLAN_TOOL } from "../shared/plan.ts";
 import { gitBranch } from "./branch.ts";
 import { type ClassifyOptions, classifyStop } from "./finish.ts";
 import { postToolUse, preToolUse } from "./question.ts";
@@ -47,6 +48,8 @@ export interface HookContext {
   readonly disabled: () => boolean;
   /** Leaves a cancel or a waiter's end on disk for the next broker, when none answered. */
   readonly pending: (item: Pending) => void;
+  /** Where a plan's file may be read from (plan 4.2); ~/.claude unless a test says otherwise. */
+  readonly claudeDir?: string;
   /** Tests wait less for a stop's summary… */
   readonly classify?: ClassifyOptions;
   /** …and retry sooner while waiting. */
@@ -176,10 +179,13 @@ async function notification(context: HookContext): Promise<void> {
   await context.call("Idle", context.session);
 }
 
-/** The 🔐 ping; AskUserQuestion's dialog is a permission request too, and has its own ping. */
+/**
+ * The 🔐 ping. The dialogs of AskUserQuestion and ExitPlanMode are permission requests too; the
+ * question hook relays those (plans 4.1, 4.2).
+ */
 async function permissionRequest(context: HookContext): Promise<void> {
   const { toolName, toolInput } = context.input;
-  if (toolName === undefined || toolName === "AskUserQuestion") return;
+  if (toolName === undefined || toolName === "AskUserQuestion" || toolName === PLAN_TOOL) return;
   if (!(await context.ensureBroker())) return;
   await context.call("PermissionRequest", { ...context.session, tool: toolName, input: toolInput });
 }

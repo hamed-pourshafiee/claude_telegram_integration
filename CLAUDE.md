@@ -9,7 +9,7 @@ replies come back into the same session.
 Read these completely before doing anything in a new session:
 
 1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F19, architecture
-   and flows 1–4, decisions D1–D8, open questions O2–O3, security, rollback, risks.
+   and flows 1–4, decisions D1–D9, open question O3, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
 3. [project-docs/progress.md](project-docs/progress.md): steps done, their evidence, what we learned and

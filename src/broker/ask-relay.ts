@@ -173,7 +173,7 @@ export class AskRelay {
     const { asks, log } = this.#deps;
     const input = parseAskInput(call.input);
     const where: Where = input === undefined ? { local: "unreadable" } : this.#deps.where(session);
-    const raw = JSON.stringify({ title: call.input?.title, questions: call.input?.questions });
+    const raw = JSON.stringify(keptOf(call.input));
     const ask = asks.create({
       id: this.#deps.newId?.() ?? newAskId(),
       sessionId: session.id,
@@ -186,7 +186,9 @@ export class AskRelay {
     });
     const why = "local" in where ? { why: where.local } : {};
     const questions = input?.questions.length ?? 0;
-    log("ask.created", { session: session.id, ask: ask.id, state: ask.state, questions, ...why });
+    const plan = input?.plan !== undefined;
+    const fields = { session: session.id, ask: ask.id, state: ask.state, questions, plan, ...why };
+    log("ask.created", fields);
     if ("chat" in where) this.#post(ask, session, where.chat);
     else this.#deps.onLocal?.(ask);
     this.#hurry();
@@ -274,6 +276,13 @@ function callOf(fields: Fields): Call | undefined {
   if (toolUseId === "" || typeof pid !== "number" || typeof claudePid !== "number")
     return undefined;
   return { sessionId, toolUseId, pid, claudePid, input: asFields(fields.input) };
+}
+
+/** What is kept of a call's input: a plan waiting for approval (plan 4.2), or the questions. */
+function keptOf(input: Fields | undefined): object {
+  const plan = input?.plan;
+  if (typeof plan === "string") return { plan };
+  return { title: input?.title, questions: input?.questions };
 }
 
 /** Eight hex digits: short enough for the buttons' callback_data. */

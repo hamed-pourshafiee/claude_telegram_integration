@@ -73,9 +73,9 @@ describe("our entries (design §3)", () => {
     expect(groups.Notification?.[0]).toMatchObject({ matcher: "idle_prompt" });
   });
 
-  test("phase 4: the question hook waits for your answers, and PostToolUse closes a question", () => {
+  test("phase 4: the question hook waits for your answers or approval, and PostToolUse closes the call", () => {
     const groups = hookGroups(bun, repoRoot);
-    expect(groups.PreToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
+    expect(groups.PreToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion|ExitPlanMode" });
     // Sync, so Claude waits for its answers; up to 12 h, with a spinner saying where they may come from.
     expect(groups.PreToolUse?.[0]?.hooks).toEqual([
       expect.objectContaining({
@@ -84,7 +84,7 @@ describe("our entries (design §3)", () => {
       }),
     ]);
     expect(groups.PreToolUse?.[0]?.hooks).not.toEqual([expect.objectContaining({ async: true })]);
-    expect(groups.PostToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion" });
+    expect(groups.PostToolUse?.[0]).toMatchObject({ matcher: "AskUserQuestion|ExitPlanMode" });
     expect(groups.PostToolUse?.[0]?.hooks).toEqual([expect.objectContaining({ async: true })]);
   });
 

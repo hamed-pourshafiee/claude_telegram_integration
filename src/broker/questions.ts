@@ -1,4 +1,5 @@
 import { asFields } from "../shared/json.ts";
+import { APPROVE, KEEP_PLANNING, PLAN_QUESTION } from "../shared/plan.ts";
 import type { InlineKeyboardButton } from "../shared/telegram/types.ts";
 
 /** How a question is answered (F4): by picking options, by typing, or with a number in a range. */
@@ -30,7 +31,12 @@ export interface Question {
 export interface AskInput {
   readonly title: string | undefined;
   readonly questions: readonly Question[];
+  /** A plan waiting for approval (ExitPlanMode, plan 4.2): its one question is PLAN_QUESTION. */
+  readonly plan: string | undefined;
 }
+
+/** How to answer a plan, under it. */
+const PLAN_HOW = "Approve it, or tap Keep planning. To say what to change, reply to this message.";
 
 /** A press of a question's button (plan 4.1). */
 export type Press =
@@ -53,12 +59,32 @@ const BUTTON = /^ask:([0-9a-f]{8}):(?:(\d):(\d|done)|mac)$/;
  */
 export function parseAskInput(value: unknown): AskInput | undefined {
   const fields = asFields(value);
+  if (typeof fields?.plan === "string") return planInput(fields.plan);
   const list: readonly unknown[] = Array.isArray(fields?.questions) ? fields.questions : [];
   if (list.length === 0 || list.length > 4) return undefined;
   const questions = list.map(parseQuestion);
   if (!questions.every((question) => question !== undefined)) return undefined;
   if (new Set(questions.map((question) => question.text)).size < questions.length) return undefined;
-  return { title: text(fields?.title), questions };
+  return { title: text(fields?.title), questions, plan: undefined };
+}
+
+/** A plan waiting for approval (plan 4.2), as a call with one question: Approve, or Keep planning. */
+function planInput(plan: string): AskInput | undefined {
+  if (plan.trim() === "") return undefined;
+  const question: Question = {
+    text: PLAN_QUESTION,
+    header: "",
+    kind: "choice",
+    description: undefined,
+    options: [APPROVE, KEEP_PLANNING].map((label) => ({ label, description: undefined })),
+    multiSelect: false,
+    placeholder: undefined,
+    min: undefined,
+    max: undefined,
+    step: undefined,
+    unit: undefined,
+  };
+  return { title: undefined, questions: [question], plan };
 }
 
 function parseQuestion(value: unknown): Question | undefined {
@@ -96,6 +122,7 @@ function parseQuestion(value: unknown): Question | undefined {
 
 /** A question's message as Markdown, which the formatter renders (D8): the question, its options, how. */
 export function questionBody(input: AskInput, index: number): string {
+  if (input.plan !== undefined) return `${input.plan.trim()}\n\n${PLAN_HOW}`;
   const question = input.questions[index];
   if (question === undefined) return "";
   const lines: string[] = [];
