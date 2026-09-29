@@ -3,8 +3,9 @@ import type { Config, ContentMode } from "../shared/config.ts";
 import type { Log } from "../shared/log.ts";
 import { contentModeFor } from "../shared/scope.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
+import { TelegramError } from "../shared/telegram/errors.ts";
 import type { InlineKeyboardMarkup } from "../shared/telegram/types.ts";
-import { formatReply } from "./format.ts";
+import { escapeHtml, formatReply } from "./format.ts";
 import type { FullTexts } from "./full-texts.ts";
 import type { Notice } from "./notices.ts";
 import type { Pairing } from "./pairing.ts";
@@ -71,7 +72,7 @@ export class Notifier {
 
   /** Sends the notice for `session` if you are away; whether it went out. */
   async send(kind: string, session: Session, noticeOf: NoticeOf): Promise<boolean> {
-    const { config, log, telegram } = this.#deps;
+    const { config, log } = this.#deps;
     const target = this.target();
     if ("skip" in target) {
       log("notice.skipped", { kind, session: session.id, reason: target.skip });
@@ -81,16 +82,9 @@ export class Notifier {
     const notice = noticeOf(label(session), mode);
     const reply = formatReply(notice.header, notice.body, config.content.maxChars);
     const button = reply.fullText === undefined ? undefined : this.#button(reply.fullText, session);
-    for (const [index, text] of reply.messages.entries()) {
+    for (const [index, html] of reply.messages.entries()) {
       const markup = index === reply.messages.length - 1 && button ? { reply_markup: button } : {};
-      const quiet = { link_preview_options: { is_disabled: true } };
-      const sent = await telegram.sendMessage({
-        chat_id: target.chat,
-        text,
-        parse_mode: "HTML",
-        ...quiet,
-        ...markup,
-      });
+      const { sent, text } = await this.#sendHtml(target.chat, html, markup);
       this.#deps.link?.(target.chat, sent.message_id, session, kind);
       if (kind === "finish" && index === reply.messages.length - 1) {
         this.#keep(session, {
@@ -121,6 +115,30 @@ export class Notifier {
     await telegram.answerCallbackQuery({ callback_query_id: queryId });
     await telegram.sendDocument({ chat_id: chat, filename: kept.filename, content: kept.text });
     log("button.full-text", { chars: kept.text.length });
+  }
+
+  /**
+   * Sends one formatted message. Should Telegram refuse its markup ("can't parse entities"), it goes
+   * again as plain text, so a rendering mistake never loses a notice (D5). What was sent, and as what.
+   */
+  async #sendHtml(chat: number, html: string, markup: { reply_markup?: InlineKeyboardMarkup }) {
+    const quiet = { link_preview_options: { is_disabled: true } };
+    const params = { chat_id: chat, text: html, parse_mode: "HTML" as const, ...quiet, ...markup };
+    try {
+      return { sent: await this.#deps.telegram.sendMessage(params), text: html };
+    } catch (error) {
+      if (!(error instanceof TelegramError) || !/can't parse entities/i.test(error.message))
+        throw error;
+      this.#deps.log("notice.plain", { chars: html.length });
+      const text = plainOf(html);
+      const sent = await this.#deps.telegram.sendMessage({
+        chat_id: chat,
+        text,
+        ...quiet,
+        ...markup,
+      });
+      return { sent, text: escapeHtml(text) };
+    }
   }
 
   /**
@@ -161,4 +179,14 @@ export class Notifier {
     const id = this.#deps.fullTexts.put(fullText, filename);
     return { inline_keyboard: [[{ text: "📄 Full text as a file", callback_data: `full:${id}` }]] };
   }
+}
+
+/** A formatted message as the plain text it shows: tags dropped, escapes undone. */
+export function plainOf(html: string): string {
+  return html
+    .replace(/<[^>]+>/g, "")
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&amp;", "&");
 }

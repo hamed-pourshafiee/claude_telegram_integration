@@ -9,6 +9,7 @@ import type { PairedUser } from "../../src/broker/pairing.ts";
 import type { Snapshot } from "../../src/broker/presence.ts";
 import { parseConfig } from "../../src/shared/config.ts";
 import type { LogFields } from "../../src/shared/log.ts";
+import { TelegramError } from "../../src/shared/telegram/errors.ts";
 import type {
   AnswerCallbackQueryParams,
   EditMessageTextParams,
@@ -48,6 +49,7 @@ let documents: SendDocumentParams[];
 let answers: AnswerCallbackQueryParams[];
 let logged: string[];
 let links: string[];
+let refuseHtml = false;
 let edits: EditMessageTextParams[];
 let snapshot: Snapshot;
 let user: PairedUser | undefined;
@@ -61,6 +63,11 @@ const chat = { id: 4242, type: "private" };
 const notifier = new Notifier({
   telegram: {
     sendMessage: (params) => {
+      if (refuseHtml && params.parse_mode === "HTML") {
+        refuseHtml = false;
+        const message = "sendMessage: 400 Bad Request: can't parse entities: unexpected end tag";
+        return Promise.reject(new TelegramError(message, "sendMessage", "api", 400));
+      }
       sent.push(params);
       return Promise.resolve({ message_id: sent.length, date: 0, chat });
     },
@@ -162,6 +169,15 @@ test("typing at the Mac mid-wait: that stop's ✅ is edited, once, keeping its b
     parse_mode: "HTML",
     reply_markup: last?.reply_markup,
   });
+});
+
+test("markup Telegram refuses: the notice goes again as plain text, and nothing is lost", async () => {
+  refuseHtml = true;
+  await notifier.send("finish", session("sandbox"), finish("**Done:** see hello.py & more"));
+  expect(sent).toHaveLength(1);
+  expect(sent[0]).not.toHaveProperty("parse_mode");
+  expect(sent[0]?.text).toBe("✅ sandbox (main) · b1e8\n\nDone: see hello.py & more");
+  expect(logged.some((line) => line.includes('"event":"notice.plain"'))).toBe(true);
 });
 
 describe("what leaves the Mac (D8)", () => {

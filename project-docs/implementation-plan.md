@@ -1,8 +1,9 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 8 (§1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6:
-Codex review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per
-waiter) · 2026-09-28 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 9 (3.4: Markdown in the chat; rev. 8, §1: steps follow on their own, Codex reviews paused;
+rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's continuation
+entries, proven in 2.8, SIGTERM per waiter) · 2026-09-29 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 What we build and why is in [design.md](design.md): the goal, platform facts (F1–F18), architecture and
 flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and the review log. References such as
@@ -173,6 +174,10 @@ flows 1–4, decisions (D1–D8, open O2–O3), security, rollback, risks and th
   - 10 round-trips in a row work;
   - typing locally mid-wait edits the Telegram message to "↩️ continued at the computer" and injects
     nothing.
+- **3.4 Claude's Markdown in Telegram** (D8, decided with you at the phase 2 checkpoint, 2026-09-29).
+  The chat renders bold, italics, code, code blocks, tables and web links; file names and paths are
+  code. **Pass:** tests that every message's tags nest and fit, for tricky Markdown and oversized code or
+  lines; markup Telegram refuses goes again as plain text; live, a Markdown-rich ✅ arrives formatted.
 
 ### Phase 4: Answer Claude's questions from Telegram
 

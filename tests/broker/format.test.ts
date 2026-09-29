@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { escapeHtml, formatReply, MESSAGE_LIMIT, split } from "../../src/broker/format.ts";
+import { escapeHtml, formatReply, MESSAGE_LIMIT } from "../../src/broker/format.ts";
 import { redact } from "../../src/broker/redact.ts";
 import { SAMPLES } from "../helpers/secret-samples.ts";
 
@@ -54,7 +54,8 @@ describe("messages Telegram accepts", () => {
     expect(fullText).toBeUndefined();
     expect(messages.length).toBeGreaterThan(3);
     for (const message of messages) expect(message.length).toBeLessThanOrEqual(MESSAGE_LIMIT);
-    const joined = htmlToText(messages.join("")).replace("<b>✅ header</b>\n\n", "");
+    // Messages break between lines, so the line break between two of them is the one lost.
+    const joined = htmlToText(messages.join("\n")).replace("<b>✅ header</b>\n\n", "");
     expect(joined).toBe(long);
   });
 
@@ -72,10 +73,6 @@ describe("messages Telegram accepts", () => {
       "<b>repo &lt;main&gt; &amp; co</b>\n\nuse &lt;b&gt;bold&lt;/b&gt; &amp; more",
     ]);
     expect(escapeHtml("<&>")).toBe("&lt;&amp;&gt;");
-  });
-
-  test("split cuts after a line break or space near the end", () => {
-    expect(split("aaaa bbbb cccc", 10, 10)).toEqual(["aaaa bbbb ", "cccc"]);
   });
 });
 

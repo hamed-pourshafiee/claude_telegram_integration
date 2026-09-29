@@ -1,4 +1,7 @@
+import { escapeHtml, renderUnits } from "./markdown.ts";
 import { redact } from "./redact.ts";
+
+export { escapeHtml } from "./markdown.ts";
 
 /** The most a Telegram message may hold (Bot API, sendMessage). */
 export const MESSAGE_LIMIT = 4096;
@@ -16,56 +19,36 @@ export interface Reply {
 
 /**
  * A reply for Telegram (D8): the body redacted, then cut near `maxChars` with the full text kept for a
- * file, HTML-escaped under a bold header, and split into messages Telegram accepts.
+ * file, its Markdown rendered as Telegram formatting (decided 2026-09-29), under a bold header, and
+ * packed into messages Telegram accepts, each a run of whole lines, code blocks or tables.
  */
 export function formatReply(header: string, body: string, maxChars: number): Reply {
   const { text, count } = redact(body);
   const shown = text.length > maxChars ? text.slice(0, cutPoint(text, maxChars)) : text;
   const cut = shown.length < text.length;
-  const note = cut ? `\n\n✂️ ${shown.length} of ${text.length} characters shown.` : "";
-  const head = `<b>${escapeHtml(header.slice(0, HEADER_LIMIT))}</b>\n\n`;
-  const pieces = split(shown + note, MESSAGE_LIMIT - head.length, MESSAGE_LIMIT);
-  if (pieces.length === 0) return { messages: [head.trimEnd()], fullText: undefined, redacted: 0 };
-  const messages = pieces.map((piece, index) => (index === 0 ? head : "") + escapeHtml(piece));
-  return { messages, fullText: cut ? text : undefined, redacted: count };
+  const head = `<b>${escapeHtml(header.slice(0, HEADER_LIMIT))}</b>`;
+  // Room for any unit in the first message too, after the header and its blank line.
+  const room = MESSAGE_LIMIT - head.length - 2;
+  const units = shown.trim() === "" ? [] : renderUnits(shown.trimEnd(), room);
+  if (cut) units.push("", `✂️ ${shown.length} of ${text.length} characters shown.`);
+  if (units.length === 0) return { messages: [head], fullText: undefined, redacted: 0 };
+  return { messages: pack(head, units), fullText: cut ? text : undefined, redacted: count };
 }
 
-/** Telegram's HTML mode needs these three escaped in text (Bot API, formatting options). */
-export function escapeHtml(text: string): string {
-  return text.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-/**
- * Splits `text` into pieces whose escaped form fits: the first in `firstLimit`, the others in `limit`.
- * It cuts after a line break or a space near the end when there is one, and never inside an emoji.
- */
-export function split(text: string, firstLimit: number, limit: number): string[] {
-  const pieces: string[] = [];
-  let rest = text;
-  while (rest.length > 0) {
-    const end = fitting(rest, pieces.length === 0 ? firstLimit : limit);
-    if (end === 0) throw new Error(`split: a limit of ${limit} leaves no room`);
-    const at = end >= rest.length ? end : cutPoint(rest, end);
-    pieces.push(rest.slice(0, at));
-    rest = rest.slice(at);
+/** Units into messages of at most MESSAGE_LIMIT, one unit per line; the first opens with the header. */
+function pack(head: string, units: readonly string[]): string[] {
+  const messages: string[] = [];
+  let current = `${head}\n`;
+  for (const unit of units) {
+    if (current.length + 1 + unit.length > MESSAGE_LIMIT) {
+      messages.push(current);
+      current = unit;
+      continue;
+    }
+    current = `${current}\n${unit}`;
   }
-  return pieces;
-}
-
-/** How long a start of `text` fits in `max` once escaped, without splitting a surrogate pair. */
-function fitting(text: string, max: number): number {
-  let size = 0;
-  let index = 0;
-  while (index < text.length) {
-    const char = text.charAt(index);
-    const code = text.charCodeAt(index);
-    const units = code >= 0xd800 && code <= 0xdbff ? 2 : 1;
-    const width = char === "&" ? 5 : char === "<" || char === ">" ? 4 : units;
-    if (size + width > max) return index;
-    size += width;
-    index += units;
-  }
-  return index;
+  messages.push(current);
+  return messages;
 }
 
 /** Where to cut `text` at or before `end`: after the last line break or space in the last fifth. */

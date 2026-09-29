@@ -1,9 +1,10 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 10, F2: a wake fires UserPromptSubmit (rev. 9: F18 the hook's parent; rev. 8: F16 and
-flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5:
-Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
-2026-09-29 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 11, D8: Markdown shown as formatting (rev. 10: F2, a wake fires UserPromptSubmit; rev. 9:
+F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen
+lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3;
+rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -159,7 +160,10 @@ Taken (say so before the step if you disagree):
   reply, redacted, up to about 3,500 characters in the chat. A longer reply gets a button that sends the
   full text, redacted, as a `.md` file. Folders listed in `config.json` (`content.pingOnly`) get pings
   only. Bot chats are Telegram cloud chats, not end-to-end encrypted, so that text is stored by
-  Telegram.
+  Telegram. The chat shows Claude's Markdown as Telegram formatting (bold, italics, code, code blocks,
+  tables as preformatted text, web links), with file names and paths as code so that Telegram doesn't
+  turn them into links (decided with you on 2026-09-29, at the phase 2 checkpoint). Markup that Telegram
+  refuses goes again as plain text.
 
 Open, needed at the plan step shown:
 
