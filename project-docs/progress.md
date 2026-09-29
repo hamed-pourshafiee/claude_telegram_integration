@@ -859,7 +859,24 @@ Committed as `2abcdaa` (2026-09-29).
 
 ## Next
 
-The phase 2 checkpoint (plan): the user chooses which folders to serve beyond `sandbox/` (all, or a
-list), then a day of notify-only use, and tells me what is noisy. Also for them: the Markdown question
-above. The user is still in `/away` from the live check. Our hooks stay installed, and the broker is
-running the 2.7 code, which 2.8 didn't change.
+Committed as `426a330` (2026-09-29).
+
+## Phase 2 checkpoint
+
+- **Date:** 2026-09-29
+- **Decisions (the user's):**
+  - **Served folders:** all of `~`, this build session included. `config.json` is now the template
+    with `"serve": ["~"]`. `ctl doctor` passes (`serve ~`, entrypoints `claude-vscode, cli`).
+  - **How phase 3 is built:** in a git worktree, `../claude_telegram_integration-dev` on branch `dev`.
+    The installed hooks run this working copy's code for every session under `~`, so `main` here only
+    moves, by fast-forward, to a step whose gate passed; then the broker restarts and the live check
+    runs. Recorded in CLAUDE.md.
+- **Before that:** the user went back to `/auto` after the live checks. The broker keeps running the 2.7
+  code; `serve` is read by the hooks on each run, so no restart was needed.
+- **Now running:** a day of notify-only use. The user tells me what is noisy. Also for them: the Markdown
+  question from 2.8 (render it, and file names as code?).
+
+## Next
+
+Phase 3, step 3.1 (waiter protocol), built in the worktree. The day of use goes on meanwhile; its
+feedback may change phase 2's notices first.

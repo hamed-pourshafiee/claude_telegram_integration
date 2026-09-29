@@ -23,9 +23,13 @@ Read these completely before doing anything in a new session:
   theirs), and say exactly what to do.
 - After each step, `project-docs/progress.md` records the step, date, result, the evidence line and what
   we learned, so a new session can pick up from there.
-- Hooks in `~/.claude/settings.json` apply to every Claude session on this Mac. Until the user widens it
-  at the phase 2 checkpoint, everything we install acts only for sessions started in `<repo>/sandbox/`,
-  never for the session doing the build or the user's other work.
+- Hooks in `~/.claude/settings.json` apply to every Claude session on this Mac. At the phase 2 checkpoint
+  (2026-09-29) the user chose to serve all of `~` (`config.json`), this build session included. The hooks
+  run this working copy's code, so it must always hold a step that passed:
+  - New work happens in a git worktree, `../claude_telegram_integration-dev` on branch `dev`, tested there.
+  - When its gate passes, fast-forward `main` here to it and restart the broker; then the live check.
+  - A live check that fails is fixed in the worktree and fast-forwarded again.
+- When the user has to act, give one small step per message and wait for them before the next.
 - Strict TypeScript with no `any`; files ≤ 300 lines, functions ≤ 50; an `unhandledRejection` handler in
   every entry point; no silent catches (log with context).
 - A step is done only when `bun run typecheck`, `bun run lint` and `bun test` pass and its live check
