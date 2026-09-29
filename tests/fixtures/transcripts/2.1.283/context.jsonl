@@ -1,0 +1,33 @@
+{"type":"ai-title"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:01.606Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:01.614Z"}
+{"type":"user","uuid":"b028161c-966b-4f39-b642-d84e209a0ec2","parentUuid":null,"promptId":"85140f86-a212-4fca-bd23-cff7967288a7","timestamp":"2026-09-28T23:16:03.632Z","message":{"role":"user","content":"Say hi in one short sentence."}}
+{"type":"attachment","uuid":"a8030f2e-6c41-401a-8897-1566e4e4aae1","parentUuid":"b028161c-966b-4f39-b642-d84e209a0ec2","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"c6d1fe8d-eec5-45de-82b8-2a9e127e4e98","parentUuid":"a8030f2e-6c41-401a-8897-1566e4e4aae1","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"466136ad-d89e-454b-a967-ff31be2ddc23","parentUuid":"c6d1fe8d-eec5-45de-82b8-2a9e127e4e98","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"0ed2521d-fd11-4cc3-b8c3-50d6b11c4542","parentUuid":"466136ad-d89e-454b-a967-ff31be2ddc23","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"a91fa707-c1e2-43df-9f09-6dc3598f7b11","parentUuid":"0ed2521d-fd11-4cc3-b8c3-50d6b11c4542","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"b6e0d249-4e53-4fb5-8a63-050f0e0a32d9","parentUuid":"a91fa707-c1e2-43df-9f09-6dc3598f7b11","timestamp":"2026-09-28T23:16:03.631Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"50d52f88-9c26-4367-ab2a-bc16d6ee9586","parentUuid":"b6e0d249-4e53-4fb5-8a63-050f0e0a32d9","timestamp":"2026-09-28T23:16:03.664Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"b5b987ff-33f6-4cde-bcf0-545cc46c680e","parentUuid":"50d52f88-9c26-4367-ab2a-bc16d6ee9586","timestamp":"2026-09-28T23:16:03.664Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"f827d056-14a7-4382-928f-923cfa581690","parentUuid":"b5b987ff-33f6-4cde-bcf0-545cc46c680e","timestamp":"2026-09-28T23:16:03.664Z","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"0d02fdfe-8c4e-456e-a967-9e731f8e871b","parentUuid":"f827d056-14a7-4382-928f-923cfa581690","timestamp":"2026-09-28T23:16:03.665Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"53ba1231-95e9-4c16-9d4f-f7ae39488174","parentUuid":"0d02fdfe-8c4e-456e-a967-9e731f8e871b","timestamp":"2026-09-28T23:16:03.666Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"48c7cb18-5acf-4650-a9e4-f0469383200b","parentUuid":"53ba1231-95e9-4c16-9d4f-f7ae39488174","timestamp":"2026-09-28T23:16:05.315Z","message":{"id":"msg_011CfWguzsKKNzkH76DNXuhV","role":"assistant","content":[{"type":"text","text":"Hi there, what can I help you with today?"}]}}
+{"type":"attachment","uuid":"f09449ef-6211-4152-9859-2dec5d02723a","parentUuid":"48c7cb18-5acf-4650-a9e4-f0469383200b","timestamp":"2026-09-28T23:16:05.342Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"5881a43d-96e4-434d-9d0f-b2cfbadea0b3","parentUuid":"f09449ef-6211-4152-9859-2dec5d02723a","timestamp":"2026-09-28T23:16:05.364Z","attachment":{"type":"hook_success","hookEvent":"Stop"}}
+{"type":"attachment","uuid":"e6974ca5-8854-4f20-ab6d-62d0f37526d8","parentUuid":"5881a43d-96e4-434d-9d0f-b2cfbadea0b3","timestamp":"2026-09-28T23:16:05.364Z","attachment":{"type":"hook_additional_context","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"a85cc721-6bf9-4303-a4a9-8a82e8b1365a","parentUuid":"e6974ca5-8854-4f20-ab6d-62d0f37526d8","timestamp":"2026-09-28T23:16:05.365Z","preventedContinuation":false,"hookCount":2,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"99c7954b-fbc7-409c-9b3d-80883fbcc68c","parentUuid":"a85cc721-6bf9-4303-a4a9-8a82e8b1365a","timestamp":"2026-09-28T23:16:06.457Z","message":{"id":"msg_011CfWgv7Njep8SEsbU2uiAK","role":"assistant","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"edd87497-3875-48b8-a631-a5153176d4e7","parentUuid":"99c7954b-fbc7-409c-9b3d-80883fbcc68c","timestamp":"2026-09-28T23:16:07.057Z","message":{"id":"msg_011CfWgv7Njep8SEsbU2uiAK","role":"assistant","content":[{"type":"text","text":"I'm ready whenever you are."}]}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"5a1cd860-e2ec-4e34-b557-b36d5748a91c","parentUuid":"edd87497-3875-48b8-a631-a5153176d4e7","timestamp":"2026-09-28T23:16:07.094Z","preventedContinuation":false,"hookCount":2,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"cost-state"}

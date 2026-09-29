@@ -1,0 +1,30 @@
+{"type":"ai-title"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:08.740Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:08.741Z"}
+{"type":"user","uuid":"d17b6b3e-6941-4ea7-9e44-9e878dad3afe","parentUuid":null,"promptId":"b6ed2b61-9be7-4cca-be20-f527f6d39f2f","timestamp":"2026-09-28T23:16:10.769Z","message":{"role":"user","content":"Say hi in one short sentence."}}
+{"type":"attachment","uuid":"564ff623-2175-493e-9499-5f0b93d264a5","parentUuid":"d17b6b3e-6941-4ea7-9e44-9e878dad3afe","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"72fe88bb-5109-470a-aabb-705f9e128aaf","parentUuid":"564ff623-2175-493e-9499-5f0b93d264a5","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"b46df8a3-c255-4c0f-ad63-27065d73afbc","parentUuid":"72fe88bb-5109-470a-aabb-705f9e128aaf","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"e5d6c5d2-03b5-4d18-9ecf-b731a9b22e7f","parentUuid":"b46df8a3-c255-4c0f-ad63-27065d73afbc","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"ab08c795-39a3-4450-a86d-82160c89b9d9","parentUuid":"e5d6c5d2-03b5-4d18-9ecf-b731a9b22e7f","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"05240b62-db13-4488-83a1-2109357547e4","parentUuid":"ab08c795-39a3-4450-a86d-82160c89b9d9","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"25963327-7171-4c20-b33a-aa3beb9a51bd","parentUuid":"05240b62-db13-4488-83a1-2109357547e4","timestamp":"2026-09-28T23:16:10.769Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"2e3d51a4-2119-4b84-b1e1-8e788481907a","parentUuid":"25963327-7171-4c20-b33a-aa3beb9a51bd","timestamp":"2026-09-28T23:16:10.800Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"2e0c8aee-2e8e-4946-9790-58246f2da666","parentUuid":"2e3d51a4-2119-4b84-b1e1-8e788481907a","timestamp":"2026-09-28T23:16:10.800Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"e2e27d34-62fa-48f4-91ad-a66539a94ab3","parentUuid":"2e0c8aee-2e8e-4946-9790-58246f2da666","timestamp":"2026-09-28T23:16:10.801Z","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"876b7ab3-d7cd-4694-be81-dd9f7fa31e40","parentUuid":"e2e27d34-62fa-48f4-91ad-a66539a94ab3","timestamp":"2026-09-28T23:16:10.801Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"dfb2f884-677a-4f04-9313-7b8dcc521fac","parentUuid":"876b7ab3-d7cd-4694-be81-dd9f7fa31e40","timestamp":"2026-09-28T23:16:10.802Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"6de29f64-a149-4231-bdd1-d7b66916711b","parentUuid":"dfb2f884-677a-4f04-9313-7b8dcc521fac","timestamp":"2026-09-28T23:16:12.533Z","attachment":{"type":"deferred_tools_record"}}
+{"type":"assistant","uuid":"76fcfef8-e93c-4ec4-a129-614c31c72f34","parentUuid":"6de29f64-a149-4231-bdd1-d7b66916711b","timestamp":"2026-09-28T23:16:12.533Z","message":{"id":"msg_011CfWgvXbmQexvPij8wbXy9","role":"assistant","content":[{"type":"text","text":"Hi there!"}]}}
+{"type":"attachment","uuid":"32f0c48a-8158-4f70-afb0-9919ea93a6d5","parentUuid":"76fcfef8-e93c-4ec4-a129-614c31c72f34","timestamp":"2026-09-28T23:16:12.571Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"0d98e450-a63d-492b-9632-1b5a8b9f409e","parentUuid":"32f0c48a-8158-4f70-afb0-9919ea93a6d5","timestamp":"2026-09-28T23:16:12.594Z","attachment":{"type":"hook_non_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"e14894be-5e72-49cf-a5f9-b18999ef4f8f","parentUuid":"0d98e450-a63d-492b-9632-1b5a8b9f409e","timestamp":"2026-09-28T23:16:12.595Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Failed with non-blocking status code: throwaway test hook crashed"],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"cost-state"}

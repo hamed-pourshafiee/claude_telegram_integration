@@ -1,0 +1,35 @@
+{"type":"queue-operation","timestamp":"2026-09-28T23:15:49.268Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:15:49.269Z"}
+{"type":"user","uuid":"4b7c9381-de5b-4350-9d30-65121ad6b2cb","parentUuid":null,"promptId":"504c4894-143e-4e4b-8c24-5644447ae4de","timestamp":"2026-09-28T23:15:51.291Z","message":{"role":"user","content":"Say hi in one short sentence."}}
+{"type":"attachment","uuid":"361346da-1a51-4fce-823c-2f890e28caee","parentUuid":"4b7c9381-de5b-4350-9d30-65121ad6b2cb","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"73e4a3e7-63d8-4b69-ba82-45b9dcee2bfb","parentUuid":"361346da-1a51-4fce-823c-2f890e28caee","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"f9c17af0-8f5a-4c6c-91bf-ecf4a657b108","parentUuid":"73e4a3e7-63d8-4b69-ba82-45b9dcee2bfb","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"edd08a2c-0de3-455a-a5a8-fdb0f1d61791","parentUuid":"f9c17af0-8f5a-4c6c-91bf-ecf4a657b108","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"5fb06f1b-bc89-481a-b9e6-b1e5c41eda61","parentUuid":"edd08a2c-0de3-455a-a5a8-fdb0f1d61791","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"8cb6a363-e3a9-48ab-926a-c4ffcbb5d545","parentUuid":"5fb06f1b-bc89-481a-b9e6-b1e5c41eda61","timestamp":"2026-09-28T23:15:51.290Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"dd0163e6-fe31-46da-b069-e8d7b9b4e917","parentUuid":"8cb6a363-e3a9-48ab-926a-c4ffcbb5d545","timestamp":"2026-09-28T23:15:51.323Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"3fdd8dc6-f307-43d3-9800-1c19253783f8","parentUuid":"dd0163e6-fe31-46da-b069-e8d7b9b4e917","timestamp":"2026-09-28T23:15:51.323Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"019f882e-3b28-44a3-94ce-06ef82fbed9b","parentUuid":"3fdd8dc6-f307-43d3-9800-1c19253783f8","timestamp":"2026-09-28T23:15:51.323Z","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"6c9d59f4-583d-40de-b2f2-2a82dd818ed8","parentUuid":"019f882e-3b28-44a3-94ce-06ef82fbed9b","timestamp":"2026-09-28T23:15:51.324Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"f58094c4-d7d6-473d-8c35-bb320875bd55","parentUuid":"6c9d59f4-583d-40de-b2f2-2a82dd818ed8","timestamp":"2026-09-28T23:15:51.325Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"atis-latch"}
+{"type":"ai-title"}
+{"type":"assistant","uuid":"045ac3bc-e83e-4808-b46c-b36f3216d0e6","parentUuid":"f58094c4-d7d6-473d-8c35-bb320875bd55","timestamp":"2026-09-28T23:15:55.249Z","message":{"id":"msg_011CfWgu7txaMeWUTAQYkbub","role":"assistant","content":[{"type":"text","text":"Hi, what are we working on today?"}]}}
+{"type":"attachment","uuid":"fdc75ff9-26b4-41fc-8b76-a7b92529ef28","parentUuid":"045ac3bc-e83e-4808-b46c-b36f3216d0e6","timestamp":"2026-09-28T23:15:55.273Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"f495b265-e1bf-4872-a229-7c54f2a62252","parentUuid":"fdc75ff9-26b4-41fc-8b76-a7b92529ef28","promptId":"504c4894-143e-4e4b-8c24-5644447ae4de","isMeta":true,"timestamp":"2026-09-28T23:15:55.294Z","message":{"role":"user","content":"Stop hook feedback:\nThrowaway test hook: add one more short sentence, then stop."}}
+{"type":"attachment","uuid":"a08f6512-c4aa-4794-98eb-402c2bf46a81","parentUuid":"f495b265-e1bf-4872-a229-7c54f2a62252","timestamp":"2026-09-28T23:15:55.294Z","attachment":{"type":"hook_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"a493b47f-f916-426a-8b49-c0a5bbdb49e2","parentUuid":"a08f6512-c4aa-4794-98eb-402c2bf46a81","timestamp":"2026-09-28T23:15:55.295Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Throwaway test hook: add one more short sentence, then stop."],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"50c9a167-ec89-4e85-98dc-e10643cdb23a","parentUuid":"a493b47f-f916-426a-8b49-c0a5bbdb49e2","timestamp":"2026-09-28T23:15:57.318Z","message":{"id":"msg_011CfWguNMMnU2jHceENLkyZ","role":"assistant","content":[{"type":"text","text":"I'm ready whenever you are."}]}}
+{"type":"user","uuid":"1294407d-1634-4063-aa76-a486fe54fbc7","parentUuid":"50c9a167-ec89-4e85-98dc-e10643cdb23a","promptId":"504c4894-143e-4e4b-8c24-5644447ae4de","isMeta":true,"timestamp":"2026-09-28T23:15:57.355Z","message":{"role":"user","content":"Stop hook feedback:\nThrowaway test hook: add one more short sentence, then stop."}}
+{"type":"attachment","uuid":"1a1150f0-659e-44f5-a96e-35d636783ae0","parentUuid":"1294407d-1634-4063-aa76-a486fe54fbc7","timestamp":"2026-09-28T23:15:57.355Z","attachment":{"type":"hook_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"a00dd75a-28f8-4d12-aaac-3c51361c8195","parentUuid":"1a1150f0-659e-44f5-a96e-35d636783ae0","timestamp":"2026-09-28T23:15:57.356Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Throwaway test hook: add one more short sentence, then stop."],"level":"suggestion"}
+{"type":"assistant","uuid":"fe9b4f19-4311-4f97-ae96-2bfa760a3bc1","parentUuid":"a00dd75a-28f8-4d12-aaac-3c51361c8195","timestamp":"2026-09-28T23:15:59.154Z","message":{"id":"msg_011CfWguX4V76y5ZRVtt2LtM","role":"assistant","content":[{"type":"text","text":"Just let me know what you need."}]}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"41c368d0-24d5-465f-9391-621d3031ad05","parentUuid":"fe9b4f19-4311-4f97-ae96-2bfa760a3bc1","timestamp":"2026-09-28T23:15:59.176Z","preventedContinuation":false,"hookCount":2,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"cost-state"}

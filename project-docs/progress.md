@@ -751,9 +751,115 @@ Committed as `edf80ed` (2026-09-28).
 
 ## Next
 
-2.8, finish detection and the Codex hook:
-- tests on recorded transcript sequences;
-- live throwaway Stop hooks in `sandbox/`: block, `additionalContext` and crash;
-- a live check with the Codex hook's question.
+Committed as `2abcdaa` (2026-09-29).
 
-Our hooks stay installed. The broker is running the 2.7 code.
+## 2.8 Finish detection and the Codex hook
+
+- **Date:** 2026-09-29
+- **Result:** passed. No change to `src/` was needed: the 2.7 classifier gave the right outcome on every
+  recorded stop and in every live check.
+  - With throwaway Stop hooks (a block, `additionalContext`, a crash), each prompt got exactly one ✅,
+    only after the real finish.
+  - With the Codex hook, the ❓ came first and exactly one ✅ followed the real finish. That held with a
+    31 s continuation too.
+- **Evidence:**
+  - `bun run typecheck` exit 0 · `bun run lint` "Checked 91 files … No fixes applied." · `bun test`
+    "419 pass, 0 fail", twice.
+  - **Recorded:** 7 scenarios × 2 versions, 30 stops in all. The versions are 2.1.283 (the VS Code
+    extension's) and 2.1.274 (the terminal's).
+    - `scripts/record-stops.ts` runs `claude -p` in scratch folders, with throwaway hooks loaded through
+      `--settings` and `--setting-sources project`. It deletes those sessions' transcripts afterwards.
+    - The scenarios: a block, a block twice, `additionalContext`, a crash, a block with
+      `continue: false`, the same text in two turns, and the same text with a block.
+    - Claude Code did what each scenario set up: the truths match `EXPECTED` for both versions.
+  - **Tests on them** (49):
+    - Each stop is still undefined when its hook starts, and has its true outcome once its summary is
+      written (30 stops).
+    - Through the broker, exactly one ✅ per prompt, with the real finish's text (14 recordings).
+    - A prompt typed before a ✅ went out cancels that ✅ and not the next one.
+    - The summary's line half written; the summary written before the waiter started; and written while
+      it waits.
+  - **Positive controls**, each caught (failing tests):
+    - the prompt check dropped (4);
+    - `additionalContext` not a continuation (4);
+    - a blocking error not a continuation (20);
+    - `preventedContinuation` ignored (4);
+    - `hookErrors` taken as the signal (8);
+    - a partial line not skipped (1);
+    - no cancel barrier (1);
+    - a ✅ for a continuing stop (9).
+
+    The last two first missed, because they broke only one of two guards (the generation is checked in
+    two places, and a continuing stop never reaches the ✅ code). They were rewritten to break the path
+    that runs.
+  - **Live, throwaway hooks.** Session `b057`, `/away`, the hooks in `sandbox/.claude/settings.local.json`;
+    a file I wrote between prompts chose which one acted.
+    - Block: Stop at 05:48:44.788 → `continuing` 0.2 s later. Stop at 05:48:46.624 → `finish` → one ✅,
+      and the user got it.
+    - `additionalContext`: 06:01:18.937 `continuing`, then 06:01:21.351 `finish` → one ✅.
+    - Crash: 06:02:03.706 `finish` despite the hook's error → one ✅, 0.6 s later.
+  - **Live, the Codex hook.** `sandbox/` is now its own git repo, so the hook sees changes made there.
+    - `hello.py` (`b057`): 🔐 Write and 🔐 Bash. The stop at 06:15:38.806 was blocked by the Codex hook
+      → `continuing` 0.4 s later. The ❓ went out at 06:15:42.801. The real finish at 06:15:53.846 sent
+      the one ✅. The continuation took 15 s.
+    - `bye.py` (`b057`) and `hi.py` (`e28b`, a fresh tab): Claude asked about Codex by itself before
+      stopping. The Codex hook still blocked the stop (`continuing`); Claude said it had already asked.
+      One ✅ each, but the continuations took under 3 s.
+    - `yo.py` (`c907`): a "slow" throwaway hook asked for `sleep 25`. Claude Code refused a foreground
+      `sleep`, so Claude ran it in the background. That turn finished with the task listed in its ✅.
+      The task's end woke the session: a second turn, with its own ✅.
+    - `ok.py` (`80a0`): the slow hook asked for a foreground Python wait instead.
+      - The ❓ went out at 10:25:05.416.
+      - The stop at 10:25:12.393 was blocked by the Codex hook and the slow hook → `continuing` 0.4 s
+        later.
+      - The wait ran from 10:25:15, and the real finish came at 10:25:43.683.
+      - One ✅ at 10:25:44.260: a 31 s continuation.
+  - A tool declined at the Mac (06:30:34) ended the turn as interrupted. No Stop hook ran and nothing was
+    sent.
+- **Built:**
+  - `scripts/record-stops.ts` and `scripts/throwaway-stop-hook.ts`. The hook's behaviors: record, block,
+    block2, slow, context, crash, prevent. An `only` file lets a live check switch between them.
+  - `tests/fixtures/transcripts/<version>/`: each scenario's cut-down transcript (`.jsonl`) and its stops
+    (`.json`).
+  - `tests/helpers/recordings.ts`, `tests/hooks/finish-recorded.test.ts` and
+    `tests/broker/stops-recorded.test.ts`.
+  - Design rev. 8: F16 adds what the recordings showed, and flow 1 names the prompt check. CLAUDE.md
+    names the recorder and the sandbox's git repo.
+  - `sandbox/` is a git repo of its own: a baseline commit, plus the live check's files. The throwaway
+    settings were removed after the check.
+- **Decisions (mine, open to change):**
+  - Fixtures keep only what the classifier reads and what shows the chain, with home paths masked:
+    - `type`, `subtype`, `uuid`, `parentUuid`, `promptId`, `isMeta`, `timestamp`,
+      `preventedContinuation`, `hookCount`, `hookErrors`, `level`;
+    - the message's id, role and text;
+    - the attachment's type.
+
+    Thinking, tool inputs and other attachments' contents are left out.
+  - A recorded stop's truth comes from what Claude Code did (whether another stop of its prompt
+    followed), never from our classifier.
+- **Learned:**
+  - A stop's own assistant entry reached the transcript after its Stop hooks had started in 28 of 30
+    recorded stops: all 15 on 2.1.283 and 13 of 15 on 2.1.274. So the waiter's first read rarely finds
+    it, and the prompt check is what keeps an earlier turn's identical stop from being taken (F16).
+  - `hookErrors` carried the blocking reason in 12 of 16 blocked stops.
+  - Attachment types seen besides F16's: `hook_stopped_continuation` (with `continue: false`),
+    `hook_success`, `hook_non_blocking_error` (a crash) and `prompt_snapshot`. With a block and
+    `continue: false` together, Claude Code writes `hook_blocking_error` and still ends the turn
+    (`preventedContinuation: true`).
+  - The user's global CLAUDE.md makes Claude offer a Codex review by itself before stopping. The Codex
+    hook then blocks once more for the same change, and Claude answers that it already asked. Still
+    exactly one ✅.
+  - Claude Code refuses a foreground `sleep`. A background task's end starts a new turn, with its own ✅
+    while you are away.
+  - `claude -p --resume <id>` adds to the same session and transcript.
+  - Telegram shows Claude's Markdown as typed (`[hello.py](hello.py)`, backticks). It also turns file names
+    such as `hello.py` into links, because `.py` is a country's domain. D8 sends the text as plain text.
+    Rendering Markdown as Telegram formatting, with file names as code, would change D8: a question for
+    the checkpoint.
+
+## Next
+
+The phase 2 checkpoint (plan): the user chooses which folders to serve beyond `sandbox/` (all, or a
+list), then a day of notify-only use, and tells me what is noisy. Also for them: the Markdown question
+above. The user is still in `/away` from the live check. Our hooks stay installed, and the broker is
+running the 2.7 code, which 2.8 didn't change.

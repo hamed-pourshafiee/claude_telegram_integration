@@ -1,0 +1,35 @@
+{"type":"ai-title"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:35.153Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:35.153Z"}
+{"type":"user","uuid":"4cdbf589-5694-4b46-8402-c1df0175fcae","parentUuid":null,"promptId":"9d139919-593c-4822-b357-b658efad085a","timestamp":"2026-09-28T23:18:37.168Z","message":{"role":"user","content":"Reply with exactly this and nothing else: Done."}}
+{"type":"attachment","uuid":"c51b15f5-597f-4e55-8575-25917e17b025","parentUuid":"4cdbf589-5694-4b46-8402-c1df0175fcae","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"d38f8bd4-abd1-4a63-b1f9-3f70453723d2","parentUuid":"c51b15f5-597f-4e55-8575-25917e17b025","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"97481537-82f2-448b-9d51-7a8a7940d05c","parentUuid":"d38f8bd4-abd1-4a63-b1f9-3f70453723d2","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"af0d3aac-d9ce-4100-b8c1-8954861b5f6b","parentUuid":"97481537-82f2-448b-9d51-7a8a7940d05c","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"b462abce-e73a-424c-9ff8-cf780e33e94b","parentUuid":"af0d3aac-d9ce-4100-b8c1-8954861b5f6b","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"55728cd8-33fc-48d9-988d-7c876f055c14","parentUuid":"b462abce-e73a-424c-9ff8-cf780e33e94b","timestamp":"2026-09-28T23:18:37.168Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"62f4d94d-57f8-4a29-84aa-9163c6e1eeb2","parentUuid":"55728cd8-33fc-48d9-988d-7c876f055c14","timestamp":"2026-09-28T23:18:37.203Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"b3af0224-c30b-4f68-b13d-50d6256611e2","parentUuid":"62f4d94d-57f8-4a29-84aa-9163c6e1eeb2","timestamp":"2026-09-28T23:18:37.203Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"d85c2134-4e0d-47e0-835a-40e65215b63d","parentUuid":"b3af0224-c30b-4f68-b13d-50d6256611e2","timestamp":"2026-09-28T23:18:37.204Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"8d196a49-f1f6-4fbb-af01-e33a941b0703","parentUuid":"d85c2134-4e0d-47e0-835a-40e65215b63d","timestamp":"2026-09-28T23:18:37.204Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"ae04cd30-c6ad-4f54-a89c-525bfced48bc","parentUuid":"8d196a49-f1f6-4fbb-af01-e33a941b0703","timestamp":"2026-09-28T23:18:40.142Z","message":{"id":"msg_011CfWh7KLsM8a3YRK6kfDP1","role":"assistant","content":[{"type":"text","text":"Done."}]}}
+{"type":"attachment","uuid":"897ce83a-4e3b-46a9-95b3-d7f80f9d8ba9","parentUuid":"ae04cd30-c6ad-4f54-a89c-525bfced48bc","timestamp":"2026-09-28T23:18:40.161Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"00e041c4-6d31-4a78-ac0b-6d383255c16a","parentUuid":"897ce83a-4e3b-46a9-95b3-d7f80f9d8ba9","timestamp":"2026-09-28T23:18:40.178Z","preventedContinuation":false,"hookCount":1,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:42.665Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:42.665Z"}
+{"type":"user","uuid":"f4fea8e4-512f-410e-893d-71e03213b17b","parentUuid":"00e041c4-6d31-4a78-ac0b-6d383255c16a","promptId":"58f23eb5-d22d-4eff-b1b6-73602b5ed573","timestamp":"2026-09-28T23:18:42.679Z","message":{"role":"user","content":"Reply with exactly this and nothing else: Done."}}
+{"type":"attachment","uuid":"9c22bd19-b3f5-4ec3-ac6d-8df458c74d6c","parentUuid":"f4fea8e4-512f-410e-893d-71e03213b17b","timestamp":"2026-09-28T23:18:42.679Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"cc6d00ee-9933-42fd-a05e-c197be5004d7","parentUuid":"9c22bd19-b3f5-4ec3-ac6d-8df458c74d6c","timestamp":"2026-09-28T23:18:42.679Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"assistant","uuid":"95961283-e191-4a62-917d-192a63a81d62","parentUuid":"cc6d00ee-9933-42fd-a05e-c197be5004d7","timestamp":"2026-09-28T23:18:45.887Z","message":{"id":"msg_011CfWh7kgd9L15nohNGSP5y","role":"assistant","content":[{"type":"text","text":"Done."}]}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"af5ea5a5-1938-4697-8fac-a7742ff05410","parentUuid":"95961283-e191-4a62-917d-192a63a81d62","timestamp":"2026-09-28T23:18:45.932Z","preventedContinuation":false,"hookCount":1,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"mode"}

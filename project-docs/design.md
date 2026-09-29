@@ -1,8 +1,8 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 7, F17 the screen lock (rev. 6: O1 decided as D8; rev. 5: Codex review of the spike
-changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-28 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 8, F16 and flow 1 from the recorded stops of plan 2.8 (rev. 7: F17 the screen lock; rev. 6:
+O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14;
+rev. 2: Codex review) · 2026-09-29 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -44,7 +44,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F13 | Bun loads `.env` from the current directory automatically; `bun --no-env-file` turns that off. | tested |
 | F14 | Bun also loads `bunfig.toml` from the current directory and runs its `preload` scripts, even with `--no-env-file`. `--config=<file>` loads that file instead; a missing file stops Bun with exit 1. | tested 2026-09-28 (plan 1.2) |
 | F15 | `CLAUDE_PROJECT_DIR` is the directory the session started in and stays there after a `cd`; the input's `cwd` follows the `cd`. | S3 |
-| F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` also holds non-blocking errors, so it is not the signal. Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28 |
+| F16 | Each stop leaves a `stop_hook_summary` line in the transcript (`transcript_path`) once the synchronous Stop hooks finish, chained by `parentUuid` after the stop's last assistant message. When Claude Code continues the turn, it first writes a continuation entry into that chain: a `hook_blocking_error` attachment (after a meta "Stop hook feedback" message) or a `hook_additional_context` attachment; `preventedContinuation: true` ends the turn anyway. `hookErrors` holds non-blocking errors and often a blocking hook's reason too, so it is not the signal. A stop's own assistant entry often reaches the file only after its Stop hooks have started (28 of 30 recorded stops). Seen in 2.1.274 and 2.1.283; undocumented. | 2.1.283 code; transcripts, 2026-09-28; recorded stops, 2026-09-29 (plan 2.8) |
 | F17 | `ioreg -n Root -d 1`: the kernel's `IOConsoleLocked` is `Yes` while the screen is locked (also at the login window and on the way to sleep), and the console session in `IOConsoleUsers` then carries `CGSSessionScreenIsLocked`=Yes and `CGSSessionScreenLockedTime`. Unlocked, the flag is `No` and both keys are gone. This Mac locks itself after 30 minutes without input. | observed 2026-09-28 (plan 2.6) |
 
 ## 3. Architecture
@@ -90,8 +90,9 @@ Key flows:
 1. **Turn finished → reply.** The Stop hook registers a waiter (a new generation for that session), then
    finds this stop's `stop_hook_summary` (F16): it reads the transcript's tail, so a summary written
    before the waiter started is found, skips a partial last line, takes the latest assistant entry whose
-   text equals the input's `last_assistant_message`, and follows `parentUuid` from it to the first
-   summary. The chain in between decides:
+   text equals the input's `last_assistant_message` in the turn of its `prompt_id`, and follows
+   `parentUuid` from it to the first summary. Until that entry is written, it reads again: an earlier
+   turn's stop with the same text is never taken for it. The chain in between decides:
    - a continuation entry, without `preventedContinuation`: another hook, such as the Codex checkpoint,
      made Claude continue, so nothing is sent and the next stop decides;
    - anything else, including `hookErrors` from a hook that crashed: a real finish, so the

@@ -1,0 +1,17 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "prevented",
+  "hooks": [
+    "block",
+    "prevent"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "d707932a-9339-4bcd-a1cc-555233d950e6",
+      "text": "Hi there!",
+      "entriesAtStart": 20,
+      "truth": "finish"
+    }
+  ]
+}

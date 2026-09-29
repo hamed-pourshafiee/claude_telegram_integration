@@ -1,0 +1,31 @@
+{"type":"ai-title"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:14.984Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:14.984Z"}
+{"type":"user","uuid":"978da624-42cf-4ff5-a68e-b5758405e308","parentUuid":null,"promptId":"d707932a-9339-4bcd-a1cc-555233d950e6","timestamp":"2026-09-28T23:16:17.013Z","message":{"role":"user","content":"Say hi in one short sentence."}}
+{"type":"attachment","uuid":"3b5274f0-e77f-455b-b7ac-6a862a4afd95","parentUuid":"978da624-42cf-4ff5-a68e-b5758405e308","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"26967404-cb07-4ef9-85cf-d2c67e17460d","parentUuid":"3b5274f0-e77f-455b-b7ac-6a862a4afd95","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"ae83d6c0-7308-459d-babf-d4399d280b6d","parentUuid":"26967404-cb07-4ef9-85cf-d2c67e17460d","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"bc40b87d-6444-468c-85b5-7768ba297315","parentUuid":"ae83d6c0-7308-459d-babf-d4399d280b6d","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"7c2820f8-4026-40bc-b98c-4650612d8545","parentUuid":"bc40b87d-6444-468c-85b5-7768ba297315","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"8f070da0-7b9f-4f72-b35c-74aaf116ca35","parentUuid":"7c2820f8-4026-40bc-b98c-4650612d8545","timestamp":"2026-09-28T23:16:17.012Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"6aa000a0-dab9-4e72-a504-ae2608a002a9","parentUuid":"8f070da0-7b9f-4f72-b35c-74aaf116ca35","timestamp":"2026-09-28T23:16:17.046Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"b68c6104-c6b3-4976-adbe-f55728804a77","parentUuid":"6aa000a0-dab9-4e72-a504-ae2608a002a9","timestamp":"2026-09-28T23:16:17.046Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"b1de7a8a-fd34-46c5-84a0-3cdaa6433013","parentUuid":"b68c6104-c6b3-4976-adbe-f55728804a77","timestamp":"2026-09-28T23:16:17.047Z","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"33026418-51c5-40c7-8dd4-44a20a116116","parentUuid":"b1de7a8a-fd34-46c5-84a0-3cdaa6433013","timestamp":"2026-09-28T23:16:17.047Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"7a5c3b08-4bc2-483c-973e-2cb3c4f083f0","parentUuid":"33026418-51c5-40c7-8dd4-44a20a116116","timestamp":"2026-09-28T23:16:17.048Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"d87bc934-df6a-4813-b25c-1ed1848ef0f1","parentUuid":"7a5c3b08-4bc2-483c-973e-2cb3c4f083f0","timestamp":"2026-09-28T23:16:18.570Z","message":{"id":"msg_011CfWgvz5xYSZ42PcHXeiZ2","role":"assistant","content":[{"type":"text","text":"Hi there!"}]}}
+{"type":"attachment","uuid":"87cac47c-535f-4192-8173-ef37a6ffd841","parentUuid":"d87bc934-df6a-4813-b25c-1ed1848ef0f1","timestamp":"2026-09-28T23:16:18.603Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"904288f5-185d-40fa-a76f-48fd798cf606","parentUuid":"87cac47c-535f-4192-8173-ef37a6ffd841","timestamp":"2026-09-28T23:16:18.626Z","attachment":{"type":"hook_stopped_continuation","hookEvent":"Stop"}}
+{"type":"attachment","uuid":"0b471d5a-423b-4b2a-89de-98b399601d88","parentUuid":"904288f5-185d-40fa-a76f-48fd798cf606","timestamp":"2026-09-28T23:16:18.626Z","attachment":{"type":"hook_success","hookEvent":"Stop"}}
+{"type":"user","uuid":"73235a59-eff5-4471-9efb-8bc4d6ccbead","parentUuid":"0b471d5a-423b-4b2a-89de-98b399601d88","promptId":"d707932a-9339-4bcd-a1cc-555233d950e6","isMeta":true,"timestamp":"2026-09-28T23:16:18.626Z","message":{"role":"user","content":"Stop hook feedback:\nThrowaway test hook: add one more short sentence, then stop."}}
+{"type":"attachment","uuid":"5aba252c-65f0-43ff-acee-60e3a317a48a","parentUuid":"73235a59-eff5-4471-9efb-8bc4d6ccbead","timestamp":"2026-09-28T23:16:18.626Z","attachment":{"type":"hook_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"04ff7746-6714-4e6d-94c3-0bbcce4b2e5d","parentUuid":"5aba252c-65f0-43ff-acee-60e3a317a48a","timestamp":"2026-09-28T23:16:18.627Z","preventedContinuation":true,"hookCount":3,"hookErrors":["Throwaway test hook: add one more short sentence, then stop."],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"cost-state"}

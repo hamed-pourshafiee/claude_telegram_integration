@@ -1,0 +1,21 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "same-text",
+  "hooks": [],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "5fdcced4-24ef-4739-9b13-9d6b32a6d265",
+      "text": "Done.",
+      "entriesAtStart": 19,
+      "truth": "finish"
+    },
+    {
+      "prompt": 2,
+      "promptId": "a5a9b09b-5b10-4800-b2b3-b44c34ef3873",
+      "text": "Done.",
+      "entriesAtStart": 31,
+      "truth": "finish"
+    }
+  ]
+}

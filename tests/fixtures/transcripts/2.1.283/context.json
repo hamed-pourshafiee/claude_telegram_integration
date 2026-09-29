@@ -1,0 +1,23 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "context",
+  "hooks": [
+    "context"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "85140f86-a212-4fca-bd23-cff7967288a7",
+      "text": "Hi there, what can I help you with today?",
+      "entriesAtStart": 20,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "85140f86-a212-4fca-bd23-cff7967288a7",
+      "text": "I'm ready whenever you are.",
+      "entriesAtStart": 28,
+      "truth": "finish"
+    }
+  ]
+}

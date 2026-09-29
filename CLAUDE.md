@@ -65,6 +65,7 @@ bun run ctl disable    # sets the disabled flag and stops the broker, until `ctl
 bun run ctl pair       # a one-time code (10 min) to send the bot as `/pair <code>`
 bun run ctl install    # our hooks into ~/.claude/settings.json, after a backup; --dry-run shows them
 bun run ctl uninstall  # removes only our hooks (the user runs both; see the rules above)
+bun scripts/record-stops.ts [claude]  # re-records tests/fixtures/transcripts/ (calls the Claude API)
 ```
 
 In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/away` relays
@@ -79,9 +80,10 @@ Tests that need a real broker, hook or ctl process run them in a throwaway copy 
 src/            hooks/ and broker/ (design §3), ctl/ (command line), shared/ (config, .env, scope,
                 telegram/ client); paths come from the script's own location, never the cwd
 tests/          bun:test
-scripts/        helper scripts
+scripts/        helper scripts: the stop recorder and its throwaway Stop hook (plan 2.8)
 project-docs/   design, plan, progress, spike findings
-sandbox/        gitignored; open a second VS Code window here to test hooks live
+sandbox/        gitignored; open a second VS Code window here to test hooks live. Its own git repo, so
+                the Codex hook sees changes made there
 .state/         gitignored runtime state: SQLite, broker.sock, logs, settings backups
 .env            gitignored, mode 600: the bot token; never read it into the conversation
 config.json     gitignored: your settings; config.example.json holds the defaults used without it

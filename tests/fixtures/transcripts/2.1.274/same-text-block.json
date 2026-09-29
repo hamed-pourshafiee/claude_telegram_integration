@@ -1,0 +1,37 @@
+{
+  "claudeCode": "2.1.274",
+  "scenario": "same-text-block",
+  "hooks": [
+    "block"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "078a92c9-7a2c-4664-bd2a-fccb26cfe358",
+      "text": "Done.",
+      "entriesAtStart": 18,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "078a92c9-7a2c-4664-bd2a-fccb26cfe358",
+      "text": "The task is complete.",
+      "entriesAtStart": 26,
+      "truth": "finish"
+    },
+    {
+      "prompt": 2,
+      "promptId": "1cd37abf-3d6c-48b4-8e10-4bc121c1fd8e",
+      "text": "Done.",
+      "entriesAtStart": 36,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 2,
+      "promptId": "1cd37abf-3d6c-48b4-8e10-4bc121c1fd8e",
+      "text": "The reply above is complete.",
+      "entriesAtStart": 41,
+      "truth": "finish"
+    }
+  ]
+}

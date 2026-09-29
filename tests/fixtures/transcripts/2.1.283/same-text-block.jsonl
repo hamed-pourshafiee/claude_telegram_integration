@@ -1,0 +1,51 @@
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:32.169Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:32.178Z"}
+{"type":"user","uuid":"b88a9d94-2130-49a2-a8e0-1e636c80be36","parentUuid":null,"promptId":"46658d5d-dfd9-4e34-9273-6544a4f8723f","timestamp":"2026-09-28T23:16:34.176Z","message":{"role":"user","content":"Reply with exactly this and nothing else: Done."}}
+{"type":"attachment","uuid":"f7e67a1a-c72e-41d0-ba1d-2c66036e687d","parentUuid":"b88a9d94-2130-49a2-a8e0-1e636c80be36","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"bfe244f8-d275-41a1-9cb1-2a3adc14729c","parentUuid":"f7e67a1a-c72e-41d0-ba1d-2c66036e687d","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"b390afd4-5159-495a-9e1c-24c451c65e08","parentUuid":"bfe244f8-d275-41a1-9cb1-2a3adc14729c","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"d83b0fc6-7579-4c77-8430-6e142e339d7d","parentUuid":"b390afd4-5159-495a-9e1c-24c451c65e08","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"ee533b3c-2a1d-4fef-9080-6f89396f263b","parentUuid":"d83b0fc6-7579-4c77-8430-6e142e339d7d","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"5526c6f5-e42c-498e-bc7b-03310fe63f02","parentUuid":"ee533b3c-2a1d-4fef-9080-6f89396f263b","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"b82293bf-c4d4-457a-a1e1-ca4f961e37bb","parentUuid":"5526c6f5-e42c-498e-bc7b-03310fe63f02","timestamp":"2026-09-28T23:16:34.175Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"65afa12e-5088-49ce-b7c3-c4b2bb959d1d","parentUuid":"b82293bf-c4d4-457a-a1e1-ca4f961e37bb","timestamp":"2026-09-28T23:16:34.203Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"ebaa1e4e-d93b-4215-bc15-bfefa69d2b4e","parentUuid":"65afa12e-5088-49ce-b7c3-c4b2bb959d1d","timestamp":"2026-09-28T23:16:34.203Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"84019c8b-2b2e-4dca-a3f3-dfe7386c0160","parentUuid":"ebaa1e4e-d93b-4215-bc15-bfefa69d2b4e","timestamp":"2026-09-28T23:16:34.203Z","attachment":{"type":"credential_org"}}
+{"type":"attachment","uuid":"7fdf8a88-2ac1-4868-b0a4-c106fba04ab3","parentUuid":"84019c8b-2b2e-4dca-a3f3-dfe7386c0160","timestamp":"2026-09-28T23:16:34.204Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"cfd8f343-5e77-4dd3-baf7-03e75f6d8d4e","parentUuid":"7fdf8a88-2ac1-4868-b0a4-c106fba04ab3","timestamp":"2026-09-28T23:16:34.204Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"atis-latch"}
+{"type":"ai-title"}
+{"type":"attachment","uuid":"6d569b26-ea48-4e37-baa1-0d1d8b9d940b","parentUuid":"cfd8f343-5e77-4dd3-baf7-03e75f6d8d4e","timestamp":"2026-09-28T23:16:36.488Z","attachment":{"type":"deferred_tools_record"}}
+{"type":"assistant","uuid":"550ab513-6202-4611-a97c-53cd3072dbd7","parentUuid":"6d569b26-ea48-4e37-baa1-0d1d8b9d940b","timestamp":"2026-09-28T23:16:36.487Z","message":{"id":"msg_011CfWgxHPneDDdmW9cTu92w","role":"assistant","content":[{"type":"text","text":"Done."}]}}
+{"type":"attachment","uuid":"69d4871a-9ab0-453b-ac63-45c0350f64c8","parentUuid":"550ab513-6202-4611-a97c-53cd3072dbd7","timestamp":"2026-09-28T23:16:36.524Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"user","uuid":"2290c76e-7e4f-4bdd-8330-df3f644764ba","parentUuid":"69d4871a-9ab0-453b-ac63-45c0350f64c8","promptId":"46658d5d-dfd9-4e34-9273-6544a4f8723f","isMeta":true,"timestamp":"2026-09-28T23:16:36.581Z","message":{"role":"user","content":"Stop hook feedback:\nThrowaway test hook: add one more short sentence, then stop."}}
+{"type":"attachment","uuid":"a0925cc1-ccf6-4800-ac01-8a6ef630d874","parentUuid":"2290c76e-7e4f-4bdd-8330-df3f644764ba","timestamp":"2026-09-28T23:16:36.581Z","attachment":{"type":"hook_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"681bc3ab-f54b-478a-a933-f065dbbab6a9","parentUuid":"a0925cc1-ccf6-4800-ac01-8a6ef630d874","timestamp":"2026-09-28T23:16:36.583Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Throwaway test hook: add one more short sentence, then stop."],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"a680962e-93a8-43a8-bcb6-e3917b9eb8f9","parentUuid":"681bc3ab-f54b-478a-a933-f065dbbab6a9","timestamp":"2026-09-28T23:16:38.583Z","message":{"id":"msg_011CfWgxQxxRMYb19bxFtoPS","role":"assistant","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"ec2309a3-1057-48c2-83fa-c464ec8a725c","parentUuid":"a680962e-93a8-43a8-bcb6-e3917b9eb8f9","timestamp":"2026-09-28T23:16:38.783Z","message":{"id":"msg_011CfWgxQxxRMYb19bxFtoPS","role":"assistant","content":[{"type":"text","text":"The stop hook asked for one more sentence, so I've added this one."}]}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"95b56d24-a20e-4216-aa5e-15239aee8d9d","parentUuid":"ec2309a3-1057-48c2-83fa-c464ec8a725c","timestamp":"2026-09-28T23:16:38.819Z","preventedContinuation":false,"hookCount":2,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"cost-state"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:40.717Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:16:40.718Z"}
+{"type":"user","uuid":"efd70114-8f4c-4fb5-a9c4-b221013c833b","parentUuid":"95b56d24-a20e-4216-aa5e-15239aee8d9d","promptId":"c150ff1b-3619-4ddf-ac8e-e37646763300","timestamp":"2026-09-28T23:16:40.734Z","message":{"role":"user","content":"Reply with exactly this and nothing else: Done."}}
+{"type":"attachment","uuid":"3ffc15eb-8427-4c82-b649-6a8bb7e92515","parentUuid":"efd70114-8f4c-4fb5-a9c4-b221013c833b","timestamp":"2026-09-28T23:16:40.733Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"1091d9a6-55bf-4588-b997-abbb5665410a","parentUuid":"3ffc15eb-8427-4c82-b649-6a8bb7e92515","timestamp":"2026-09-28T23:16:40.734Z","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"a3598090-aa08-431e-8956-ecb2ec68d7cb","parentUuid":"1091d9a6-55bf-4588-b997-abbb5665410a","timestamp":"2026-09-28T23:16:40.734Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"assistant","uuid":"6e303a60-ff0e-4326-bfe6-ae4f6bef3be6","parentUuid":"a3598090-aa08-431e-8956-ecb2ec68d7cb","timestamp":"2026-09-28T23:16:42.671Z","message":{"id":"msg_011CfWgxkTETGGteKT7pBdTZ","role":"assistant","content":[{"type":"text","text":"Done."}]}}
+{"type":"user","uuid":"e419170b-e2e2-4d84-b815-791e9030e664","parentUuid":"6e303a60-ff0e-4326-bfe6-ae4f6bef3be6","promptId":"c150ff1b-3619-4ddf-ac8e-e37646763300","isMeta":true,"timestamp":"2026-09-28T23:16:42.771Z","message":{"role":"user","content":"Stop hook feedback:\nThrowaway test hook: add one more short sentence, then stop."}}
+{"type":"attachment","uuid":"b9472c62-cb39-4fda-9e97-15a7fbf429e9","parentUuid":"e419170b-e2e2-4d84-b815-791e9030e664","timestamp":"2026-09-28T23:16:42.771Z","attachment":{"type":"hook_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"de85f018-587a-4590-a0ee-00c730b49636","parentUuid":"b9472c62-cb39-4fda-9e97-15a7fbf429e9","timestamp":"2026-09-28T23:16:42.772Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Throwaway test hook: add one more short sentence, then stop."],"level":"suggestion"}
+{"type":"assistant","uuid":"ddf39522-75c8-415d-986a-89889cb42494","parentUuid":"de85f018-587a-4590-a0ee-00c730b49636","timestamp":"2026-09-28T23:16:44.306Z","message":{"id":"msg_011CfWgxsGViMrQronuSGnUs","role":"assistant","content":[{"type":"thinking"}]}}
+{"type":"assistant","uuid":"dac47aa9-0d2a-4287-9815-7278625a0b4b","parentUuid":"ddf39522-75c8-415d-986a-89889cb42494","timestamp":"2026-09-28T23:16:44.889Z","message":{"id":"msg_011CfWgxsGViMrQronuSGnUs","role":"assistant","content":[{"type":"text","text":"As the stop hook asked again, here is one more short sentence."}]}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"0aa28581-eb39-486a-b911-a14b96bd4ff1","parentUuid":"dac47aa9-0d2a-4287-9815-7278625a0b4b","timestamp":"2026-09-28T23:16:44.930Z","preventedContinuation":false,"hookCount":2,"hookErrors":[],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"mode"}
+{"type":"cost-state"}

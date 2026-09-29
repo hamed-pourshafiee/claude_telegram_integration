@@ -1,0 +1,30 @@
+{
+  "claudeCode": "2.1.274",
+  "scenario": "block-twice",
+  "hooks": [
+    "block2"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "5ec64509-0e7f-4e3b-b066-7c71d0151ef3",
+      "text": "Hi! What can I help you with today?",
+      "entriesAtStart": 20,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "5ec64509-0e7f-4e3b-b066-7c71d0151ef3",
+      "text": "Happy to help with code, debugging, or anything else you're working on.",
+      "entriesAtStart": 29,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "5ec64509-0e7f-4e3b-b066-7c71d0151ef3",
+      "text": "Just let me know what you'd like to tackle.",
+      "entriesAtStart": 34,
+      "truth": "finish"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "same-text-block",
+  "hooks": [
+    "block"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "46658d5d-dfd9-4e34-9273-6544a4f8723f",
+      "text": "Done.",
+      "entriesAtStart": 20,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "46658d5d-dfd9-4e34-9273-6544a4f8723f",
+      "text": "The stop hook asked for one more sentence, so I've added this one.",
+      "entriesAtStart": 29,
+      "truth": "finish"
+    },
+    {
+      "prompt": 2,
+      "promptId": "c150ff1b-3619-4ddf-ac8e-e37646763300",
+      "text": "Done.",
+      "entriesAtStart": 41,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 2,
+      "promptId": "c150ff1b-3619-4ddf-ac8e-e37646763300",
+      "text": "As the stop hook asked again, here is one more short sentence.",
+      "entriesAtStart": 45,
+      "truth": "finish"
+    }
+  ]
+}

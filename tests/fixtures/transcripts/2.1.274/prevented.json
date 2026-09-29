@@ -1,0 +1,17 @@
+{
+  "claudeCode": "2.1.274",
+  "scenario": "prevented",
+  "hooks": [
+    "block",
+    "prevent"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "cd3e77a6-7c18-40dc-af12-cf831170417b",
+      "text": "Hi! Ready when you are.",
+      "entriesAtStart": 20,
+      "truth": "finish"
+    }
+  ]
+}

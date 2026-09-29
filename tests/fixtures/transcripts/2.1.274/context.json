@@ -1,0 +1,23 @@
+{
+  "claudeCode": "2.1.274",
+  "scenario": "context",
+  "hooks": [
+    "context"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "5ef4c74c-4dde-40de-a885-1076c2f2f535",
+      "text": "Hi! What can I help you with today?",
+      "entriesAtStart": 19,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "5ef4c74c-4dde-40de-a885-1076c2f2f535",
+      "text": "Happy to dig into whatever you're working on whenever you're ready.",
+      "entriesAtStart": 26,
+      "truth": "finish"
+    }
+  ]
+}

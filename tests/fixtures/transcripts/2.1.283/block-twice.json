@@ -1,0 +1,30 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "block-twice",
+  "hooks": [
+    "block2"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "504c4894-143e-4e4b-8c24-5644447ae4de",
+      "text": "Hi, what are we working on today?",
+      "entriesAtStart": 19,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "504c4894-143e-4e4b-8c24-5644447ae4de",
+      "text": "I'm ready whenever you are.",
+      "entriesAtStart": 27,
+      "truth": "continuing"
+    },
+    {
+      "prompt": 1,
+      "promptId": "504c4894-143e-4e4b-8c24-5644447ae4de",
+      "text": "Just let me know what you need.",
+      "entriesAtStart": 31,
+      "truth": "finish"
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{"type":"ai-title"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:23.887Z"}
+{"type":"queue-operation","timestamp":"2026-09-28T23:18:23.889Z"}
+{"type":"user","uuid":"77f6b165-d477-455d-97cc-c130051b9342","parentUuid":null,"promptId":"3ad76741-52da-4b82-9333-4ba0ef59990a","timestamp":"2026-09-28T23:18:25.910Z","message":{"role":"user","content":"Say hi in one short sentence."}}
+{"type":"attachment","uuid":"9a5c20d7-4bef-42c3-b795-5a6089edb174","parentUuid":"77f6b165-d477-455d-97cc-c130051b9342","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"environment"}}
+{"type":"attachment","uuid":"ef318f81-2e51-46b7-8300-29fa05129965","parentUuid":"9a5c20d7-4bef-42c3-b795-5a6089edb174","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"model"}}
+{"type":"attachment","uuid":"6b0f5445-5f83-4a09-a849-584d01a3a709","parentUuid":"ef318f81-2e51-46b7-8300-29fa05129965","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"deferred_tools_delta"}}
+{"type":"attachment","uuid":"08603dd1-912e-4417-9e42-33cae08db7d6","parentUuid":"6b0f5445-5f83-4a09-a849-584d01a3a709","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"agent_listing_delta"}}
+{"type":"attachment","uuid":"d15fc02d-94e8-421c-b929-bceed45951b9","parentUuid":"08603dd1-912e-4417-9e42-33cae08db7d6","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"mcp_instructions_delta"}}
+{"type":"attachment","uuid":"593317cf-4ea2-4a11-afdd-0fd67838ff16","parentUuid":"d15fc02d-94e8-421c-b929-bceed45951b9","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"skill_listing"}}
+{"type":"attachment","uuid":"bf55672d-67ed-404a-9114-022a1f1aa4ef","parentUuid":"593317cf-4ea2-4a11-afdd-0fd67838ff16","timestamp":"2026-09-28T23:18:25.909Z","attachment":{"type":"total_tokens_reminder"}}
+{"type":"file-history-snapshot"}
+{"type":"atis-latch"}
+{"type":"attachment","uuid":"b6a84ce5-512b-4c56-86c9-3607df5e089e","parentUuid":"bf55672d-67ed-404a-9114-022a1f1aa4ef","timestamp":"2026-09-28T23:18:25.941Z","attachment":{"type":"session_context"}}
+{"type":"attachment","uuid":"f39a35c0-1acc-42eb-b4e6-95d41ee509a0","parentUuid":"b6a84ce5-512b-4c56-86c9-3607df5e089e","timestamp":"2026-09-28T23:18:25.941Z","attachment":{"type":"date"}}
+{"type":"attachment","uuid":"6ba17478-6e25-462d-b88f-2d171a6b3b6e","parentUuid":"f39a35c0-1acc-42eb-b4e6-95d41ee509a0","timestamp":"2026-09-28T23:18:25.942Z","attachment":{"type":"remote_session_change"}}
+{"type":"attachment","uuid":"67981405-1267-469e-8be1-1661a62a9dc0","parentUuid":"6ba17478-6e25-462d-b88f-2d171a6b3b6e","timestamp":"2026-09-28T23:18:25.942Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}
+{"type":"assistant","uuid":"9b03239a-25b6-4f10-a9fb-6ef2cf8e5274","parentUuid":"67981405-1267-469e-8be1-1661a62a9dc0","timestamp":"2026-09-28T23:18:28.003Z","message":{"id":"msg_011CfWh6V5yjhVKoQ7BPogSE","role":"assistant","content":[{"type":"text","text":"Hi! Ready when you are."}]}}
+{"type":"attachment","uuid":"2c5cef51-8c19-4ad7-9975-ef282efa5c18","parentUuid":"9b03239a-25b6-4f10-a9fb-6ef2cf8e5274","timestamp":"2026-09-28T23:18:28.046Z","attachment":{"type":"prompt_snapshot"}}
+{"type":"attachment","uuid":"d3cea837-04d2-48dc-a7a2-b0780e69c38d","parentUuid":"2c5cef51-8c19-4ad7-9975-ef282efa5c18","timestamp":"2026-09-28T23:18:28.046Z","attachment":{"type":"deferred_tools_record"}}
+{"type":"attachment","uuid":"90de665f-c08e-4f0e-968b-3624215b6c87","parentUuid":"d3cea837-04d2-48dc-a7a2-b0780e69c38d","timestamp":"2026-09-28T23:18:28.071Z","attachment":{"type":"hook_non_blocking_error","hookEvent":"Stop"}}
+{"type":"system","subtype":"stop_hook_summary","uuid":"214deedb-8ac9-4095-9b2a-ff2b233480dd","parentUuid":"90de665f-c08e-4f0e-968b-3624215b6c87","timestamp":"2026-09-28T23:18:28.072Z","preventedContinuation":false,"hookCount":2,"hookErrors":["Failed with non-blocking status code: throwaway test hook crashed"],"level":"suggestion"}
+{"type":"last-prompt"}
+{"type":"ai-title"}
+{"type":"atis-latch"}

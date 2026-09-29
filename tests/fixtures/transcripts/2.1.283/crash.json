@@ -1,0 +1,16 @@
+{
+  "claudeCode": "2.1.283",
+  "scenario": "crash",
+  "hooks": [
+    "crash"
+  ],
+  "stops": [
+    {
+      "prompt": 1,
+      "promptId": "b6ed2b61-9be7-4cca-be20-f527f6d39f2f",
+      "text": "Hi there!",
+      "entriesAtStart": 21,
+      "truth": "finish"
+    }
+  ]
+}
