@@ -1121,5 +1121,107 @@ noisy ("Nothing so far").
 
 ## Next
 
-Phase 4, "answer Claude's questions from Telegram": 4.1 relays `AskUserQuestion` with flow 3's three
-presence states. Built on `dev`.
+Committed as `756758f` (2026-09-29).
+
+## 4.1 Answer Claude's questions from Telegram
+
+- **Date:** 2026-09-29
+- **Result:** passed, with the user one small step at a time. Every session under `~` now relays Claude's
+  questions while the user is away or in between.
+- **Built** (on `dev`, `7fb7d4a`; design rev. 12):
+  - **The question hook** (`PreToolUse` on `AskUserQuestion`, installed with `--wait`; `src/hooks/
+    question.ts`, `asker.ts`) asks the broker where a call goes.
+    - It goes to the dialog at the Mac while the user is active, muted, unpaired, or in a ping-only
+      folder. Otherwise it goes to the chat, and the hook holds its Ask as a Stop hook holds its Wait.
+    - It confirms the answers, then prints them for Claude as `allow` plus `updatedInput.answers` (F4).
+      Without `--wait` it only sends phase 2's ping.
+  - **The broker** (`asks.ts`, `ask-relay.ts`, `ask-messages.ts`, `ask-chat.ts`, `questions.ts`; schema
+    4 adds `asks` and `ask_questions`):
+    - One message per question, with a button per option; a multi-select gets toggles and Done, and
+      its answer is one string joined with `", "`.
+    - Text and number questions take a reply; a number must be in range and on its steps.
+    - A call in the chat goes to the dialog at the user's first touch (not in `/away` mode), on
+      `/local`, or on its "🖥 Answer at the Mac" button.
+    - A call left open at the Mac is reported once the user is away.
+    - `PostToolUse` closes a call, and its text goes (D8).
+  - **Routing:** a reply-to answers its question; a plain message goes to the only session that asks;
+    the picker lists sessions that wait and sessions that ask.
+  - **Presence** tells listeners of every change of state. While a question waits in the chat and the
+    user is in between, it looks every second instead of every 5 s.
+  - Gate: typecheck exit 0, "Checked 125 files", "532 pass, 0 fail", twice.
+  - Positive controls, 12, 11 caught (failing tests):
+    - a multi-select joined with "," (2);
+    - no hand-over at the first touch (1);
+    - numbers out of range accepted (2);
+    - unconfirmed answers printed (1);
+    - told twice of a question left open (1);
+    - `/local` moving nothing (3);
+    - lost answers not announced (1);
+    - a reply-to ignoring its question (2, once a two-question test was added for it);
+    - presence never hurried (2);
+    - a released hook never told (4);
+    - relayed while at the Mac (3).
+  - The miss, a tap on an answered question accepted, is a doubled guard: without the database's
+    guard 1 test fails, and without both, 2.
+- **Going live:**
+  - The live database was backed up at schema 3 (`VACUUM INTO`, 12 sessions):
+    `.state/backups/broker.pre-schema4.2026-09-29T16-19-13Z.db` (0600).
+  - `main` was fast-forwarded to `7fb7d4a`; the broker restarted on it (pid 27664, schema 4), and the
+    sandbox's waiting hook carried over.
+  - After the user's OK, they ran `bun run ctl install`: "installed 9 hooks", backup
+    `settings.2026-09-29T16-26-23-331Z.json`.
+  - Compared with the backup: nothing outside `hooks` changed, and the user's own 17 hooks in 14
+    events are identical. Ours changed only in two places:
+    - `PreToolUse` → `PreToolUse --wait`, timeout 10 → 43200, and a `statusMessage`;
+    - `PostToolUse` on `AskUserQuestion` is new, so 8 hooks became 9.
+- **Evidence** (broker log):
+  - **The Codex checkpoint question from the phone** (`/away` on). The sandbox created `q.py`, and at its
+    stop the checkpoint made Claude ask "Should Codex review the uncommitted change to q.py?" (Skip /
+    Run Codex review).
+    - The call went to the chat (16:29:13.436), and its ❓ went out at 16:29:13.848.
+    - The user tapped Skip at 16:30:09.039. The call was answered and confirmed 3 ms later, and the
+      hook printed the answer. `PostToolUse` closed the call at 16:30:09.149, and the ❓ was edited to
+      "✅ Skip".
+    - The sandbox's ✅ went out at 16:30:11.447. In its transcript the tool result reads "Your questions
+      have been answered: …="Skip"", and Claude said "I skipped the Codex review, as you chose." No
+      dialog opened.
+  - **A bug, fixed** (`343a490`, deployed; broker pid 66299). The "✅ Skip" edit landed 455 ms after the
+    tap, after the close, and saved the question's text in SQLite again. A message's text is now kept
+    only while its call is open. A test lets an edit land after the close; its control is caught (1).
+    Gate: "533 pass, 0 fail", twice. The live call's leftover text goes with the weekly prune: only the
+    broker writes to its database.
+  - **Leaving while a question is open at the Mac** (`/auto`). The sandbox asked "Do you prefer Red or
+    Blue?"; the user was active, so the dialog opened at once (16:35:26.534, "at the Mac").
+    - The user locked the screen. Presence turned away/locked at 16:36:23.945, and "❓ … has a question
+      waiting at the computer", with the question and "It opened while you were at the Mac, so it can
+      only be answered there", went out 0.45 s later (screenshot). It is sent once per call.
+    - After unlocking, the user answered at the Mac: `PostToolUse` closed the call at 16:37:31.500, its
+      text dropped.
+- **Decisions (mine, open to change):**
+  - A question in the chat goes to the dialog at the first touch after being away too, not only in
+    between, so nobody faces a spinner at the desk; `/away` mode keeps it in the chat. Held or relayed,
+    it can be answered in the chat.
+  - `/local` hands back every question in the chat; each question also has a "🖥 Answer at the Mac"
+    button.
+  - A reply-to any message of a session that asks answers its first open question; a plain message
+    goes to the only session asking.
+  - A number may be typed with its unit ("35px"); it must lie in range and on the steps.
+  - A call that can't be relayed (more than 4 questions, two alike, a choice with one option) goes to
+    the dialog.
+  - Presence looks every second only in between: one look costs about 52 ms of CPU, so away keeps 5 s.
+- **Learned:**
+  - 2.1.284's `AskUserQuestion` has a `title`, and `text` and `number` questions (F4); a hook's
+    `statusMessage` shows in the spinner; the dialog can resolve itself after a stretch of idle, not seen
+    live (F19).
+  - A Telegram edit takes about 0.45 s, time enough for the next hook to arrive: anything saved after an
+    await must still be wanted.
+  - zsh doesn't split an unquoted `$VAR` into words (`${=VAR}` does); a test helper shared by several
+    files must clean up at process exit, not in `afterAll`; an async function that returns a promise
+    makes its caller wait for that promise; `contentModeFor` treats a folder that doesn't exist as
+    ping-only, so tests need real folders.
+
+## Next
+
+Two decisions for the user before the next step: 4.2 (optional), relaying `ExitPlanMode`; and O2, whether
+permission prompts may be approved from Telegram at all (phase 5). Without either, phase 6: hardening and
+handover.
