@@ -81,15 +81,19 @@ function snapshot(state: State, mode: Mode): Snapshot {
   return { mode, state, because, idleSeconds: 0, locked: false };
 }
 
-/** The parts on the database in `file` (the same file again: a restarted broker). */
-export function askHarness(file: string, dead: ReadonlySet<number> = new Set()): AskHarness {
+/** The parts on the database in `file` (the same file again: a restarted broker); edits take `editMs`. */
+export function askHarness(
+  file: string,
+  dead: ReadonlySet<number> = new Set(),
+  editMs = 0,
+): AskHarness {
   const db = BrokerDb.open(file);
   const sessions = new Sessions(db);
   const asks = new Asks(db);
   let now = snapshot("away", "auto");
   let hurried = false;
   const presence = { snapshot: () => now, hurry: (on: boolean) => (hurried = on) };
-  const record = recorder();
+  const record = recorder(editMs);
   const messages = new AskMessages({ asks, ...record.parts, log: noLog });
   const pairing = { pairedUser: () => ({ id: CHAT, name: "Hamed (@someone)" }) };
   const where = askWhere({ pairing, presence, config });
@@ -131,7 +135,7 @@ export function askHarness(file: string, dead: ReadonlySet<number> = new Set()):
 }
 
 /** A stand-in notifier and Telegram client that keep what they were asked to send. */
-function recorder() {
+function recorder(editMs: number) {
   const lists = {
     posted: [] as PostedQuestion[],
     told: [] as Notice[],
@@ -163,9 +167,10 @@ function recorder() {
       lists.sent.push(params);
       return Promise.resolve(message(params.chat_id));
     },
-    editMessageText: (params: EditMessageTextParams) => {
+    editMessageText: async (params: EditMessageTextParams) => {
       lists.edits.push(params);
-      return Promise.resolve(message(params.chat_id));
+      await Bun.sleep(editMs);
+      return message(params.chat_id);
     },
     editMessageReplyMarkup: (params: EditMessageReplyMarkupParams) => {
       lists.markups.push(params);

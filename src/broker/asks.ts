@@ -167,14 +167,19 @@ export class Asks {
     return row === undefined ? undefined : questionFromRow(row);
   }
 
-  /** The question's message, as it now reads. */
+  /**
+   * The question's message, as it now reads. Its text isn't kept once the call is settled (D8): an edit
+   * can finish after PostToolUse closed the call.
+   */
   shown(
     askId: string,
     index: number,
     message: { chatId: number; messageId: number; html: string },
   ) {
     this.#db.run(
-      "UPDATE ask_questions SET chat_id = ?, message_id = ?, html = ? WHERE ask_id = ? AND idx = ?",
+      `UPDATE ask_questions SET chat_id = ?, message_id = ?, html = CASE
+         WHEN (SELECT state FROM asks WHERE id = ask_id) IN ('closed', 'ended') THEN '' ELSE ? END
+       WHERE ask_id = ? AND idx = ?`,
       message.chatId,
       message.messageId,
       message.html,

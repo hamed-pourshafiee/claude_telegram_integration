@@ -235,3 +235,20 @@ describe("left open at the Mac (flow 3)", () => {
     expect(h.told).toEqual([]);
   });
 });
+
+describe("text kept only until the call is settled (D8)", () => {
+  test("an edit that finishes after PostToolUse closed the call doesn't bring its text back", async () => {
+    files += 1;
+    const h = askHarness(join(dir, `asks-${files}.db`), new Set(), 60);
+    const waiting = h.ask("toolu_1", COLOR);
+    await posted(h, 1);
+    await h.chat.press(`ask:${h.idOf("toolu_1")}:0:0`, "q1");
+    await waiting;
+    h.relay.confirm({ session_id: "5e551011-aaaa", tool_use_id: "toolu_1" });
+    h.relay.asked("5e551011-aaaa", "toolu_1");
+    // The "✅ Red" edit is on its way; it lands after the call closed, as it did live (455 ms).
+    expect(h.edits).toHaveLength(1);
+    await Bun.sleep(120);
+    expect(h.asks.questions(h.idOf("toolu_1")).map((question) => question.html)).toEqual([""]);
+  });
+});
