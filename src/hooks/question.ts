@@ -26,7 +26,8 @@ const UNTOLD: ReadonlySet<string> = new Set([
  * The question hook (PreToolUse on AskUserQuestion and ExitPlanMode, flow 3). Installed with --wait,
  * it asks the broker where Claude's questions, or its plan, go: to the dialog at the Mac, which then
  * opens as usual, or to the chat, where it waits for your answers and hands them to Claude (F4), so no
- * dialog opens. Without --wait, phase 2's ❓ ping for questions only.
+ * dialog opens. A plan in the chat can only be sent back for more planning; it is approved in its dialog
+ * at the Mac (F20). Without --wait, phase 2's ❓ ping for questions only.
  */
 export async function preToolUse(context: HookContext): Promise<void> {
   const { toolName, toolInput, toolUseId } = context.input;
@@ -80,8 +81,8 @@ export async function postToolUse(context: HookContext): Promise<void> {
 }
 
 /**
- * The decision for Claude Code: a question's answers go in as updatedInput (F4); a plan approved is
- * allowed, so Claude leaves plan mode, and anything else is denied with your words (plan 4.2).
+ * The decision for Claude Code: a question's answers go in as updatedInput (F4); a plan is denied with
+ * your words, so Claude keeps planning (plan 4.2, F20).
  */
 function outputFor(tool: string, toolInput: Fields, answers: Readonly<Record<string, string>>) {
   const decision =

@@ -1,12 +1,12 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 10 (4.2 chosen, with its pass; phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
-chat; rev. 8, §1: steps follow on their own, Codex reviews paused;
-rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's continuation
-entries, proven in 2.8, SIGTERM per waiter) · 2026-09-29 · Repo:
+Status: rev. 11 (4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
+on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
+reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
+continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-29 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F19), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F20), architecture and
 flows 1–4, decisions (D1–D9, open O3), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -194,10 +194,13 @@ flows 1–4, decisions (D1–D9, open O3), security, rollback, risks and the rev
     "expired", and an in-between hold released by input;
   - live, you answer the Codex checkpoint question from your phone;
   - live, leaving while a question is open locally gets you a "waiting at the computer" message.
-- **4.2 (optional; you chose it on 2026-09-29)** `ExitPlanMode`: the plan as a `.md` file + Approve / Keep
-  planning, the way of flow 3. **Pass:** tests for Approve (allowed), your words or Keep planning (denied
-  with them), a plan read from its file, and one left open at the Mac; live, you approve a sandbox plan
-  from your phone and Claude leaves plan mode.
+- **4.2 (optional; you chose it on 2026-09-29)** `ExitPlanMode`: the plan in the chat, the way of flow 3,
+  with its `.md` file when long. No hook can approve a plan (F20, found live), so from the phone you can
+  only send it back for more planning: Keep planning, or a reply with what to change; it is approved in
+  its dialog at the Mac (your choice, 2026-09-29). **Pass:** tests for Keep planning and your words
+  (denied with them), a plan read from its file, "🖥 Approve at the Mac", and one left open at the Mac;
+  live, a reply from your phone sends a sandbox plan back for more planning, and the next plan is
+  approved at the Mac.
 
 ### Phase 5: Permission approvals (O2 = yes: D9, decided 2026-09-29)
 

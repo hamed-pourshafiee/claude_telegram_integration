@@ -1,10 +1,11 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 13, O2 decided as D9, plans in flow 3 (plan 4.2) (rev. 12: flow 3 as built in plan 4.1,
-F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires
-UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops;
-rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8;
-rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-29 · Repo:
+Status: rev. 14, F20: no hook can approve a plan, so plans are reviewed from the phone (rev. 13: O2
+decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11:
+D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's
+parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1
+decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
+Codex review) · 2026-09-29 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
@@ -51,6 +52,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F17 | `ioreg -n Root -d 1`: the kernel's `IOConsoleLocked` is `Yes` while the screen is locked (also at the login window and on the way to sleep), and the console session in `IOConsoleUsers` then carries `CGSSessionScreenIsLocked`=Yes and `CGSSessionScreenLockedTime`. Unlocked, the flag is `No` and both keys are gone. This Mac locks itself after 30 minutes without input. | observed 2026-09-28 (plan 2.6) |
 | F18 | A command hook runs as a direct child of the Claude Code process, with no shell in between, for synchronous and `asyncRewake` hooks alike, so a hook's parent pid is its Claude. | probed 2026-09-29 with 2.1.283 (plan 3.1) |
 | F19 | A command hook's `statusMessage` is shown in the spinner while the hook runs. The `AskUserQuestion` dialog can resolve itself after a stretch of idle, telling Claude the user may be away (`afkTimeoutMs` in its result); `PostToolUse` follows as usual. | 2.1.284 binary (plan 4.1); the idle timeout not seen live |
+| F20 | No hook can approve a plan (`ExitPlanMode`): after a hook's allow, Claude Code runs the tool's own permission check, and ExitPlanMode's always asks, so the plan dialog opens anyway. That holds for a `PreToolUse` allow (seen live) and a `PermissionRequest` allow, which the dialog ignores without `updatedInput` and re-asks with one. A deny from either stops the call; `AskUserQuestion`'s check is satisfied by the answers in `updatedInput`. The hook's input holds `plan` and `planFilePath` (seen live). | 2.1.284 binary; seen live 2026-09-29 (plan 4.2) |
 
 ## 3. Architecture
 
@@ -85,7 +87,7 @@ by the directory the session started in, `CLAUDE_PROJECT_DIR`, never by the inpu
 | `Notification` | `idle_prompt` | `async` | Terminal only (F6): a second sign that the session is idle |
 | `PermissionRequest` | — | `async` | "🔐 waiting for your permission" ping until phase 5; skips `AskUserQuestion` and `ExitPlanMode`, relayed by `PreToolUse` (F5, F6) |
 | `StopFailure` | — | `async` | "⚠️ stopped on an API error" |
-| `PreToolUse` | `AskUserQuestion\|ExitPlanMode` | sync, timeout 12 h | Ping (phase 2); relay a question and return the answers, or a plan and approve or deny it (phase 4) |
+| `PreToolUse` | `AskUserQuestion\|ExitPlanMode` | sync, timeout 12 h | Ping (phase 2); relay a question and return the answers, or a plan and send it back for more planning (phase 4; F20) |
 | `PostToolUse` | `AskUserQuestion\|ExitPlanMode` | `async` | Close a question or plan that was answered |
 | `PermissionRequest` | per policy | sync, timeout 12 h | Phase 5 only; never `AskUserQuestion` |
 | `SessionEnd` | — | `async` | Mark the session ended, cancel its waiters |
@@ -129,9 +131,10 @@ Key flows:
    computer. `/away` sent from your phone as you leave makes everything relay at once.
 
    A plan waiting for approval (`ExitPlanMode`, plan 4.2) goes the same way, as one question: the plan in
-   the chat (a long one cut, with the 📄 file), Approve or Keep planning, and a reply says what to change.
-   Approve allows the call, so Claude leaves plan mode for the mode it was in before; anything else denies
-   it with your words, so Claude keeps planning.
+   the chat (a long one cut, with the 📄 file), and Keep planning or a reply with what to change, which
+   denies the call with your words, so Claude keeps planning. No hook can approve a plan (F20): it is
+   approved in its dialog at the Mac, which opens at your first touch or when you tap "🖥 Approve at the
+   Mac".
 4. **Routing and delivery.** Every bot message is linked to its session and request.
    - A reply-to goes to that session.
    - A plain message goes to the only waiting session; if several are waiting, the bot asks

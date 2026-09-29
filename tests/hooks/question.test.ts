@@ -172,19 +172,15 @@ describe("ExitPlanMode with --wait (plan 4.2)", () => {
   });
   const answered = (answer: string) => (name: string) =>
     name === "Ask"
-      ? { ok: true, state: "answered", answers: { "Approve this plan?": answer } }
+      ? { ok: true, state: "answered", answers: { "What should change in the plan?": answer } }
       : { ok: true, delivered: true };
   const output = () => JSON.parse(printed[0] ?? "{}").hookSpecificOutput;
 
-  test("approved: allowed as it is, so Claude leaves plan mode", async () => {
-    respond = answered("Approve");
+  test("the plan goes to the broker; sent to the Mac, no output, so its dialog opens (F20)", async () => {
+    respond = () => ({ ok: true, state: "local" });
     await run("PreToolUse", plan());
     expect(calls[0]?.body.input).toEqual({ plan: "# Plan" });
-    expect(output()).toEqual({
-      hookEventName: "PreToolUse",
-      permissionDecision: "allow",
-      permissionDecisionReason: "Approved from Telegram",
-    });
+    expect(printed).toEqual([]);
   });
 
   test("your words, or Keep planning: denied with them, so Claude keeps planning", async () => {

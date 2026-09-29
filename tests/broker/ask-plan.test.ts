@@ -19,19 +19,28 @@ const PLAN = { plan: "# Add q.py\n\n1. Write q.py.\n2. Run it." };
 const body = (answer: Answer) => answer.body as Record<string, unknown>;
 
 describe("a plan waiting for approval", () => {
-  test("away: the plan comes to the chat; Approve is the answer the hook gets", async () => {
+  test("away: the plan comes to the chat; Keep planning is the answer the hook gets", async () => {
     const h = fresh();
     const waiting = h.ask("toolu_p", PLAN);
     expect(await until(() => h.posted.length === 1)).toBe(true);
     expect(h.posted[0]?.header).toBe("📋 sandbox · 5e55 has a plan ready");
     expect(h.posted[0]?.body).toStartWith("# Add q.py\n\n1. Write q.py.");
     expect(h.posted[0]?.rows.map((row) => row[0]?.text)).toEqual([
-      "Approve",
       "Keep planning",
-      "🖥 Answer at the Mac",
+      "🖥 Approve at the Mac",
     ]);
     await h.chat.press(`ask:${h.idOf("toolu_p")}:0:0`, "q");
-    expect(body(await waiting)).toMatchObject({ answers: { "Approve this plan?": "Approve" } });
+    expect(body(await waiting)).toMatchObject({
+      answers: { "What should change in the plan?": "Keep planning" },
+    });
+  });
+
+  test("🖥 Approve at the Mac hands the plan to its dialog there (F20)", async () => {
+    const h = fresh();
+    const waiting = h.ask("toolu_p", PLAN);
+    expect(await until(() => h.posted.length === 1)).toBe(true);
+    await h.chat.press(`ask:${h.idOf("toolu_p")}:mac`, "q");
+    expect(body(await waiting)).toMatchObject({ state: "local" });
   });
 
   test("a reply to the plan is what to change", async () => {
@@ -41,7 +50,7 @@ describe("a plan waiting for approval", () => {
     const target = h.chat.questionAt(CHAT, 101) ?? { sessionId: "" };
     expect(h.chat.answerText(target, "Also add a test")).toEqual({ outcome: "answered" });
     expect(body(await waiting)).toMatchObject({
-      answers: { "Approve this plan?": "Also add a test" },
+      answers: { "What should change in the plan?": "Also add a test" },
     });
   });
 

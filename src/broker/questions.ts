@@ -1,5 +1,5 @@
 import { asFields } from "../shared/json.ts";
-import { APPROVE, KEEP_PLANNING, PLAN_QUESTION } from "../shared/plan.ts";
+import { KEEP_PLANNING, PLAN_QUESTION } from "../shared/plan.ts";
 import type { InlineKeyboardButton } from "../shared/telegram/types.ts";
 
 /** How a question is answered (F4): by picking options, by typing, or with a number in a range. */
@@ -36,7 +36,9 @@ export interface AskInput {
 }
 
 /** How to answer a plan, under it. */
-const PLAN_HOW = "Approve it, or tap Keep planning. To say what to change, reply to this message.";
+const PLAN_HOW =
+  "To approve it, tap 🖥 Approve at the Mac: its dialog opens there. To have Claude keep planning, tap " +
+  "Keep planning, or reply to this message with what to change.";
 
 /** A press of a question's button (plan 4.1). */
 export type Press =
@@ -68,7 +70,7 @@ export function parseAskInput(value: unknown): AskInput | undefined {
   return { title: text(fields?.title), questions, plan: undefined };
 }
 
-/** A plan waiting for approval (plan 4.2), as a call with one question: Approve, or Keep planning. */
+/** A plan waiting for approval (plan 4.2), as a call with one question: Keep planning, or what to change. */
 function planInput(plan: string): AskInput | undefined {
   if (plan.trim() === "") return undefined;
   const question: Question = {
@@ -76,7 +78,7 @@ function planInput(plan: string): AskInput | undefined {
     header: "",
     kind: "choice",
     description: undefined,
-    options: [APPROVE, KEEP_PLANNING].map((label) => ({ label, description: undefined })),
+    options: [{ label: KEEP_PLANNING, description: undefined }],
     multiSelect: false,
     placeholder: undefined,
     min: undefined,
@@ -173,7 +175,9 @@ export function questionButtons(
   });
   if (question.multiSelect)
     rows.push([{ text: "✅ Done", callback_data: `ask:${askId}:${index}:done` }]);
-  rows.push([{ text: "🖥 Answer at the Mac", callback_data: `ask:${askId}:mac` }]);
+  // A plan is approved only in its dialog at the Mac (F20).
+  const mac = question.text === PLAN_QUESTION ? "🖥 Approve at the Mac" : "🖥 Answer at the Mac";
+  rows.push([{ text: mac, callback_data: `ask:${askId}:mac` }]);
   return rows;
 }
 

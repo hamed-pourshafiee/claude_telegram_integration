@@ -214,29 +214,27 @@ describe("answers", () => {
 });
 
 describe("a plan waiting for approval (plan 4.2)", () => {
-  test("one question, Approve or Keep planning; its message is the plan, then how to answer", () => {
+  test("one question, Keep planning; its message is the plan, then how to answer", () => {
     const input = parsed({ plan: "# Plan\n\n1. Add q.py.\n" });
     expect(input.plan).toBe("# Plan\n\n1. Add q.py.\n");
     expect(input.questions).toEqual([
       expect.objectContaining({
-        text: "Approve this plan?",
+        text: "What should change in the plan?",
         kind: "choice",
         multiSelect: false,
-        options: [
-          { label: "Approve", description: undefined },
-          { label: "Keep planning", description: undefined },
-        ],
+        options: [{ label: "Keep planning", description: undefined }],
       }),
     ]);
     expect(questionBody(input, 0)).toBe(
-      "# Plan\n\n1. Add q.py.\n\nApprove it, or tap Keep planning. To say what to change, reply to this message.",
+      "# Plan\n\n1. Add q.py.\n\nTo approve it, tap 🖥 Approve at the Mac: its dialog opens there. " +
+        "To have Claude keep planning, tap Keep planning, or reply to this message with what to change.",
     );
     const [question] = input.questions;
     if (question === undefined) throw new Error("no question");
+    // No hook can approve a plan (F20): approving is done in its dialog at the Mac.
     expect(questionButtons("0a1b2c3d", 0, question, []).map((row) => row[0]?.text)).toEqual([
-      "Approve",
       "Keep planning",
-      "🖥 Answer at the Mac",
+      "🖥 Approve at the Mac",
     ]);
   });
 
