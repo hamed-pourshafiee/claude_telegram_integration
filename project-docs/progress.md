@@ -1641,6 +1641,7 @@ rev. 16).
 ## 7.4 Write to a session from `/sessions`
 
 - **Date:** 2026-09-30
+- **Result:** passed live, with the user (see "Going live" below).
 - **Built** (on `dev`):
   - Under the list, a button for each session that can take a message: asking in the chat, waiting
     for your reply, at the Mac or working. A stopped session gets none: no hook of it waits, so nothing
@@ -1763,10 +1764,16 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   - The launcher adds about 0.2 s to a broker's start.
   - Hooks started before 7.6 still start brokers directly, until they end (at most 12 h).
 
+- **7.4 live, passed** (16:26 to 16:27, broker 13578):
+  - The user sent `/sessions`; "IQ-1572" was listed, and they tapped it (`write.asked`, working).
+  - They then tapped this session (`write.asked`, listening) and wrote "Is your done?" in the reply box.
+  - The broker routed it by the question's link to this session (`reply.routed` handed; `reply.confirmed`
+    delivered: true). Claude woke with it (UserPromptSubmit 16:27:34.209).
+  - Three sessions were waiting, so a plain message would have brought the picker; none came.
+
 ## Next
 
-- **Live checks with the user:**
-  - 7.4: from `/sessions`, tap a waiting session and write to it;
+- **Live checks still to come:**
   - 7.5: `/sessions` during a new session's first turn shows its title.
   - 7.6's live part: once a hook started after 7.6 has started a broker, its parent is launchd. The
     process test covers the hook's path.
