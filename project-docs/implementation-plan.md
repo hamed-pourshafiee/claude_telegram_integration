@@ -9,7 +9,7 @@ the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Ma
 rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter) ·
 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F22), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F23), architecture and
 flows 1–4, decisions (D1–D10), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 

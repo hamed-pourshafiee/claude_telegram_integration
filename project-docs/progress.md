@@ -1771,6 +1771,23 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
     delivered: true). Claude woke with it (UserPromptSubmit 16:27:34.209).
   - Three sessions were waiting, so a plain message would have brought the picker; none came.
 
+## Spike: a Claude Code tab opened from outside (asked 2026-09-30)
+
+- **Asked:** can the bot open a new Claude Code tab in VS Code?
+- **Found** (F23): the extension handles `vscode://anthropic.claude-code/open?prompt=…` (and
+  `session=<id>`).
+- **Tried** at 16:50:56 with `open` and a harmless prompt ("reply with just the word pong"):
+  - VS Code opened a new Claude Code tab in the window used last, this repo's. A new process (66056)
+    started session `061be445`: SessionStart at 16:51:12.
+  - The prompt was only typed into the input box. It ran at 16:51:22, when sent at the Mac, and Claude
+    answered "pong". The webview's only use of it is `setInputText`.
+- **So:** from the phone, the link opens the tab, but nothing sends the prompt. A way to send it: open
+  the tab without a prompt, and have the new session's SessionStart hook, run as `asyncRewake`, wake
+  Claude with the prompt the way a reply goes in.
+  - This needs a spike first: does `asyncRewake` wake a new session from SessionStart? F2 was proven on
+    Stop.
+  - It also needs a new hook entry, so a settings change with the user's OK.
+
 ## Next
 
 - **Live checks still to come:**
