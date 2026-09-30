@@ -1275,6 +1275,82 @@ recommends (now D9: phase 5 is on).
 
 ## Next
 
-Phase 5 (D9): 5.1 relays permission prompts for Bash, Edit and Write, with the presence states of flow 3.
-F20 doesn't stand in its way: for tools that don't need the user's interaction, a `PermissionRequest`
-hook's allow is taken (2.1.284 code); the live check will show it.
+Committed as `5d85a97` (2026-09-30).
+
+## 5.1 Permission prompts approved from Telegram
+
+- **Date:** 2026-09-30 (built around midnight, live in the morning)
+- **Result:** passed, with the user one small step at a time. While the user is away or in between, a
+  permission prompt for Bash, Edit or Write in any session under `~` comes to the chat whole, with Allow
+  once and Deny. At the Mac its dialog works as before.
+- **Built** (on `dev`, `ac2e9b5`; design rev. 15):
+  - **The permission hook** (`PermissionRequest`, installed with `--wait`: synchronous, timeout 12 h;
+    `src/hooks/permission.ts`) runs beside the dialog (F5).
+    - For Bash, Edit and Write it asks the broker as the question hook does (4.1's machinery), under an
+      id of its own (`perm_<uuid>`: the request has no `tool_use_id`).
+    - It prints Claude Code's decision: `allow`, or `deny` with a message for Claude. Any other tool, or
+      without `--wait`: phase 2's 🔐 ping.
+  - **The operation** (`src/broker/operation.ts`): the whole Bash command, where it runs and its
+    description, or the file and the full change for Edit and Write, then every other field of the input.
+    - Long ones go over up to four messages, or else as a file, `operation-<ref>.txt`, with a short note
+      that carries the buttons.
+    - The ref is the first 8 hex digits of a SHA-256 of the tool and its input. The buttons name the
+      request's record, whose operation never changes once stored; the message and the audit log carry
+      its ref.
+  - **Answers** (`src/shared/permission.ts`): Allow once, Deny, or a reply, which denies with the user's
+    words; "🖥 Answer at the Mac" hands it back, as for questions. Never "always allow".
+  - **Stays at the Mac:** a tool outside the policy, a ping-only folder, a prompt with something that
+    looks like a secret, and any prompt while the user is active.
+  - **The audit log** (`.state/logs/audit.log`, 0600): every step of a relayed prompt (asked, answered,
+    delivered, at the Mac, ended), by session, ask, tool and ref, never the text.
+  - **Answered at the Mac:** Claude Code drops a hook's answer once the dialog has one. So when the turn
+    moves on (the next prompt, or the stop), a prompt still in the chat reads "🖥 Answered at the Mac."
+    and its hook stops.
+  - Gate: typecheck exit 0, "Checked 134 files", "569 pass, 0 fail", twice.
+  - Positive controls, 10, each caught (failing tests):
+    - WebFetch in the policy (1);
+    - an always-allow slipped in (1);
+    - a reason dropped (1);
+    - a secret relayed (1);
+    - a prompt cut like a reply (1);
+    - other fields hidden (1);
+    - no file past four messages (1);
+    - a stale prompt kept when the turn moves on (1);
+    - decisions not audited (2);
+    - a stranger's press taken (4).
+  - The first control run found a real bug: the relay's cleanup could reject unhandled once its database
+    had closed (a `.finally` after a failed edit). It now logs `ask.forget-failed`.
+- **Going live:**
+  - `main` was fast-forwarded to `ac2e9b5`, and the broker restarted on it (pid 85971, still schema 4). A
+    waiting hook started it again the moment the old one stopped.
+  - After the user's OK, they ran `bun run ctl install`: "installed 9 hooks", backup
+    `settings.2026-09-30T05-52-11-678Z.json`.
+  - Compared with the backup: nothing outside `hooks` changed, and the user's 17 hooks are identical and
+    in order. Ours changed in one place: `PermissionRequest` → `PermissionRequest --wait`, timeout 10 →
+    43200, no longer `async`.
+- **Evidence** (`/away` on; audit and broker logs, the sandbox's transcript). The sandbox conversation,
+  switched to "Ask before edits", was asked to run `npm test` (a script added to the sandbox for this):
+  - Claude called Bash `npm test` at 05:58:21.155. The prompt reached the broker 79 ms later (ref
+    `438bf823`), and went out as one message, nothing redacted or cut.
+  - The user tapped Allow once; the answer was recorded at 05:58:45.410 (audit: allow, by telegram). It
+    was delivered 5 ms later, and the hook logged `hook.permission {result: "answered"}`.
+  - The dialog at the Mac closed by itself. The tool result, "sandbox tests: 3 passed", came at
+    05:58:45.707, 0.3 s after the tap. The call closed when the turn ended (05:58:48.109).
+- **Decisions (mine, open to change):**
+  - A prompt goes over up to four messages, then as a file; it goes as a file at once when a line starts
+    with ```, which can't sit whole inside a code block.
+  - A prompt with something that looks like a secret stays at the Mac: it can't be both redacted (D8)
+    and shown whole (D9).
+- **Learned:**
+  - A `PermissionRequest` hook's `allow` is taken for Bash, live, as the 2.1.284 code showed: F20 holds
+    only for tools that need the user's interaction.
+  - A running conversation picks up changed hooks without a restart: this check and 4.2's ran in a
+    sandbox conversation started before either install.
+  - In auto mode, the default in the user's settings, a classifier decides most calls without a dialog,
+    so the check needed "Ask before edits".
+
+## Next
+
+Phase 6. 6.1: `README.md`, `ctl doctor`'s remaining checks, log rotation, and uninstall in the order of
+design §6, passing while a Stop waiter, a held question and a permission request are all active. 6.2: the
+full gate; then the user decides whether Codex reviews the project (reviews were paused until the end).
