@@ -1529,10 +1529,57 @@ menu and a guide: step 7.1 (plan rev. 12).
 
 ## Next
 
-The plan and 7.1 are done. Possible later steps, from the plan: a Telegram topic per session, `/new` to
-start a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin.
-- O3 is decided: GitHub, as `origin` (D10, 2026-09-30). The user pushed `main` up to `9654bdd`; the
-  later commits went up when they asked, each push after a scan of its commits for secrets.
+Committed as `876c2bb`, then D10 as `db98106` (2026-09-30). Then the user asked for sessions to be named by
+their titles in the chat, not by their folders: step 7.2 (plan rev. 14).
+
+## 7.2 Sessions named by their titles
+
+- **Date:** 2026-09-30
+- **Result:** passed, with the user one small step at a time.
+- **Found first** (F21, design rev. 18): Claude Code writes a session's title into its transcript, and
+  again every few turns.
+  - `custom-title` holds the one you gave it, and `ai-title` the one it made; it shows
+    `customTitle || aiTitle` (2.1.284 binary).
+  - A new session may get its title only after its first turn: the sandbox's came at line 105 of its
+    transcript, after its first stop.
+- **Built** (on `dev`, `085a1e4`):
+  - Every hook reads the title from the last 512 KB of its transcript and sends it with each call to the
+    broker. The broker keeps the latest (schema 6), so a waiting hook's calls update it too.
+  - Messages and the picker name a session by its title. Until it has one, the folder label stays.
+  - A title is Claude's text (D8): redacted, one line, at most 60 characters. None is kept for a
+    ping-only folder, and at each start the broker drops those of folders that config.json has since
+    made ping-only.
+  - In the picker, two sessions of the same title get the start of their id.
+  - Gate: typecheck exit 0, "Checked 145 files", "624 pass, 0 fail" across 59 files, twice.
+  - Positive controls, 10, each caught by its own tests:
+    - the hooks sending no title;
+    - the made title over yours;
+    - the first title kept, not the latest;
+    - the label ignoring the title;
+    - a title not redacted;
+    - a call without a title erasing it;
+    - a ping-only folder's title kept;
+    - waiting calls not updating it;
+    - hidden titles kept at start;
+    - same-title buttons alike.
+- **Going live:**
+  - The live database was backed up at schema 5 (integrity ok):
+    `.state/backups/broker.pre-schema6.2026-09-30T07-30-51Z.db` (0600).
+  - `main` was fast-forwarded to `085a1e4`, and the broker restarted on it (pid 94777, schema 6).
+- **Evidence** (`/away` on): the sandbox conversation answered "Say hi", and its ✅ came as
+  "✅ Hello.py markdown note" (07:32:00.749). The broker holds that title for the sandbox session, and
+  "Claude Code ↔ Telegram bridge" for this one.
+- **Decisions (mine, open to change):**
+  - The title alone, without the folder or the id, as the user asked; the id is added only in the
+    picker, and only when two sessions share a title.
+  - At most 60 characters, and one line.
+
+## Next
+
+The plan, 7.1 and 7.2 are done. Possible later steps, from the plan: a Telegram topic per session, `/new`
+to start a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin.
+- O3 is decided: GitHub, as `origin` (D10, 2026-09-30). The user pushed `main` up to `9654bdd`; later
+  commits go up when they ask, each push after a scan of its commits for secrets.
 - A live uninstall rehearsal stays the user's choice (6.1 tested it with real processes).
 - Both VS Code windows still run Claude Code 2.1.283. Once they reload into 2.1.284, `ctl doctor`'s
   stops line will show whether its stops are read.
