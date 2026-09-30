@@ -86,6 +86,17 @@ const MIGRATIONS: readonly (readonly string[])[] = [
     ) STRICT`,
     "CREATE INDEX ask_messages ON ask_questions (chat_id, message_id)",
   ],
+  // 5 (the Codex review, 2026-09-30): every message of a question, as a long one takes several (a
+  // permission prompt, D9), so a reply to any of them answers that question.
+  [
+    `CREATE TABLE ask_parts (
+      chat_id INTEGER NOT NULL,
+      message_id INTEGER NOT NULL,
+      ask_id TEXT NOT NULL REFERENCES asks (id),
+      idx INTEGER NOT NULL,
+      PRIMARY KEY (chat_id, message_id)
+    ) STRICT`,
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;

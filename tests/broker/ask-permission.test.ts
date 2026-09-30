@@ -72,6 +72,23 @@ describe("a prompt relayed while you're away", () => {
   });
 });
 
+test("a reply to any message of a long prompt answers that prompt, with another one waiting too", async () => {
+  const h = fresh();
+  void h.ask("perm_1", prompt("npm test"));
+  expect(await until(() => h.posted.length === 1)).toBe(true);
+  const second = h.ask("perm_2", prompt(`echo ${"x".repeat(9_000)} END`));
+  expect(await until(() => h.posted.length === 2)).toBe(true);
+  // perm_1 is message 101; perm_2 starts at 102, its buttons under its last message (the Codex review).
+  expect(h.posted[1]?.messageId).toBeGreaterThan(102);
+  const target = h.chat.questionAt(CHAT, 102);
+  expect(target).toEqual({ askId: h.idOf("perm_2"), index: 0 });
+  expect(h.chat.answerText(target ?? { sessionId: "" }, "Not that one")).toEqual({
+    outcome: "answered",
+  });
+  expect(body(await second)).toMatchObject({ answers: { "Allow this?": "Not that one" } });
+  expect(h.asks.get(h.idOf("perm_1"))?.state).toBe("remote");
+});
+
 describe("prompts kept at the Mac", () => {
   test("at the Mac: its dialog only; nothing comes here", async () => {
     const h = fresh();

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { formatReply } from "../../src/broker/format.ts";
 import {
   needsFile,
   operationBody,
@@ -67,7 +68,7 @@ describe("the operation, whole", () => {
     const permission = parsed({ tool: "Edit", input, cwd: "/w" });
     expect(operationTitle(permission)).toBe("wants to edit /w/a.ts");
     expect(operationBody(permission)).toBe(
-      `Replace (every occurrence):\n\`\`\`\na < b\n\`\`\`\nWith:\n\`\`\`\na <= b\n\`\`\`\nref ${permission.hash}`,
+      `In \`/w/a.ts\`, replace (every occurrence):\n\`\`\`\na < b\n\`\`\`\nWith:\n\`\`\`\na <= b\n\`\`\`\nref ${permission.hash}`,
     );
   });
 
@@ -84,5 +85,33 @@ describe("the operation, whole", () => {
     expect(operationFile(write)).toBe(
       `Write, in /w\n\n--- file_path ---\n/w/README.md\n\n--- content ---\n${readme.content}\n\nref ${write.hash}`,
     );
+  });
+});
+
+describe("a long path (the Codex review)", () => {
+  const path = `/Users/someone/${"a-rather-deep-folder/".repeat(12)}settings.ts`;
+
+  test.each([
+    ["Edit", { file_path: path, old_string: "a", new_string: "b" }],
+    ["Write", { file_path: path, content: "x" }],
+  ])(
+    "%s: the whole path is in the body, which is never cut, and not only in the header",
+    (tool, input) => {
+      const permission = parsed({ tool, input, cwd: "/w" });
+      expect(operationBody(permission)).toContain(path);
+      // The header is cut at 200 characters; the body, sent whole, keeps the path.
+      const header = `🔐 app · 5e55 ${operationTitle(permission)}`;
+      const shown = formatReply(header, operationBody(permission), Number.MAX_SAFE_INTEGER);
+      expect(shown.messages.join("\n")).toContain(path);
+    },
+  );
+
+  test("a path or folder with a backtick can't sit in a code span: the operation goes as a file", () => {
+    const edit = { file_path: "/w/odd`name.ts", old_string: "a", new_string: "b" };
+    expect(needsFile(parsed({ tool: "Edit", input: edit, cwd: "/w" }))).toBe(true);
+    expect(needsFile(parsed({ tool: "Bash", input: { command: "ls" }, cwd: "/w/odd`dir" }))).toBe(
+      true,
+    );
+    expect(needsFile(bash({}))).toBe(false);
   });
 });

@@ -25,6 +25,7 @@ let sends: { kind: string; notice: Notice }[];
 let goesOut: boolean;
 let user: PairedUser | undefined;
 let events: HookEvents;
+let sessions: Sessions;
 beforeEach(() => {
   files += 1;
   sends = [];
@@ -37,7 +38,7 @@ beforeEach(() => {
     },
   };
   const db = BrokerDb.open(join(dir, `events-${files}.db`));
-  const sessions = new Sessions(db);
+  sessions = new Sessions(db);
   const relay = new Relay({
     db,
     sessions,
@@ -110,13 +111,24 @@ describe("a stop", () => {
     await settled();
     expect(sends).toHaveLength(2);
   });
+});
 
-  test("after SessionEnd, an older stop's result is dropped", async () => {
+describe("after SessionEnd", () => {
+  test("an older stop's result is dropped, and a late report doesn't reopen the session", async () => {
     const generation = stop();
     call("SessionEnd", { reason: "other" });
+    // The panel closed while its Stop hook read the transcript (the Codex review).
     result(generation, "finish");
+    call("Idle");
     await settled();
     expect(sends).toEqual([]);
+    expect(sessions.get(ref.session_id)?.ended).toBe(true);
+    // A Stop that comes after it too: the panel closed just as the turn ended.
+    call("Stop");
+    expect(sessions.get(ref.session_id)?.ended).toBe(true);
+    // Resumed: it lives again.
+    call("SessionStart");
+    expect(sessions.get(ref.session_id)?.ended).toBe(false);
   });
 });
 

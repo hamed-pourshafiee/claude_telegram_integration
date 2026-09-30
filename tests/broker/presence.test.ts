@@ -155,7 +155,7 @@ describe("when the Mac can't be read", () => {
 });
 
 describe("listeners and hurrying (plan 4.1)", () => {
-  test("listeners hear of each new state, a mode's included; the first look only sets the start", async () => {
+  test("listeners hear of each new state, a mode's included, and of the first look (the Codex review)", async () => {
     const looks = [
       look(1, false),
       look(1, false),
@@ -170,7 +170,9 @@ describe("listeners and hurrying (plan 4.1)", () => {
     presence.setMode("away");
     presence.setMode("away");
     presence.setMode("auto");
+    // A broker that restarts with a question waiting in the chat acts on where you are at once.
     expect(heard).toEqual([
+      "undefined→active",
       "active→between",
       "between→away",
       "away→active",

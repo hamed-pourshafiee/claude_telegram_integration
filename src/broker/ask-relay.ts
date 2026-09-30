@@ -124,12 +124,18 @@ export class AskRelay {
 
   /**
    * At start: calls whose hook or Claude went while no broker ran are over, and you're told of answers
-   * that never went in. Calls whose hook still waits stay; it asks the new broker again.
+   * that never went in. Calls whose hook still waits stay; it asks the new broker again. One whose
+   * messages didn't all go out (the broker stopped mid-send) goes to the Mac, as a failed send does.
    */
   recover(): void {
     const alive = this.#deps.alive ?? processAlive;
     for (const ask of this.#deps.asks.inState(["remote", "answered"])) {
       if (!alive(ask.pid) || !alive(ask.claudePid)) this.#end(ask, "hook gone");
+    }
+    for (const ask of this.#deps.asks.inState(["remote"])) {
+      const questions = this.#deps.asks.questions(ask.id);
+      if (questions.some((asked) => asked.messageId === undefined))
+        this.release(ask.id, "not sent");
     }
     for (const ask of this.#deps.asks.inState(["local", "delivered"])) {
       if (!alive(ask.claudePid)) this.#close(ask);

@@ -61,15 +61,16 @@ export function operationBody(permission: Permission): string {
     lines.push(`In \`${cwd}\`:`, ...block(text(input.command), "sh"));
     if (text(input.description)) lines.push(`_${text(input.description)}_`);
   } else if (tool === "Edit") {
+    // The path in full here too: a header is cut at 200 characters.
     const every = input.replace_all === true ? " (every occurrence)" : "";
     lines.push(
-      `Replace${every}:`,
+      `In \`${text(input.file_path)}\`, replace${every}:`,
       ...block(text(input.old_string)),
       "With:",
       ...block(text(input.new_string)),
     );
   } else {
-    lines.push(...block(text(input.content)));
+    lines.push(`New content of \`${text(input.file_path)}\`:`, ...block(text(input.content)));
   }
   const rest = Object.entries(input).filter(([name]) => !(SHOWN[tool] ?? []).includes(name));
   for (const [name, value] of rest) lines.push(`${name}: \`${JSON.stringify(value)}\``);
@@ -77,11 +78,14 @@ export function operationBody(permission: Permission): string {
   return lines.join("\n");
 }
 
-/** Whether the operation can't be shown safely as Markdown: a line that would end its code block. */
+/**
+ * Whether the operation can't be shown safely as Markdown: a line that would end its code block, or a
+ * path with a backtick, which would end its code span.
+ */
 export function needsFile(permission: Permission): boolean {
-  return Object.values(permission.input).some(
-    (value) => typeof value === "string" && /^\s*```/m.test(value),
-  );
+  const { input, cwd } = permission;
+  if ([cwd, text(input.file_path)].some((path) => path.includes("`"))) return true;
+  return Object.values(input).some((value) => typeof value === "string" && /^\s*```/m.test(value));
 }
 
 /** The whole operation as plain text, for a file. */

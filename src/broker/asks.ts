@@ -1,5 +1,6 @@
+import { type AskRow, fromRow, type QuestionRow, questionFromRow } from "./ask-rows.ts";
 import type { BrokerDb } from "./db.ts";
-import { type AskInput, parseAskInput } from "./questions.ts";
+import type { AskInput } from "./questions.ts";
 
 /**
  * Where a call's questions are (plan 4.1): on Telegram (remote), all answered there, delivered to its
@@ -42,28 +43,6 @@ export type NewAsk = Omit<Ask, "told" | "createdAt" | "input"> & {
   readonly raw: string;
   readonly count: number;
 };
-
-interface AskRow {
-  readonly id: string;
-  readonly session_id: string;
-  readonly tool_use_id: string;
-  readonly pid: number;
-  readonly claude_pid: number;
-  readonly state: AskState;
-  readonly input: string;
-  readonly told: number;
-  readonly created_at: number;
-}
-
-interface QuestionRow {
-  readonly ask_id: string;
-  readonly idx: number;
-  readonly chat_id: number | null;
-  readonly message_id: number | null;
-  readonly html: string;
-  readonly picked: string;
-  readonly answer: string | null;
-}
 
 /** How long a settled call is kept, for its buttons to say "expired". */
 const KEEP_MS = 7 * 24 * 60 * 60 * 1000;
@@ -159,12 +138,40 @@ export class Asks {
 
   /** The question whose message this is. */
   at(chatId: number, messageId: number): AskedQuestion | undefined {
-    const row = this.#db.get<QuestionRow>(
-      "SELECT * FROM ask_questions WHERE chat_id = ? AND message_id = ?",
+    const part = this.#db.get<{ ask_id: string; idx: number }>(
+      "SELECT ask_id, idx FROM ask_parts WHERE chat_id = ? AND message_id = ?",
       chatId,
       messageId,
     );
+    // A call asked before schema 5 has only its last message, on its question.
+    const row =
+      part === undefined
+        ? this.#db.get<QuestionRow>(
+            "SELECT * FROM ask_questions WHERE chat_id = ? AND message_id = ?",
+            chatId,
+            messageId,
+          )
+        : this.#db.get<QuestionRow>(
+            "SELECT * FROM ask_questions WHERE ask_id = ? AND idx = ?",
+            part.ask_id,
+            part.idx,
+          );
     return row === undefined ? undefined : questionFromRow(row);
+  }
+
+  /** Every message a question went out in: a reply to any of them answers it. */
+  parts(askId: string, index: number, chatId: number, messageIds: readonly number[]): void {
+    this.#db.transaction(() => {
+      for (const messageId of messageIds) {
+        this.#db.run(
+          "INSERT OR IGNORE INTO ask_parts (chat_id, message_id, ask_id, idx) VALUES (?, ?, ?, ?)",
+          chatId,
+          messageId,
+          askId,
+          index,
+        );
+      }
+    });
   }
 
   /**
@@ -248,50 +255,13 @@ export class Asks {
   prune(): number {
     return this.#db.transaction(() => {
       const before = this.#now() - KEEP_MS;
-      this.#db.run(
-        "DELETE FROM ask_questions WHERE ask_id IN (SELECT id FROM asks WHERE created_at < ?)",
-        before,
-      );
+      for (const table of ["ask_parts", "ask_questions"]) {
+        this.#db.run(
+          `DELETE FROM ${table} WHERE ask_id IN (SELECT id FROM asks WHERE created_at < ?)`,
+          before,
+        );
+      }
       return this.#db.run("DELETE FROM asks WHERE created_at < ?", before);
     });
   }
-}
-
-function fromRow(row: AskRow): Ask {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(row.input);
-  } catch {
-    raw = undefined; // written by this code, so this is a damaged row: the call counts as settled
-  }
-  return {
-    id: row.id,
-    sessionId: row.session_id,
-    toolUseId: row.tool_use_id,
-    pid: row.pid,
-    claudePid: row.claude_pid,
-    state: row.state,
-    input: parseAskInput(raw),
-    told: row.told === 1,
-    createdAt: row.created_at,
-  };
-}
-
-function questionFromRow(row: QuestionRow): AskedQuestion {
-  let picked: unknown;
-  try {
-    picked = JSON.parse(row.picked);
-  } catch {
-    picked = [];
-  }
-  const list: readonly unknown[] = Array.isArray(picked) ? picked : [];
-  return {
-    askId: row.ask_id,
-    index: row.idx,
-    chatId: row.chat_id ?? undefined,
-    messageId: row.message_id ?? undefined,
-    html: row.html,
-    picked: list.filter((item): item is number => typeof item === "number"),
-    answer: row.answer ?? undefined,
-  };
 }

@@ -63,7 +63,8 @@ export class HookEvents {
         return ok({ generation: relay.cancel(ref.id, at) });
       }
       case "Stop": {
-        sessions.touch(ref);
+        // It may come after SessionEnd, when the panel closed as the turn ended.
+        sessions.seen(ref);
         asks.moved(ref.id);
         const generation = sessions.stop(ref.id);
         relay.stopped(ref.id, generation);
@@ -79,7 +80,8 @@ export class HookEvents {
         if (typeof fields.tool_use_id === "string") asks.asked(ref.id, fields.tool_use_id);
         return ok({});
       default:
-        return this.#notify(event, sessions.touch(ref), fields);
+        // Reports of what happened (a stop's result, idle, an API error): they never reopen a session.
+        return this.#notify(event, sessions.seen(ref), fields);
     }
   }
 

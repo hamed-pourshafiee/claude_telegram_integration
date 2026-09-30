@@ -8,6 +8,7 @@ import { AskMessages } from "../../src/broker/ask-messages.ts";
 import { AskRelay } from "../../src/broker/ask-relay.ts";
 import { Asks } from "../../src/broker/asks.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
+import { formatReply } from "../../src/broker/format.ts";
 import type { Notice } from "../../src/broker/notices.ts";
 import type { NoticeOf } from "../../src/broker/notifier.ts";
 import type { Mode, Snapshot, State } from "../../src/broker/presence.ts";
@@ -132,9 +133,9 @@ export function askHarness(
   };
 }
 
-/** A stand-in notifier and Telegram client that keep what they were asked to send. */
-function recorder(editMs: number) {
-  const lists = {
+/** What the stand-ins were asked to send, and the audit log's lines. */
+function emptyLists() {
+  return {
     posted: [] as PostedQuestion[],
     told: [] as Notice[],
     edits: [] as EditMessageTextParams[],
@@ -144,14 +145,12 @@ function recorder(editMs: number) {
     documents: [] as SendDocumentParams[],
     audited: [] as { event: string; fields: LogFields }[],
   };
-  const audit = (event: string, fields: LogFields) => lists.audited.push({ event, fields });
+}
+
+/** The notifier's stand-in: a question's messages, numbered from 101, and the notices it sends. */
+function fakeNotifier(lists: ReturnType<typeof emptyLists>) {
   let messageId = 100;
-  const message = (chatId: number) => ({
-    message_id: 1,
-    date: 0,
-    chat: { id: chatId, type: "private" },
-  });
-  const notifier = {
+  return {
     post: (
       _chat: number,
       _kind: string,
@@ -160,16 +159,33 @@ function recorder(editMs: number) {
       rows = [],
       options: { readonly whole?: boolean } = {},
     ) => {
-      messageId += 1;
       const notice = noticeOf(label(session), "full");
+      // A long one goes in several messages, as the notifier sends it (D8; D9 for a whole one).
+      const maxChars = options.whole === true ? Number.MAX_SAFE_INTEGER : config.content.maxChars;
+      const parts = formatReply(notice.header, notice.body, maxChars).messages.length;
+      const sent = Array.from({ length: parts }, (_, at) => {
+        messageId += 1;
+        return { messageId, html: at === 0 ? `<b>${notice.header}</b>` : `part ${at + 1}` };
+      });
       lists.posted.push({ ...notice, rows, messageId, whole: options.whole === true });
-      return Promise.resolve([{ messageId, html: `<b>${notice.header}</b>` }]);
+      return Promise.resolve(sent);
     },
     send: (_kind: string, session: Session, noticeOf: NoticeOf) => {
       lists.told.push(noticeOf(label(session), "full"));
       return Promise.resolve(true);
     },
   };
+}
+
+/** A stand-in notifier and Telegram client that keep what they were asked to send. */
+function recorder(editMs: number) {
+  const lists = emptyLists();
+  const audit = (event: string, fields: LogFields) => lists.audited.push({ event, fields });
+  const message = (chatId: number) => ({
+    message_id: 1,
+    date: 0,
+    chat: { id: chatId, type: "private" },
+  });
   const telegram = {
     sendMessage: (params: SendMessageParams) => {
       lists.sent.push(params);
@@ -193,5 +209,5 @@ function recorder(editMs: number) {
       return Promise.resolve(message(params.chat_id));
     },
   };
-  return { lists, parts: { notifier, telegram }, audit };
+  return { lists, parts: { notifier: fakeNotifier(lists), telegram }, audit };
 }

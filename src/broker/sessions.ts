@@ -41,12 +41,28 @@ export class Sessions {
     this.#now = now;
   }
 
-  /** Records the session, or what changed about it (a SessionStart may never have come). */
+  /**
+   * Records the session, or what changed about it (a SessionStart may never have come), as going on:
+   * one that ended lives again (resumed, or you typed in it).
+   */
   touch(ref: SessionRef, branch?: string): Session {
+    return this.#record(ref, branch, true);
+  }
+
+  /**
+   * Records a session a hook reports on, but never reopens one that ended: a stop's result, say, can
+   * come after SessionEnd, when the panel closed while its Stop hook read the transcript.
+   */
+  seen(ref: SessionRef): Session {
+    return this.#record(ref, undefined, false);
+  }
+
+  #record(ref: SessionRef, branch: string | undefined, reopen: boolean): Session {
+    const reopened = reopen ? ", ended_at = NULL" : "";
     this.#db.run(
       `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at) VALUES (?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET project_dir = excluded.project_dir,
-         entrypoint = excluded.entrypoint, ended_at = NULL`,
+         entrypoint = excluded.entrypoint${reopened}`,
       ref.id,
       ref.projectDir,
       ref.entrypoint,

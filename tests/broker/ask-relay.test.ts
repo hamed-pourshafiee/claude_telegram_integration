@@ -3,7 +3,7 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Answer } from "../../src/broker/answer.ts";
-import { type AskHarness, askHarness, CHAT, FOLDERS } from "../helpers/asks.ts";
+import { type AskHarness, askHarness, CHAT, FOLDERS, SESSION } from "../helpers/asks.ts";
 import { until } from "../helpers/wait.ts";
 
 // Plan 4.1 (flow 3): where Claude's questions go, and how a waiting question hook gets its answers.
@@ -202,6 +202,25 @@ describe("when the hook stops waiting", () => {
     const again = after.ask("toolu_2", COLOR, { pid: 32 });
     await after.chat.press(`ask:${before.idOf("toolu_2")}:0:0`, "q");
     expect(body(await again)).toMatchObject({ answers: { "Which color do you prefer?": "Red" } });
+    expect(after.posted).toEqual([]);
+  });
+});
+
+describe("a broker that went down mid-send (the Codex review)", () => {
+  test("a call the broker went down before sending: it goes to the Mac, not unseen in the chat", async () => {
+    files += 1;
+    const file = join(dir, `asks-${files}.db`);
+    const before = askHarness(file);
+    // Created for the chat, but the broker stopped before its message went out (a flood wait, say).
+    const { session_id: id, project_dir: projectDir, entrypoint } = SESSION;
+    before.sessions.touch({ id, projectDir, entrypoint });
+    const count = COLOR.questions.length;
+    const fields = { id: "0a1b2c3d", sessionId: id, toolUseId: "toolu_1", pid: 31, claudePid: 22 };
+    before.asks.create({ ...fields, state: "remote", raw: JSON.stringify(COLOR), count });
+    const after = askHarness(file);
+    after.relay.recover();
+    expect(after.asks.get("0a1b2c3d")?.state).toBe("local");
+    expect(body(await after.ask("toolu_1", COLOR, { pid: 31 }))).toMatchObject({ state: "local" });
     expect(after.posted).toEqual([]);
   });
 });

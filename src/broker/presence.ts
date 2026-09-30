@@ -57,8 +57,11 @@ export interface PresenceDeps {
   readonly fastMs?: number;
 }
 
-/** Told when the state changes, the mode's part included: the state now, and the one before. */
-export type PresenceListener = (now: Snapshot, before: State) => void;
+/**
+ * Told when the state changes, the mode's part included: the state now, and the one before, which is
+ * undefined for the first look.
+ */
+export type PresenceListener = (now: Snapshot, before: State | undefined) => void;
 
 export const MODE_KEY = "presence.mode";
 
@@ -163,12 +166,15 @@ export class Presence {
     }
   }
 
-  /** Tells the listeners of a new state; the first look only sets where things start. */
+  /**
+   * Tells the listeners of a new state, and of the first look: a broker that restarts with a question
+   * waiting in the chat while you're at the Mac must hand it over then, not at your next change.
+   */
   #tell(): void {
     const now = this.snapshot();
     const before = this.#told;
     this.#told = now.state;
-    if (before === undefined || before === now.state) return;
+    if (before === now.state) return;
     for (const listener of this.#listeners) {
       try {
         listener(now, before);

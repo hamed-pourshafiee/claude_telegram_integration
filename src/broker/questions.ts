@@ -3,6 +3,7 @@ import { ALLOW_ONCE, DENY, PERMISSION_QUESTION } from "../shared/permission.ts";
 import { KEEP_PLANNING, PLAN_QUESTION } from "../shared/plan.ts";
 import type { InlineKeyboardButton } from "../shared/telegram/types.ts";
 import { operationBody, type Permission, parsePermission } from "./operation.ts";
+import { redact } from "./redact.ts";
 
 /** How a question is answered (F4): by picking options, by typing, or with a number in a range. */
 export type Kind = "choice" | "text" | "number";
@@ -193,7 +194,9 @@ export function questionButtons(
 ): InlineKeyboardButton[][] {
   const rows = question.options.map((option, at) => {
     const mark = picked.includes(at) ? "☑" : "☐";
-    const label = question.multiSelect ? `${mark} ${option.label}` : option.label;
+    // A button is outbound text like any other (D8); the option's own text is what Claude gets.
+    const shown = redact(option.label).text;
+    const label = question.multiSelect ? `${mark} ${shown}` : shown;
     return [{ text: label, callback_data: `ask:${askId}:${index}:${at}` }];
   });
   if (question.multiSelect)

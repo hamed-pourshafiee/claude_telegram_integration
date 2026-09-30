@@ -3,9 +3,10 @@ import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { Ask, Asks } from "./asks.ts";
 import { escapeHtml, formatReply } from "./format.ts";
 import { askNotice, waitingNotice } from "./notices.ts";
-import type { NoticeOf, Notifier } from "./notifier.ts";
+import type { NoticeOf, Notifier, Posted } from "./notifier.ts";
 import { needsFile, operationFile } from "./operation.ts";
 import { type AskInput, PERMISSION_HOW, questionButtons } from "./questions.ts";
+import { redact } from "./redact.ts";
 import { label, type Session } from "./sessions.ts";
 
 export interface AskMessagesDeps {
@@ -48,7 +49,7 @@ export class AskMessages {
 
   /** Sends each question of a call to `chat`, in order, with its buttons. */
   async post(ask: Ask, session: Session, chat: number): Promise<void> {
-    const { asks, notifier } = this.#deps;
+    const { notifier } = this.#deps;
     const input = ask.input;
     if (input === undefined) return;
     if (input.permission !== undefined) return this.#postPermission(ask, session, chat, input);
@@ -61,10 +62,7 @@ export class AskMessages {
         (name) => askNotice(name, input, index),
         rows,
       );
-      const last = posted.at(-1);
-      if (last !== undefined) {
-        asks.shown(ask.id, index, { chatId: chat, messageId: last.messageId, html: last.html });
-      }
+      this.#shown(ask, index, chat, posted);
     }
   }
 
@@ -74,7 +72,7 @@ export class AskMessages {
    * under a short note.
    */
   async #postPermission(ask: Ask, session: Session, chat: number, input: AskInput): Promise<void> {
-    const { asks, notifier, telegram } = this.#deps;
+    const { notifier, telegram } = this.#deps;
     const [question] = input.questions;
     const permission = input.permission;
     if (question === undefined || permission === undefined) return;
@@ -92,15 +90,32 @@ export class AskMessages {
     const posted = await notifier.post(chat, "permission", session, noticeOf, rows, {
       whole: true,
     });
+    this.#shown(ask, 0, chat, posted);
+  }
+
+  /**
+   * A question's messages are in the chat: a reply to any of them answers it, and the last, which has
+   * its buttons, is kept for edits.
+   */
+  #shown(ask: Ask, index: number, chat: number, posted: readonly Posted[]): void {
+    const { asks } = this.#deps;
+    asks.parts(
+      ask.id,
+      index,
+      chat,
+      posted.map((message) => message.messageId),
+    );
     const last = posted.at(-1);
     if (last !== undefined) {
-      asks.shown(ask.id, 0, { chatId: chat, messageId: last.messageId, html: last.html });
+      asks.shown(ask.id, index, { chatId: chat, messageId: last.messageId, html: last.html });
     }
   }
 
   /** A question answered here: its message shows the answer, and its buttons go. */
   answered(ask: Ask, index: number, answer: string): Promise<void> {
-    const shown = answer.length > ANSWER_SHOWN ? `${answer.slice(0, ANSWER_SHOWN)}…` : answer;
+    // Redacted before it is cut, so no piece of a secret is left too short to be recognized (D8).
+    const clean = redact(answer).text;
+    const shown = clean.length > ANSWER_SHOWN ? `${clean.slice(0, ANSWER_SHOWN)}…` : clean;
     return this.#addLine(ask.id, index, `✅ ${shown}`);
   }
 

@@ -118,10 +118,10 @@ export class AskChat {
   }
 
   /**
-   * Presence changed (flow 3). Active again: calls in the chat go to the dialog at the Mac. Away: you
-   * hear once of each call left open in the dialog, which no hook can answer.
+   * Presence changed, or was first looked at (flow 3). Active: calls in the chat go to the dialog at
+   * the Mac. Away: you hear once of each call left open in the dialog, which no hook can answer.
    */
-  presenceChanged(now: Snapshot, _before: State): void {
+  presenceChanged(now: Snapshot, _before: State | undefined): void {
     if (now.state === "active") {
       for (const ask of this.#deps.asks.inState(["remote"])) {
         this.#deps.relay.release(ask.id, "back at the Mac");

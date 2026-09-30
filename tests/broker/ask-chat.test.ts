@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Answer } from "../../src/broker/answer.ts";
 import { type AskHarness, askHarness, CHAT, SESSION } from "../helpers/asks.ts";
+import { SAMPLES } from "../helpers/secret-samples.ts";
 import { until } from "../helpers/wait.ts";
 
 // Plan 4.1: your answers to Claude's questions, by button and by reply: single choice, multi-select
@@ -159,5 +160,31 @@ describe("buttons that have expired", () => {
     expect(body(await waiting)).toMatchObject({
       answers: { "Which runtime?": "Node", "Which linter?": "Biome" },
     });
+  });
+});
+
+describe("secrets in the options (D8; the Codex review)", () => {
+  const github = SAMPLES.find((sample) => sample.family === "GitHub token");
+  const line = github?.line ?? "";
+  const KEYS = {
+    questions: [
+      {
+        question: "Which login?",
+        header: "Login",
+        options: [{ label: line }, { label: "None" }],
+      },
+    ],
+  };
+
+  test("a button never shows one, nor does the answer it leaves; Claude gets the option as written", async () => {
+    const h = fresh();
+    const { waiting, id } = await asked(h, KEYS);
+    const buttons = JSON.stringify(h.posted[0]?.rows);
+    expect(buttons).not.toContain(github?.secret);
+    expect(buttons).toContain("[redacted GitHub token]");
+    await h.chat.press(`ask:${id}:0:0`, "q");
+    expect(body(await waiting)).toMatchObject({ answers: { "Which login?": line } });
+    expect(await until(() => h.edits.length === 1)).toBe(true);
+    expect(h.edits[0]?.text).not.toContain(github?.secret);
   });
 });
