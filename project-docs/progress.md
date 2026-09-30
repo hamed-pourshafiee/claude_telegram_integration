@@ -1851,6 +1851,16 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
     don't, `/new` says so.
   - No `/end` yet: a session ends 12 h after its last turn, when its Stop hook stops waiting.
   - The 🖥 button stays on its questions, and a tap says the session has no dialog at the Mac.
+- **Going live** (19:50):
+  - The live database was backed up at schema 8 (integrity ok):
+    `.state/backups/broker.pre-schema9.2026-09-30T19-50-01Z.db` (0600).
+  - `main` was fast-forwarded to `5cf9b34`. The new broker runs at schema 9 and set the menu with
+    `/new`.
+  - The handover script lost the race twice to brokers that the two hooks started before 7.6 (80151,
+    10845) start directly. SQLite doesn't queue those waiting for a lock: a newcomer 26 ms after the
+    stop took it while the waiting broker slept between tries.
+  - So broker 43820 runs as hook 10845's child until that hook ends, at 03:12Z at the latest. Then it
+    goes too, and the next hook starts one through the launcher.
 
 ## Next
 
