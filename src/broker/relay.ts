@@ -87,6 +87,9 @@ export class Relay {
       if (done) inbox.settleHanded(ref, "delivered");
       return done;
     });
+    // The reply goes in now, and the session works on it: in `claude -p` no UserPromptSubmit says so
+    // (F25), so /sessions would have it stopped (plan 7.7).
+    if (delivered) this.#deps.sessions.prompted(ref.sessionId, Date.now());
     log("reply.confirmed", { ...logRef(ref), update: updateId, delivered });
     return ok({ delivered });
   }

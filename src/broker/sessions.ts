@@ -30,6 +30,8 @@ export interface Session extends SessionRef {
   readonly promptedAt: number;
   /** "" until a hook brings it. */
   readonly transcript: string;
+  /** Started with /new: it runs in the background, with no dialog at the Mac (D11, plan 7.7). */
+  readonly fromChat: boolean;
 }
 
 interface Row {
@@ -44,6 +46,7 @@ interface Row {
   readonly claude_pid: number;
   readonly prompted_at: number;
   readonly transcript: string;
+  readonly from_chat: number;
 }
 
 /** The most of a title the chat shows, in characters. */
@@ -116,6 +119,7 @@ export class Sessions {
         claudePid: ref.claudePid ?? 0,
         promptedAt: 0,
         transcript: ref.transcript ?? "",
+        fromChat: false,
       }
     );
   }
@@ -141,9 +145,29 @@ export class Sessions {
     return row === undefined ? undefined : fromRow(row);
   }
 
+  /** The folders sessions started in, the one used last first: those /new offers (plan 7.7). */
+  folders(): string[] {
+    return this.#db
+      .all<{ project_dir: string }>(
+        `SELECT project_dir FROM sessions GROUP BY project_dir
+         ORDER BY MAX(MAX(stopped_at, prompted_at)) DESC, MAX(started_at) DESC`,
+      )
+      .map((row) => row.project_dir);
+  }
+
   /** The sessions no SessionEnd has ended; a crashed one among them too (plan 7.3). */
   open(): Session[] {
     return this.#db.all<Row>("SELECT * FROM sessions WHERE ended_at IS NULL").map(fromRow);
+  }
+
+  /**
+   * A session /new is about to start (D11): recorded before its first hook, as started from the chat,
+   * which its hooks' calls never change.
+   */
+  startedHere(ref: SessionRef): Session {
+    const session = this.touch(ref);
+    this.#db.run("UPDATE sessions SET from_chat = 1 WHERE id = ?", ref.id);
+    return { ...session, fromChat: true };
   }
 
   /** A prompt started a turn at `at` (UserPromptSubmit): the session is at work (plan 7.3). */
@@ -226,5 +250,6 @@ function fromRow(row: Row): Session {
     claudePid: row.claude_pid,
     promptedAt: row.prompted_at,
     transcript: row.transcript,
+    fromChat: row.from_chat === 1,
   };
 }

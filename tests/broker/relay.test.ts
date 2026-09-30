@@ -245,3 +245,16 @@ describe("a broker crash at each boundary", () => {
     expect(body(await again)).toMatchObject({ state: "ended" });
   });
 });
+
+test("a reply the hook confirms marks its session as working: `claude -p` sends no prompt event (plan 7.7)", async () => {
+  const { relay, sessions, stop, wait, reply, route } = broker();
+  const generation = stop();
+  const parked = wait(generation);
+  const update = reply();
+  await route(update);
+  await parked;
+  const before = Date.now();
+  expect(sessions.get(ID)?.promptedAt).toBe(0);
+  relay.confirm({ session_id: ID, generation, update_id: update });
+  expect(sessions.get(ID)?.promptedAt).toBeGreaterThanOrEqual(before);
+});

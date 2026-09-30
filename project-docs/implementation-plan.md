@@ -1,16 +1,17 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 17 (7.5: titles in /sessions as they are now, F21; 7.6: a broker no hook can take down, F22;
-rev. 16: 7.4, write to a session from /sessions; rev. 15: 7.3, /sessions lists the open sessions; rev.
-14: 7.2, sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu
-of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone, approved at
-the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev.
-8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of
-rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter) ·
-2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 18 (7.7: /new, a session started from the chat, D11; rev. 17: 7.5: titles in /sessions as
+they are now, F21; 7.6: a broker no hook can take down, F22; rev. 16: 7.4, write to a session from
+/sessions; rev. 15: 7.3, /sessions lists the open sessions; rev. 14: 7.2, sessions named by their titles;
+rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu of commands and /help, asked for after the
+plan; rev. 11: 4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
+on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
+reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
+continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-30 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F24), architecture and
-flows 1–4, decisions (D1–D10), security, rollback, risks and the review log. References such as
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F25), architecture and
+flows 1–4, decisions (D1–D11), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
 ## 1. How we work
@@ -290,6 +291,18 @@ flows 1–4, decisions (D1–D10), security, rollback, risks and the review log.
   hook, kills that hook's tree the way Claude Code does (`ps -A -o pid= -o ppid=`), and finds the broker
   still answering, with launchd as its parent; live, the broker a waiting hook started has launchd (1) as
   its parent.
+- **7.7 `/new`: a session started from the chat** (asked 2026-09-30, after the spikes F23 to F25; design
+  D11). `/new` answers with a button for each folder offered; a tap asks for the first message with the
+  reply box open, and the reply starts `claude -p` there (D11). The broker records the session as started
+  from the chat (schema 9, with the questions it asked), so notices and questions go to the chat whatever
+  your presence and never move back to the Mac. `/sessions` marks it. A reply that is delivered marks its
+  session as working, since a continuation fires no UserPromptSubmit (F25). **Pass:** tests for the
+  folders offered (recent, served, with text, existing), the question and its link, the start (command,
+  environment, the marked message on stdin, the session recorded), the limit of 3, an expired or unknown
+  choice, a start that fails, notices and questions of such a session going to the chat while you're at
+  the Mac, nothing handed back to the Mac, and end to end, `/new`, a tap and a reply starting a stand-in
+  `claude`; live, from the phone, `/new` in the sandbox, its ✅ in the chat, and a reply that continues
+  it.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.

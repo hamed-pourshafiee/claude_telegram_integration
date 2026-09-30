@@ -36,6 +36,7 @@ const TEXTS = {
   expired: "That question has expired.",
   pickFirst: "Pick at least one first, or reply to the question with your own answer.",
   moved: "🖥 Moved to the Mac.",
+  noDialog: "This session runs in the background, with no dialog at the Mac: answer it here.",
   none: "No question is waiting here.",
   handedBack: (count: number) =>
     `🖥 ${count === 1 ? "The question went" : `${count} questions went`} back to the Mac.`,
@@ -65,6 +66,7 @@ export class AskChat {
       return this.#toast(queryId, TEXTS.expired);
     }
     if (press.kind === "mac") {
+      if (!this.#hasDialog(ask)) return this.#toast(queryId, TEXTS.noDialog);
       this.#deps.relay.release(ask.id, "button");
       return this.#toast(queryId, TEXTS.moved);
     }
@@ -113,7 +115,7 @@ export class AskChat {
   handBack(): string {
     const moved = this.#deps.asks
       .inState(["remote"])
-      .filter((ask) => this.#deps.relay.release(ask.id, "/local"));
+      .filter((ask) => this.#hasDialog(ask) && this.#deps.relay.release(ask.id, "/local"));
     return moved.length === 0 ? TEXTS.none : TEXTS.handedBack(moved.length);
   }
 
@@ -124,12 +126,17 @@ export class AskChat {
   presenceChanged(now: Snapshot, _before: State | undefined): void {
     if (now.state === "active") {
       for (const ask of this.#deps.asks.inState(["remote"])) {
-        this.#deps.relay.release(ask.id, "back at the Mac");
+        if (this.#hasDialog(ask)) this.#deps.relay.release(ask.id, "back at the Mac");
       }
     }
     if (now.state === "away") {
       for (const ask of this.#deps.asks.inState(["local"])) if (!ask.told) this.#tellWaiting(ask);
     }
+  }
+
+  /** Whether the call's session has a dialog at the Mac to hand it to: not one started here (D11). */
+  #hasDialog(ask: Ask): boolean {
+    return this.#deps.sessions.get(ask.sessionId)?.fromChat !== true;
   }
 
   /** A call that went to the Mac at once: while you're away (a ping-only folder), you hear of it now. */

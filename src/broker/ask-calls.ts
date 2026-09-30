@@ -37,7 +37,8 @@ export function askWhere(deps: {
     const { mode, state } = deps.presence.snapshot();
     if (mode === "off") return { local: "muted" };
     if (contentModeFor(deps.config, session.projectDir) !== "full") return { local: "ping-only" };
-    if (state === "active") return { local: "at the Mac" };
+    // A session started from the chat has no dialog at the Mac (D11).
+    if (state === "active" && !session.fromChat) return { local: "at the Mac" };
     return { chat: user.id };
   };
 }

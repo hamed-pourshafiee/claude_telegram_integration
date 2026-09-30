@@ -40,6 +40,7 @@ const session = (folder: string) => ({
   claudePid: 0,
   promptedAt: 0,
   transcript: "",
+  fromChat: false,
 });
 const away: Snapshot = {
   mode: "auto",
@@ -151,6 +152,17 @@ describe("who gets a notice, and when", () => {
     ]);
     expect(logged.join("\n")).not.toContain("Say");
   });
+});
+
+test("a session /new started reports here at the Mac too; /off mutes it (D11, plan 7.7)", async () => {
+  const started = { ...session("sandbox"), fromChat: true };
+  snapshot = { ...away, state: "active", because: "input" };
+  expect(await notifier.send("finish", started, finish("Done."))).toBe(true);
+  snapshot = { ...away, state: "between", because: "idle" };
+  expect(await notifier.send("finish", started, finish("Done."))).toBe(true);
+  snapshot = { ...away, mode: "off" };
+  expect(await notifier.send("finish", started, finish("Done."))).toBe(false);
+  expect(sent).toHaveLength(2);
 });
 
 test("each message sent is linked to its session and generation, for a reply-to (plan 3.2)", async () => {

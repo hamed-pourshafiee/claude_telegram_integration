@@ -85,6 +85,13 @@ its turn ends. A session that stopped more than 12 hours ago takes a message aga
 the Mac. If you type at the Mac while a reply is on its way, the first one wins: a reply that comes after
 your typing isn't used, and if it went in just before, the bot tells you it crossed.
 
+**Starting a session from the phone.** `/new` offers the folders of your recent sessions. Tap one and
+write the first message in the reply box: the Mac starts Claude Code there, in the background, not in a
+VS Code tab (Claude Code has no way to start a tab working from outside). Its messages come to the chat
+wherever you are, and your replies continue it; its permission prompts come here too, and one the chat
+can't show is denied, as there is no dialog to open at the Mac. `/sessions` lists it as "(started here)".
+It ends 12 hours after its last turn. At most three run at once, and `/off` mutes them too.
+
 **Permission prompts** (Bash, Edit and Write only). The message shows the whole command and where it
 runs, or the file and the full change, split over several messages or sent as a file if long. Allow
 once allows this one call; there is no "always allow" from Telegram. Deny, or reply with your reason,
@@ -103,6 +110,7 @@ what it does.
 |---|---|
 | `/status` | Where the bridge thinks you are, and why |
 | `/sessions` | Your open sessions, one line each: which ask you something, which wait for your reply, which are working. Only sessions whose Claude still runs are listed, so one left by a crash or a restart isn't. Tap one to write to it. |
+| `/new` | Start a session in one of your folders; see "Starting a session from the phone" above |
 | `/away` | Relay everything until `/auto`, even while you're at the Mac |
 | `/auto` | Decide from your idle time and the screen lock again |
 | `/off` | Mute everything until `/auto` or `/away` |

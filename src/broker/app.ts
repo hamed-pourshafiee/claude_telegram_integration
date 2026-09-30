@@ -6,29 +6,27 @@ import { contentModeFor } from "../shared/scope.ts";
 import type { Secret } from "../shared/secret.ts";
 import { TelegramClient } from "../shared/telegram/client.ts";
 import type { Update } from "../shared/telegram/types.ts";
-import { askWhere } from "./ask-calls.ts";
-import { AskChat } from "./ask-chat.ts";
-import { AskMessages } from "./ask-messages.ts";
-import { AskRelay } from "./ask-relay.ts";
-import { type Ask, Asks } from "./asks.ts";
+import { askParts, replyParts } from "./app-parts.ts";
+import type { AskChat } from "./ask-chat.ts";
+import type { AskRelay } from "./ask-relay.ts";
 import { type CommandAnswer, MENU, runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
 import { FullTexts } from "./full-texts.ts";
 import { type GateDeps, handleUpdate, replyOf } from "./gate.ts";
-import { firstName, HookEvents, type HookEventsDeps } from "./hook-events.ts";
-import { Inbox } from "./inbox.ts";
+import { HookEvents, type HookEventsDeps } from "./hook-events.ts";
 import type { Reading } from "./ioreg.ts";
+import type { NewSessions } from "./new-session.ts";
 import { Notifier } from "./notifier.ts";
 import { Outbox } from "./outbox.ts";
 import { Pairing } from "./pairing.ts";
 import { Poller } from "./poller.ts";
 import { Presence } from "./presence.ts";
-import { Relay } from "./relay.ts";
-import { Router } from "./router.ts";
+import type { Relay } from "./relay.ts";
+import type { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
+import type { Launch } from "./session-launch.ts";
 import { type Session, Sessions } from "./sessions.ts";
 import { sessionsParts } from "./sessions-command.ts";
-import { type Waiter, Waiters } from "./waiters.ts";
 
 export interface AppDeps {
   readonly token: Secret;
@@ -43,8 +41,10 @@ export interface AppDeps {
   readonly signal: AbortSignal;
   /** Tests point the Telegram client at a local fake… */
   readonly apiBase?: string;
-  /** …and look at a stand-in Mac. */
+  /** …and look at a stand-in Mac… */
   readonly readPresence?: () => Promise<Reading>;
+  /** …and start a stand-in for the sessions /new starts (plan 7.7). */
+  readonly launchSession?: Launch;
 }
 
 export interface App {
@@ -79,7 +79,7 @@ export function createApp(deps: AppDeps): App {
   const audit = deps.audit ?? noLog;
   const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, audit, notifier });
   const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
-  const { relay, router, waiters } = replyParts(parts);
+  const { relay, router, waiters, fresh } = replyParts(parts, deps);
   const hookEvents = hookEventsOf(
     { sessions, notifier, pairing, relay, asks: ask.relay, log },
     config,
@@ -88,7 +88,7 @@ export function createApp(deps: AppDeps): App {
     { sessions, waiters, asks: ask.asks, telegram, outbox, log },
     config,
   );
-  const gateParts = { telegram, pairing, log, presence, notifier, router, asks: ask.chat };
+  const gateParts = { telegram, pairing, log, presence, notifier, router, asks: ask.chat, fresh };
   const gate = gateOf({ ...gateParts, ...listing });
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
@@ -138,11 +138,13 @@ interface GateParts {
   readonly list: () => CommandAnswer;
   /** …and a tap on one of its sessions (plan 7.4). */
   readonly write: (data: string, chat: number, queryId: string) => Promise<void>;
+  /** /new and its folder buttons (plan 7.7). */
+  readonly fresh: NewSessions;
 }
 
 /** What the gate does with the paired user's commands, buttons and replies. */
 function gateOf(parts: GateParts): GateDeps {
-  const { telegram, pairing, log, presence, notifier, router, asks, list, write } = parts;
+  const { telegram, pairing, log, presence, notifier, router, asks, list, write, fresh } = parts;
   return {
     telegram,
     pairing,
@@ -150,12 +152,14 @@ function gateOf(parts: GateParts): GateDeps {
     command: (name) => {
       if (name === "local") return asks.handBack();
       if (name === "sessions") return list();
+      if (name === "new") return fresh.answer();
       return runCommand(name, presence);
     },
     press: (data, chat, queryId) => {
       if (data.startsWith("full:")) return notifier.press(data, chat, queryId);
       if (data.startsWith("ask:")) return asks.press(data, queryId);
       if (data.startsWith("write:")) return write(data, chat, queryId);
+      if (data.startsWith("new:")) return fresh.press(data, chat, queryId);
       return router.press(data, queryId);
     },
     reply: (updateId) => router.route(updateId),
@@ -172,67 +176,6 @@ function setMenu(telegram: TelegramClient, chat: number, log: Log): void {
     .setMyCommands({ commands: MENU, scope: { type: "chat", chat_id: chat } })
     .then(() => log("menu.set", {}))
     .catch((error: unknown) => log("menu.failed", { error: messageOf(error) }));
-}
-
-interface AskParts {
-  readonly db: BrokerDb;
-  readonly sessions: Sessions;
-  readonly telegram: TelegramClient;
-  readonly pairing: Pairing;
-  readonly presence: Presence;
-  readonly config: Config;
-  readonly log: Log;
-  readonly audit: Log;
-  readonly notifier: Notifier;
-}
-
-/**
- * The parts for Claude's questions (plan 4.1): their hooks' side, their messages, and your side, which
- * hears of every change of presence (flow 3).
- */
-function askParts(parts: AskParts) {
-  const { db, sessions, telegram, pairing, presence, config, log, audit, notifier } = parts;
-  const asks = new Asks(db);
-  const messages = new AskMessages({ asks, notifier, telegram, log });
-  const where = askWhere({ pairing, presence, config });
-  const onLocal = (ask: Ask) => chat.localNow(ask);
-  const relay = new AskRelay({ sessions, asks, messages, where, presence, log, onLocal, audit });
-  const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log, audit });
-  presence.watch((now, before) => chat.presenceChanged(now, before));
-  return { relay, chat, asks };
-}
-
-interface ReplyParts {
-  readonly db: BrokerDb;
-  readonly sessions: Sessions;
-  readonly telegram: TelegramClient;
-  readonly pairing: Pairing;
-  readonly log: Log;
-  readonly outbox: Outbox;
-  readonly notifier: Notifier;
-  readonly asks: AskChat;
-}
-
-/**
- * The parts that take replies to sessions (plans 3.1 to 3.3). Messages about your replies go to the
- * paired user; a wait that typing at the Mac cancelled has its ✅ edited to say so.
- */
-function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier, asks }: ReplyParts) {
-  const tell = async (text: string) => {
-    const user = pairing.pairedUser();
-    if (user !== undefined) await telegram.sendMessage({ chat_id: user.id, text });
-  };
-  const senderName = () => firstName(pairing.pairedUser()?.name);
-  const onCancelled = (waiter: Waiter) => {
-    notifier.continuedAtMac(waiter.sessionId, waiter.generation).catch((error: unknown) => {
-      log("notice.continued-failed", { session: waiter.sessionId, error: String(error) });
-    });
-  };
-  const waiters = new Waiters(db);
-  const inbox = new Inbox(db);
-  const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log, onCancelled });
-  const router = new Router({ relay, waiters, asks, inbox, outbox, sessions, telegram, log });
-  return { relay, router, waiters };
 }
 
 /** `ctl pair` (plan 2.4): a new code, and polling from now on to hear it. */

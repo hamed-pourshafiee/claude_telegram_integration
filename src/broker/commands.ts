@@ -3,9 +3,9 @@ import type { Mode, Presence, Snapshot, State, Thresholds } from "./presence.ts"
 
 /**
  * The bot's commands (D4): /local hands Claude's questions back to the Mac (plan 4.1), /help is the
- * guide (plan 7.1), and /sessions lists the open sessions (plan 7.3).
+ * guide (plan 7.1), /sessions lists the open sessions (plan 7.3), and /new starts one (plan 7.7).
  */
-export type CommandName = Mode | "status" | "local" | "help" | "sessions";
+export type CommandName = Mode | "status" | "local" | "help" | "sessions" | "new";
 const NAMES: readonly CommandName[] = [
   "away",
   "auto",
@@ -14,6 +14,7 @@ const NAMES: readonly CommandName[] = [
   "local",
   "help",
   "sessions",
+  "new",
 ];
 /** A command's answer with buttons under it, such as /sessions' (plan 7.4). */
 export interface CommandAnswer {
@@ -31,6 +32,7 @@ const ALIASES: ReadonlyMap<string, CommandName> = new Map([["start", "help"]]);
 export const MENU: readonly BotCommand[] = [
   { command: "status", description: "Where the bridge thinks you are, and why" },
   { command: "sessions", description: "Your open sessions, and which wait for you" },
+  { command: "new", description: "Start a session in one of your folders" },
   { command: "away", description: "Send everything here until /auto" },
   { command: "auto", description: "Decide from your idle time and the screen lock" },
   { command: "off", description: "Mute everything until /auto or /away" },

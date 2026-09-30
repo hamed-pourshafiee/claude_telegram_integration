@@ -111,9 +111,10 @@ function since(doing: Doing): number {
   return "since" in doing ? doing.since : doing.ask.createdAt;
 }
 
-function lineOf({ name, doing }: Listed, now: number): string {
+function lineOf({ session, name, doing }: Listed, now: number): string {
   const ago = (at: number) => duration((now - at) / 1000);
-  const start = `${emojiOf(doing)} ${name}`;
+  // A session /new started runs in the background (D11).
+  const start = `${emojiOf(doing)} ${name}${session.fromChat ? " (started here)" : ""}`;
   switch (doing.kind) {
     case "asks":
       return `${start}: waits for your answer here`;

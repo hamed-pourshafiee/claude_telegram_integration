@@ -1800,6 +1800,58 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   it runs itself, as the plan's `/new <repo> <prompt>` has it; you follow it and answer it from the
   chat, and can open it at the Mac later.
 
+## 7.7 `/new`: a session started from the chat
+
+- **Date:** 2026-09-30 (asked "go" after the spikes; design D11, plan rev. 18)
+- **Found first** (F25, 23:05, throwaway hooks outside `~`, 2.1.274):
+  - In `claude -p` a Stop hook installed with `asyncRewake` blocks. The process stays alive while the
+    hook waits, and its exit 2 continues the session with its stderr as the next message.
+  - A PermissionRequest hook's allow applies there too: the test's `touch` ran.
+  - So the bridge's own hooks can run a session the broker starts, with no new hook.
+- **Built** (on `dev`):
+  - `/new` answers with a button for each folder offered: those of recent sessions, served for
+    terminal sessions, showing Claude's text, and still there (at most 8). A tap sends "✏️ Your first
+    message for a new session in …" with the reply box open, recorded in `starts` (schema 9).
+  - The reply to it starts `claude -p --session-id <id>` in that folder, through your login shell
+    (`zsh -l -c 'exec claude …' "$1"`), with the message on stdin, marked "📨 From … on Telegram".
+    - It runs in a session of its own (setsid), with the minimal environment plus the entrypoint
+      `cli`.
+    - Its stderr goes to `.state/logs/sessions.log`; its stdout goes nowhere, since the hooks send
+      what Claude says.
+  - The session is recorded before it starts, as started from the chat (`sessions.from_chat`):
+    - its notices and questions go to the chat wherever you are (not with `/off`);
+    - nothing hands its questions back to the Mac, where it has no dialog;
+    - `/sessions` marks it "(started here)".
+  - At most 3 run at once. A question takes one reply, within 30 minutes. A start that fails, or a
+    process that exits with an error, is told in the chat. Every start goes to `audit.log`, by session
+    and folder, never the message.
+  - A delivered reply now marks its session as working, since `claude -p` sends no UserPromptSubmit
+    when a reply continues it.
+  - `askParts` and `replyParts` moved to `src/broker/app-parts.ts`, which kept `app.ts` under 300
+    lines.
+  - Gate: typecheck exit 0, "Checked 164 files", "668 pass, 0 fail" across 67 files, twice.
+  - Positive controls, 15, each caught by its own tests:
+    - notices ignoring where the session started;
+    - questions ignoring it;
+    - its questions handed back to the Mac;
+    - a delivered reply leaving it stopped;
+    - replies to /new questions not routed;
+    - ping-only folders offered;
+    - unserved folders offered;
+    - no limit;
+    - the message not marked;
+    - the session not recorded as started here;
+    - a question starting twice;
+    - the session given the broker's whole environment;
+    - not in a session of its own;
+    - an error exit not told;
+    - the "(started here)" mark missing.
+- **Decisions (mine, open to change):**
+  - It runs as a terminal session (`cli`), so `config.json`'s `entrypoints` must serve those. If they
+    don't, `/new` says so.
+  - No `/end` yet: a session ends 12 h after its last turn, when its Stop hook stops waiting.
+  - The 🖥 button stays on its questions, and a tap says the session has no dialog at the Mac.
+
 ## Next
 
 - **Live checks still to come:**

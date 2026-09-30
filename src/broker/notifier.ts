@@ -66,19 +66,26 @@ export class Notifier {
     this.#deps = deps;
   }
 
-  /** The chat a notice goes to now, or why none does. */
-  target(): { readonly chat: number } | { readonly skip: string } {
+  /**
+   * The chat a notice about `session` goes to now, or why none does. One started from the chat reports
+   * there wherever you are (D11); /off mutes it too.
+   */
+  target(
+    session: Pick<Session, "fromChat">,
+  ): { readonly chat: number } | { readonly skip: string } {
     const user = this.#deps.pairing.pairedUser();
     if (user === undefined) return { skip: "not paired" };
     const { mode, state } = this.#deps.presence.snapshot();
     if (mode === "off") return { skip: "muted" };
-    if (state !== "away") return { skip: state === "active" ? "at the Mac" : "in between" };
+    if (state !== "away" && !session.fromChat) {
+      return { skip: state === "active" ? "at the Mac" : "in between" };
+    }
     return { chat: user.id };
   }
 
-  /** Sends the notice for `session` if you are away; whether it went out. */
+  /** Sends the notice for `session` if you are away, or it was started here; whether it went out. */
   async send(kind: string, session: Session, noticeOf: NoticeOf): Promise<boolean> {
-    const target = this.target();
+    const target = this.target(session);
     if ("skip" in target) {
       this.#deps.log("notice.skipped", { kind, session: session.id, reason: target.skip });
       return false;

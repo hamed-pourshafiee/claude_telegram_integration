@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
@@ -8,8 +8,8 @@ import { appHarness, YOU } from "../helpers/app.ts";
 import { ok } from "../helpers/fake-telegram.ts";
 import { until } from "../helpers/wait.ts";
 
-// Plans 7.3 to 7.5 end to end: /sessions from the chat, with each session's title as it is now, and a
-// tap on one of its sessions to write to it.
+// Plans 7.3 to 7.5 and 7.7 end to end: /sessions from the chat, with each session's title as it is
+// now, a tap on one of its sessions to write to it, and /new.
 const harness = appHarness("app-sessions");
 const { fake, dir, app } = harness;
 const chat = { id: YOU.id, type: "private" };
@@ -108,4 +108,50 @@ test("a title Claude Code made after the session's last hook is in /sessions (pl
   expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
   const text = String(asFields(fake.calls("sendMessage")[0]?.body)?.text);
   expect(text).toMatch(/^1 open session:\n⏳ IQ-1572: working for \d+ s\n/);
+});
+
+test("/new: a tap on a folder and a reply start a session there, marked as from here (plan 7.7)", async () => {
+  const launched: string[][] = [];
+  const launchSession = (id: string, folder: string, message: string) => {
+    launched.push([id, folder, message]);
+    return { pid: 4321, exited: new Promise<number>(() => undefined) };
+  };
+  const db = BrokerDb.open(join(dir, "new.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: YOU.id, name: "Hamed" });
+  const { routes } = app(db, { launchSession });
+  mkdirSync(join(dir, "sandbox"), { recursive: true });
+  const sandbox = realpathSync(join(dir, "sandbox"));
+  // A session used the sandbox before, so /new offers it.
+  await routes.hook("SessionStart", { session_id: "old", project_dir: sandbox, entrypoint: "cli" });
+  fake.answer("sendMessage", ok({ message_id: 71, date: 0, chat, text: "folders" }));
+  fake.answer("sendMessage", ok({ message_id: 72, date: 0, chat, text: "✏️" }));
+  fake.fallback("sendMessage", ok({ message_id: 73, date: 0, chat, text: "🚀" }));
+  fake.fallback("answerCallbackQuery", ok(true));
+  from(message(70, "/new"));
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  const rows = asFields(
+    asFields(fake.calls("sendMessage")[0]?.body)?.reply_markup,
+  )?.inline_keyboard;
+  const button = Array.isArray(rows) ? asFields(rows[0]?.[0]) : undefined;
+  expect(button?.text).toBe("📂 sandbox");
+  from({
+    callback_query: {
+      id: "cbq2",
+      from: YOU,
+      data: button?.callback_data,
+      message: { message_id: 71, chat },
+    },
+  });
+  expect(await until(() => fake.calls("sendMessage").length === 2)).toBe(true);
+  from(message(74, "Fix the tests", { reply_to_message: { message_id: 72, date: 0, chat } }));
+  expect(await until(() => launched.length === 1)).toBe(true);
+  expect(launched[0]).toEqual([
+    expect.any(String),
+    sandbox,
+    "📨 From Hamed on Telegram: Fix the tests",
+  ]);
+  expect(await until(() => fake.calls("sendMessage").length === 3)).toBe(true);
+  const note = String(asFields(fake.calls("sendMessage")[2]?.body)?.text);
+  expect(note).toStartWith("🚀 Starting a session in sandbox.");
 });

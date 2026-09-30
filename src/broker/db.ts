@@ -107,6 +107,19 @@ const MIGRATIONS: readonly (readonly string[])[] = [
   ],
   // 8 (plan 7.5): the session's transcript, where /sessions reads its title as it is now (F21).
   ["ALTER TABLE sessions ADD COLUMN transcript TEXT NOT NULL DEFAULT ''"],
+  // 9 (plan 7.7, D11): sessions started from the chat, and the questions /new asked: a reply to one
+  // starts a session in its folder, once.
+  [
+    "ALTER TABLE sessions ADD COLUMN from_chat INTEGER NOT NULL DEFAULT 0",
+    `CREATE TABLE starts (
+      chat_id INTEGER NOT NULL,
+      message_id INTEGER NOT NULL,
+      project_dir TEXT NOT NULL,
+      asked_at INTEGER NOT NULL,
+      state TEXT NOT NULL,
+      PRIMARY KEY (chat_id, message_id)
+    ) STRICT`,
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;

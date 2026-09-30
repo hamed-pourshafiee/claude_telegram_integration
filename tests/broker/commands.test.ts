@@ -38,6 +38,7 @@ describe("which texts are commands", () => {
     ["/local", "local"],
     ["/help", "help"],
     ["/sessions", "sessions"],
+    ["/new", "new"],
     ["/start", "help"],
     ["/status@SomeBot", "status"],
     ["  /AWAY \n", "away"],
@@ -108,7 +109,7 @@ test.each([
 describe("the menu and the guide (plan 7.1)", () => {
   test("the menu holds every command the bot knows, each as Telegram allows it", () => {
     const names = MENU.map((entry) => entry.command);
-    expect(names).toEqual(["status", "sessions", "away", "auto", "off", "local", "help"]);
+    expect(names).toEqual(["status", "sessions", "new", "away", "auto", "off", "local", "help"]);
     for (const { command, description } of MENU) {
       expect(String(parseCommand(`/${command}`))).toBe(command);
       expect(command).toMatch(/^[a-z0-9_]{1,32}$/);

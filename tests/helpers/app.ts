@@ -2,7 +2,7 @@ import { afterAll, beforeEach } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type App, createApp } from "../../src/broker/app.ts";
+import { type App, type AppDeps, createApp } from "../../src/broker/app.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import type { Reading } from "../../src/broker/ioreg.ts";
 import { parseConfig } from "../../src/shared/config.ts";
@@ -21,8 +21,11 @@ export interface AppHarness {
   readonly dir: string;
   /** What the stand-in Mac shows; each test starts at the Mac. */
   mac: Reading;
-  /** The broker's parts on a new database, or on `db`. */
-  readonly app: (db?: BrokerDb) => App & { readonly db: BrokerDb };
+  /** The broker's parts on a new database, or on `db`; /new starts `launchSession`, if given. */
+  readonly app: (
+    db?: BrokerDb,
+    extra?: Pick<AppDeps, "launchSession">,
+  ) => App & { readonly db: BrokerDb };
 }
 
 /**
@@ -39,7 +42,7 @@ export function appHarness(name: string): AppHarness {
     fake,
     dir,
     mac: { idleSeconds: 1, locked: false, problems: [] },
-    app: (db) => {
+    app: (db, extra = {}) => {
       files += 1;
       const opened = db ?? BrokerDb.open(join(dir, `app-${files}.db`));
       const deps = {
@@ -51,7 +54,14 @@ export function appHarness(name: string): AppHarness {
       const config = parseConfig({}, { repoRoot: dir, home: dir });
       const readPresence = () => Promise.resolve(harness.mac);
       const paths = statePaths(join(dir, `state-${files}`));
-      const parts = createApp({ ...deps, config, paths, readPresence, apiBase: fake.url });
+      const parts = createApp({
+        ...deps,
+        ...extra,
+        config,
+        paths,
+        readPresence,
+        apiBase: fake.url,
+      });
       apps.push(parts);
       return { db: opened, ...parts };
     },

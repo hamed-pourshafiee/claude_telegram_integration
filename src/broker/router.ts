@@ -4,9 +4,11 @@ import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { InlineKeyboardButton } from "../shared/telegram/types.ts";
 import type { AskChat, Target } from "./ask-chat.ts";
 import type { Inbox, StoredReply } from "./inbox.ts";
+import type { Started } from "./new-session.ts";
 import type { Outbox } from "./outbox.ts";
 import type { Relay } from "./relay.ts";
 import { label, labels, type Sessions } from "./sessions.ts";
+import type { Start, Starts } from "./starts.ts";
 import type { Waiters } from "./waiters.ts";
 
 export interface RouterDeps {
@@ -19,6 +21,9 @@ export interface RouterDeps {
   readonly sessions: Pick<Sessions, "get">;
   readonly telegram: Pick<TelegramClient, "sendMessage" | "answerCallbackQuery">;
   readonly log: Log;
+  /** The questions /new asked, and what a reply to one does: it starts a session (plan 7.7). */
+  readonly starts?: Pick<Starts, "find">;
+  readonly start?: (text: string, start: Start) => Started;
   readonly now?: () => number;
 }
 
@@ -105,6 +110,8 @@ export class Router {
     if (reply.replyTo !== undefined) {
       const question = asks.questionAt(reply.chatId, reply.replyTo);
       if (question !== undefined) return this.#say(reply, this.#toQuestion(reply, question));
+      const start = this.#deps.starts?.find(reply.chatId, reply.replyTo);
+      if (start !== undefined) return this.#say(reply, this.#begin(reply, start));
       const link = outbox.find(reply.chatId, reply.replyTo);
       if (link !== undefined) return this.#say(reply, this.#give(reply, link.sessionId));
     }
@@ -137,6 +144,14 @@ export class Router {
     if (outcome === "ended") this.#deps.inbox.mark(reply.updateId, "unrouted");
     const text = outcome === "ended" ? TEXTS.ended : TEXTS.queued;
     return { outcome, text: text(this.#name(sessionId)) };
+  }
+
+  /** A reply to a /new question: the first message of a session that starts now, or why not. */
+  #begin(reply: StoredReply, start: Start): Given {
+    const started = this.#deps.start?.(reply.text, start) ?? { started: false, text: TEXTS.closed };
+    this.#deps.inbox.mark(reply.updateId, started.started ? "delivered" : "unrouted");
+    this.#deps.log("reply.start", { update: reply.updateId, started: started.started });
+    return { outcome: started.started ? "started" : "not started", text: started.text };
   }
 
   /** The reply as the answer to a question; a number out of range asks for another. */
