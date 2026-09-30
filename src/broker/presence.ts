@@ -60,7 +60,7 @@ export interface PresenceDeps {
 /** Told when the state changes, the mode's part included: the state now, and the one before. */
 export type PresenceListener = (now: Snapshot, before: State) => void;
 
-const MODE_KEY = "presence.mode";
+export const MODE_KEY = "presence.mode";
 
 /**
  * Presence (D4, flow 3). It looks at the idle time and the screen lock every 5 s and keeps the latest

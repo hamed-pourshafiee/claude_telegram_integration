@@ -32,17 +32,24 @@ export async function startBroker(
   return { ok: true, text: `${state === "started" ? "started" : "already running"} (pid ${pid})` };
 }
 
-/** Stops the broker with SIGTERM, or SIGKILL if it hasn't gone after 5 s. */
+/**
+ * Stops the broker with SIGTERM, or SIGKILL if it hasn't gone after 5 s. `known` is a pid seen running
+ * a moment ago: a broker already on its way out (it saw the disabled flag) no longer answers, and its
+ * pid file is gone.
+ */
 export async function stopBroker(
   paths: StatePaths,
   launch: BrokerLaunch,
   log: Log,
+  known?: number,
 ): Promise<Outcome> {
-  const pid = (await brokerHealth(paths, log))?.pid ?? pidFromFile(paths, launch);
-  if (pid === undefined) return { ok: true, text: "not running" };
-  process.kill(pid, "SIGTERM");
-  if (await gone(pid, 5000)) return { ok: true, text: `stopped (pid ${pid})` };
-  process.kill(pid, "SIGKILL");
+  const pid = (await brokerHealth(paths, log))?.pid ?? pidFromFile(paths, launch) ?? known;
+  if (pid === undefined || !alive(pid)) return { ok: true, text: "not running" };
+  // Gone before the signal or after it: stopped all the same.
+  if (!signal(pid, "SIGTERM") || (await gone(pid, 5000))) {
+    return { ok: true, text: `stopped (pid ${pid})` };
+  }
+  signal(pid, "SIGKILL");
   if (await gone(pid, 1000)) return { ok: true, text: `killed after 5 s (pid ${pid})` };
   return { ok: false, text: `pid ${pid} would not stop` };
 }
@@ -134,6 +141,17 @@ async function gone(pid: number, waitMs: number): Promise<boolean> {
     await Bun.sleep(50);
   }
   return !alive(pid);
+}
+
+/** Sends `name` to `pid`: false if the process has gone already (ESRCH). */
+function signal(pid: number, name: "SIGTERM" | "SIGKILL"): boolean {
+  try {
+    process.kill(pid, name);
+    return true;
+  } catch (error) {
+    if (asFields(error)?.code === "ESRCH") return false;
+    throw error;
+  }
 }
 
 function alive(pid: number): boolean {

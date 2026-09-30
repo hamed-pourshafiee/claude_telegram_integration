@@ -49,6 +49,17 @@ describe("one stop", () => {
     const t = new Transcript().prompt("p1").assistant(["Done.", "The tests pass."]).summary();
     expect(outcome(t, "Done.\nThe tests pass.")).toBe("finish");
   });
+
+  test("the summary's Claude Code version comes along, for ctl doctor (plan 6.1)", () => {
+    const t = new Transcript().prompt("p1").assistant(REPLY).blocked("p1");
+    expect(classifyEntries(t.summary({ version: "2.1.284" }).entries, REPLY, "p1")).toEqual({
+      outcome: "continuing",
+      reason: "continuation entry",
+      version: "2.1.284",
+    });
+    const unnamed = new Transcript().prompt("p1").assistant(REPLY).summary();
+    expect(classifyEntries(unnamed.entries, REPLY, "p1")).not.toHaveProperty("version");
+  });
 });
 
 describe("the right stop", () => {

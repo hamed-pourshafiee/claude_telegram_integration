@@ -8,6 +8,7 @@ import { loadConfig } from "../shared/config.ts";
 import { loadBotToken } from "../shared/env.ts";
 import { messageOf } from "../shared/errors.ts";
 import { fileLog } from "../shared/file-log.ts";
+import { rotateLogs } from "../shared/log-rotation.ts";
 import { CONFIG_FILE, ENV_FILE, HOME_DIR, REPO_ROOT, STATE } from "../shared/paths.ts";
 import { ensureStateDir, isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
@@ -21,6 +22,8 @@ ensureStateDir(STATE);
 const log = fileLog(join(STATE.logs, "broker.log"), "broker");
 /** Every step of a permission prompt relayed to Telegram (D9). */
 const audit = fileLog(join(STATE.logs, "audit.log"), "audit");
+/** How often the logs are looked at for rotation, after the look at start. */
+const ROTATE_MS = 60 * 60 * 1000;
 
 process.on("unhandledRejection", (reason) => {
   log("broker.crash", { error: messageOf(reason) });
@@ -40,6 +43,13 @@ function main(): void {
     log("broker.not-started", { reason: "another broker holds the lock" });
     return;
   }
+  // A broker spawned in a race waits up to 0.5 s for the lock, and gets it once the winner stops:
+  // after `ctl uninstall` or `disable`, say, which set the flag in the meantime (plan 6.1).
+  if (isDisabled(STATE)) {
+    lock.close();
+    log("broker.not-started", { reason: "disabled while it waited for the lock" });
+    return;
+  }
   refuseVerboseFetch(process.env);
   const config = loadConfig(CONFIG_FILE, { repoRoot: REPO_ROOT, home: HOME_DIR });
   const token = loadBotToken(ENV_FILE);
@@ -56,6 +66,8 @@ function main(): void {
   });
   const server = startServer(STATE.socket, routes);
   writeFileSync(STATE.pid, `${process.pid}\n`);
+  rotate();
+  setInterval(rotate, ROTATE_MS);
   log("broker.started", { schema: db.schemaVersion });
   const stop = (reason: string) => {
     shutdown.abort();
@@ -72,6 +84,16 @@ function main(): void {
   process.on("SIGTERM", () => stop("SIGTERM"));
   process.on("SIGINT", () => stop("SIGINT"));
   watchDisabledFlag(() => stop("disabled"));
+}
+
+/** Rotates every log in .state/logs/ that has grown too big (plan 6.1); a failure is only logged. */
+function rotate(): void {
+  try {
+    const files = rotateLogs(STATE.logs);
+    if (files.length > 0) log("logs.rotated", { files: files.join(",") });
+  } catch (error) {
+    log("logs.rotate-failed", { error: messageOf(error) });
+  }
 }
 
 /**

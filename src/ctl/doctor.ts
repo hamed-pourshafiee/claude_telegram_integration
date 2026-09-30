@@ -23,8 +23,8 @@ export interface DoctorOptions {
 }
 
 /**
- * Checks the setup and says what to fix. Later steps add their own checks (the broker, the hooks;
- * plan 6.1). No check ever prints the token.
+ * Checks the setup (config.json, .env, the bot) and says what to fix; doctor-local.ts checks this Mac's
+ * side (plan 6.1). No check ever prints the token.
  */
 export async function runDoctor(paths: DoctorPaths, options: DoctorOptions = {}): Promise<Check[]> {
   const token = tokenCheck(paths.envFile);

@@ -10,6 +10,8 @@ export interface Classification {
   readonly outcome: StopOutcome;
   /** Which rule decided, for the log. */
   readonly reason: string;
+  /** The Claude Code version in the stop's summary, for ctl doctor (plan 6.1). */
+  readonly version?: string;
 }
 
 export interface StopFacts {
@@ -85,12 +87,14 @@ export function classifyEntries(
   const stop = stopEntry(entries, byUuid, text, promptId);
   const path = stop === undefined ? undefined : pathToSummary(stop, children);
   if (path === undefined) return undefined;
+  const version = str(path.at(-1)?.version);
+  const seen = version === undefined ? {} : { version };
   const continued = path.some((entry) => CONTINUATIONS.has(attachmentType(entry) ?? ""));
-  if (!continued) return { outcome: "finish", reason: "no continuation entry" };
+  if (!continued) return { outcome: "finish", reason: "no continuation entry", ...seen };
   if (path.at(-1)?.preventedContinuation === true) {
-    return { outcome: "finish", reason: "continuation prevented" };
+    return { outcome: "finish", reason: "continuation prevented", ...seen };
   }
-  return { outcome: "continuing", reason: "continuation entry" };
+  return { outcome: "continuing", reason: "continuation entry", ...seen };
 }
 
 /** The latest assistant entry that ends a message with this text, in the turn of `promptId`. */

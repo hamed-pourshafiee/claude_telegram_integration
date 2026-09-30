@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { HANDLERS, type HookContext, sessionNote } from "../../src/hooks/events.ts";
 import { parseHookInput } from "../../src/shared/hook-input.ts";
-import { noLog } from "../../src/shared/log.ts";
+import { type Log, type LogFields, noLog } from "../../src/shared/log.ts";
 import type { Pending } from "../../src/shared/pending.ts";
 import { Transcript } from "../helpers/transcript.ts";
 
@@ -29,6 +29,7 @@ beforeEach(() => {
 interface RunOptions {
   readonly wait?: boolean;
   readonly signal?: AbortSignal;
+  readonly log?: Log;
 }
 
 async function run(event: string, fields: Record<string, unknown> = {}, options: RunOptions = {}) {
@@ -41,7 +42,7 @@ async function run(event: string, fields: Record<string, unknown> = {}, options:
   const context: HookContext = {
     input,
     session,
-    log: noLog,
+    log: options.log ?? noLog,
     ensureBroker: () => {
       started += 1;
       return Promise.resolve(brokerUp);
@@ -108,6 +109,30 @@ describe("Stop", () => {
     expect(calls.map((c) => c.name)).toEqual(["Stop", "StopResult"]);
     const result = { ...session, generation: 7, outcome: "finish", text: "Done.", tasks: [task] };
     expect(calls[1]?.body).toEqual(result);
+  });
+
+  test("logs how the stop read, with the Claude Code version of its summary (plan 6.1)", async () => {
+    const transcript = join(dir, "versioned.jsonl");
+    const t = new Transcript().prompt("p1").assistant("Done.").summary({ version: "2.1.284" });
+    writeFileSync(transcript, t.jsonl());
+    respond = () => ({ generation: 8 });
+    const stops: LogFields[] = [];
+    const log: Log = (event, fields) => {
+      if (event === "hook.stop") stops.push(fields);
+    };
+    const fields = {
+      transcript_path: transcript,
+      prompt_id: "p1",
+      last_assistant_message: "Done.",
+    };
+    await run("Stop", fields, { log });
+    expect(stops).toEqual([
+      expect.objectContaining({
+        outcome: "finish",
+        reason: "no continuation entry",
+        version: "2.1.284",
+      }),
+    ]);
   });
 
   test("no broker: no classification, no calls", async () => {

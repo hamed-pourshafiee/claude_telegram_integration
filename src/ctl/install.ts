@@ -116,15 +116,29 @@ export function withOurs(
 
 /** How many of our hooks `settings` holds. */
 export function countOurs(settings: Json, repoRoot: string): number {
+  return ourEntries(settings, repoRoot).length;
+}
+
+/**
+ * Our hooks in `settings`, one line each: event, matcher and the hook with its keys sorted, so that two
+ * settings can be compared however they order things (ctl doctor, plan 6.1).
+ */
+export function ourEntries(settings: Json, repoRoot: string): string[] {
   const hooks = asFields(settings.hooks) ?? {};
-  return Object.values(hooks).reduce<number>((total, groups) => {
+  return Object.entries(hooks).flatMap(([event, groups]) => {
     const list: readonly unknown[] = Array.isArray(groups) ? groups : [];
-    const ours = list.flatMap((group) => {
-      const inner = asFields(group)?.hooks;
-      return Array.isArray(inner) ? inner.filter((hook) => isOurs(hook, repoRoot)) : [];
+    return list.flatMap((group) => {
+      const fields = asFields(group);
+      const inner: readonly unknown[] = Array.isArray(fields?.hooks) ? fields.hooks : [];
+      const matcher = typeof fields?.matcher === "string" ? fields.matcher : "";
+      return inner
+        .filter((hook) => isOurs(hook, repoRoot))
+        .map((hook) => {
+          const keys = Object.keys(asFields(hook) ?? {}).sort();
+          return `${event}\t${matcher}\t${JSON.stringify(hook, keys)}`;
+        });
     });
-    return total + ours.length;
-  }, 0);
+  });
 }
 
 /** The group minus our hooks, as a list: empty when nothing else was in it. */
@@ -142,11 +156,14 @@ export function serialize(settings: Json): string {
   return `${JSON.stringify(settings, null, 2)}\n`;
 }
 
-/** The file's text and settings; a file that doesn't exist yet reads as {}. A symlink is refused. */
+/**
+ * The file's text and settings; a file that doesn't exist yet reads as {}. A symlink is refused, one
+ * that points nowhere too: writing would replace the link itself.
+ */
 export function readSettings(file: string): { readonly text: string; readonly settings: Json } {
-  if (!existsSync(file)) return { text: "", settings: {} };
-  if (lstatSync(file).isSymbolicLink())
-    throw new Error(`${file} is a symlink; refusing to replace it`);
+  const stat = lstatSync(file, { throwIfNoEntry: false });
+  if (stat?.isSymbolicLink()) throw new Error(`${file} is a symlink; refusing to replace it`);
+  if (stat === undefined) return { text: "", settings: {} };
   const text = readFileSync(file, "utf8");
   const settings = asFields(JSON.parse(text));
   if (settings === undefined) throw new Error(`${file} is not a JSON object`);

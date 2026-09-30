@@ -45,13 +45,27 @@ export class RepoCopy {
   readonly brokerMain: string = join(this.root, "src/broker/main.ts");
   #sessions = 0;
 
-  constructor() {
+  /**
+   * `apiBase`: the copy's Telegram client talks to that stand-in (tests/helpers/fake-telegram.ts), so
+   * its broker may be paired. Without it, keep the copy unpaired: nothing may reach Telegram.
+   */
+  constructor(options: { readonly apiBase?: string } = {}) {
     cpSync(join(REPO_ROOT, "src"), join(this.root, "src"), { recursive: true });
     cpSync(join(REPO_ROOT, "bunfig.toml"), join(this.root, "bunfig.toml"));
     const env = join(this.root, ".env");
     writeFileSync(env, `TELEGRAM_BOT_TOKEN=${FAKE_TOKEN}\n`);
     chmodSync(env, 0o600);
     mkdirSync(this.sandbox);
+    if (options.apiBase !== undefined) this.#pointAt(options.apiBase);
+  }
+
+  #pointAt(apiBase: string): void {
+    const client = join(this.root, "src/shared/telegram/client.ts");
+    const real = 'const BOT_API = "https://api.telegram.org";';
+    const text = readFileSync(client, "utf8");
+    // Should the line change, fail here rather than send the test's requests to Telegram.
+    if (!text.includes(real)) throw new Error(`${client} no longer has: ${real}`);
+    writeFileSync(client, text.replace(real, `const BOT_API = ${JSON.stringify(apiBase)};`));
   }
 
   /** The command that runs the copy's src/<entry>/main.ts with our flags, as hooks and ctl run. */

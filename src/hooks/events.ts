@@ -123,7 +123,7 @@ async function stop(context: HookContext): Promise<void> {
     lastMessage: input.lastAssistantMessage,
     promptId: input.promptId,
   };
-  const { outcome, reason } = await classifyStop(facts, context.classify);
+  const { outcome, reason, version } = await classifyStop(facts, context.classify);
   const text = input.lastAssistantMessage ?? "";
   context.log("hook.stop", {
     session: input.sessionId,
@@ -132,6 +132,7 @@ async function stop(context: HookContext): Promise<void> {
     reason,
     chars: text.length,
     tasks: input.backgroundTasks.length,
+    ...(version === undefined ? {} : { version }),
   });
   const result = { ...context.session, generation, outcome, text, tasks: input.backgroundTasks };
   await context.call("StopResult", result);
