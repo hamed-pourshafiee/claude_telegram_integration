@@ -1,19 +1,19 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 24, D11: /new starts a session the broker runs, F25 (rev. 23: F24, no hook can start a new
-session working; rev. 22: F23, a Claude Code tab can be opened from outside, but its prompt isn't sent;
-rev. 21: F22: Claude Code kills a hook's whole process tree, so the broker starts through a launcher (D3,
-plan 7.6); F21: a title can come during the first turn, so `/sessions` reads titles as it lists, plan
-7.5; rev. 20: D4, a tap on a session under `/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists
-the open sessions, whose Claude still runs by F18, plan 7.3; rev. 18: F21, messages name a session by its
-title, plan 7.2; rev. 17: D10, the git remote is GitHub, O3; rev. 16: the bot's menu of commands and
-/help, plan 7.1; rev. 15: permission prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a
-plan, so plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3
-as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a
-wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's
-recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike
-changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 25, F26 and O4: Bun's userInfo() reads $SHELL and $HOME (rev. 24: D11, /new starts a session
+the broker runs, F25; rev. 23: F24, no hook can start a new session working; rev. 22: F23, a Claude Code
+tab can be opened from outside, but its prompt isn't sent; rev. 21: F22: Claude Code kills a hook's whole
+process tree, so the broker starts through a launcher (D3, plan 7.6); F21: a title can come during the
+first turn, so `/sessions` reads titles as it lists, plan 7.5; rev. 20: D4, a tap on a session under
+`/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists the open sessions, whose Claude still runs
+by F18, plan 7.3; rev. 18: F21, messages name a session by its title, plan 7.2; rev. 17: D10, the git
+remote is GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission
+prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are reviewed from the
+phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from
+2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9:
+F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen
+lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev.
+3: F14; rev. 2: Codex review) · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -65,6 +65,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F23 | The Claude Code extension handles `vscode://anthropic.claude-code/open`, with an optional `session=<id>` and `prompt=<text>`. VS Code sends it to the window used last; without a session the extension opens a new Claude Code tab there, and its new session starts at once (SessionStart). The prompt is only typed into the input box (`setInputText`), not sent. | 2.1.284 `extension.js` and `webview/index.js`; tried 2026-09-30 16:50: the tab opened in this repo's window 16 s later, and the prompt ran only when sent at the Mac; undocumented |
 | F24 | A SessionStart hook runs to completion before the session answers anything, `asyncRewake` or not, and its exit 2 wakes nothing: no hook can start a new session working. A Stop hook's `asyncRewake` does wake it (F2), in the SDK's stream-json mode too, which the VS Code tab uses. | 2.1.284, tried 2026-09-30 21:17 to 21:19 with the SDK's launch flags: `initialize` answered only after a 6 s SessionStart hook, no turn from its exit 2; after a first turn, a Stop hook's exit 2 started one with no input |
 | F25 | In `claude -p` (no streaming input) hooks block, `asyncRewake` or not: a Stop hook keeps the process alive while it waits, and its exit 2 continues the session with its stderr as the next user message ("Stop hook feedback: [command]: …"). A PermissionRequest hook's allow applies there too. | 2.1.274, tried 2026-09-30 23:05 with throwaway hooks outside `~`: a reply-like exit 2 after 3 s, then an allowed `touch` (plan 7.7) |
+| F26 | Bun's `os.userInfo()` takes `shell` from `$SHELL` ("unknown" without it, as in the broker) and `homedir` from `$HOME` (the user database only without it). The user database has both: `dscl . -read /Users/<name> UserShell NFSHomeDirectory`, about 12 ms. | Bun 1.4.1, 2026-09-30: the first `/new` failed with `Executable not found in $PATH: "unknown"` (plan 7.7) |
 
 ## 3. Architecture
 
@@ -230,7 +231,12 @@ Taken (say so before the step if you disagree):
   prompt the chat can't show is denied. At most 3 run at once. One ends 12 h after its last turn, when
   its Stop hook stops waiting. Every start goes to the audit log, without the text.
 
-No questions are open.
+Open:
+
+- **O4 The home folder hooks and ctl resolve `~/` with** (found 2026-09-30, F26): `paths.ts` says it
+  comes from the user database, but Bun takes it from `$HOME`, which a session's environment sets, so
+  such a session could change which folders count as served. Proposed: read it from the user database, as
+  the broker now does for the shell, at about 12 ms more per hook call. Yours to decide.
 
 ## 5. Security
 

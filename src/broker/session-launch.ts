@@ -1,6 +1,6 @@
-import { closeSync, openSync } from "node:fs";
+import { closeSync, openSync, statSync } from "node:fs";
 import { userInfo } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join } from "node:path";
 import { brokerEnv } from "../shared/broker-client.ts";
 
 /** A session /new started: its process, and how it ends. */
@@ -13,9 +13,27 @@ export interface Launched {
 /** Starts a session in `projectDir` with its first message; see launchSession(). */
 export type Launch = (sessionId: string, projectDir: string, message: string) => Launched;
 
-/** The shell sessions start through: yours, as the user database has it. */
-export function loginShell(): string {
-  return userInfo().shell || "/bin/zsh";
+/** The shell a session starts through when the user database names none that runs. */
+const FALLBACK_SHELL = "/bin/zsh";
+
+/**
+ * Your login shell, as the user database has it. Not os.userInfo().shell: Bun takes that from $SHELL,
+ * which the broker's environment doesn't have ("unknown", F26). A shell that isn't an executable file
+ * falls back to /bin/zsh. The broker asks once, when it starts.
+ */
+export function loginShell(user: string = userInfo().username): string {
+  const read = Bun.spawnSync(["/usr/bin/dscl", ".", "-read", `/Users/${user}`, "UserShell"], {
+    stderr: "ignore",
+  });
+  const shell = /^UserShell:\s*(\S+)\s*$/m.exec(read.stdout.toString())?.[1];
+  return shell !== undefined && usableShell(shell) ? shell : FALLBACK_SHELL;
+}
+
+/** Whether `path` is an absolute path to a file someone may execute. */
+export function usableShell(path: string): boolean {
+  if (!isAbsolute(path)) return false;
+  const stat = statSync(path, { throwIfNoEntry: false });
+  return stat?.isFile() === true && (stat.mode & 0o111) !== 0;
 }
 
 /**

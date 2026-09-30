@@ -1861,6 +1861,19 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
     stop took it while the waiting broker slept between tries.
   - So broker 43820 runs as hook 10845's child until that hook ends, at 03:12Z at the latest. Then it
     goes too, and the next hook starts one through the launcher.
+- **Live check, first try** (20:23): it failed.
+  - `/new` offered the three folders known to the bridge. The user tapped `agent-panel-frontend`, then
+    `sandbox`: both starts failed with `Executable not found in $PATH: "unknown"`.
+  - The shell came from Bun's `os.userInfo().shell`, which is `$SHELL`, and the broker has none (F26).
+  - The user also didn't recognize their two VS Code windows in the list. They are this repo and the
+    workspace `insureq-studio`, whose Claude sessions run in `agent-panel-frontend`; the list names
+    folders.
+- **Fixed** (on `dev`): the broker reads your login shell from the user database (`dscl`), once at
+  start, and uses it only if it's an absolute path to an executable file (else `/bin/zsh`).
+  - A test runs the lookup in the broker's own environment and checks it matches the user database.
+  - Positive controls, 2, each caught: the old `userInfo().shell`, and any path taken for a shell.
+- **Found too** (O4): the home folder that hooks and ctl resolve `~/` with also comes from `$HOME`, not
+  from the user database as `paths.ts` says. Proposed to the user; not changed.
 
 ## Next
 
