@@ -1744,3 +1744,31 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   - Positive controls, 2, each caught by the tree test:
     - no launcher, the hook being the broker's parent, as before;
     - a launcher that waits for the broker.
+
+## Going live (7.5 and 7.6, 2026-09-30)
+
+- The live database was backed up at schema 7 (integrity ok):
+  `.state/backups/broker.pre-schema8.2026-09-30T16-06-04Z.db` (0600).
+- `main` was fast-forwarded to `ab9efaa`. Two Stop hooks were waiting, started before 7.6 (pids 10845
+  and 80151), so they still start a broker as their own child.
+- The broker was handed over with a one-time script: start the new broker through the launcher, stop
+  the old one, and let the brokers the old hooks start find the lock held.
+  - **First try:** the old broker was stopped 200 ms after the start. The launcher itself took about
+    0.2 s, so three brokers raced, and the one hook 10845 started got the lock: broker 11740, schema 8,
+    whose parent was that hook. That's F22's setup, live.
+  - **Second try:** the script waited for the new broker's own process before stopping the old one.
+    Broker 13578 started at 16:06:44.273, schema 8, with launchd (1) as its parent. The two brokers the
+    hooks started gave up ("another broker holds the lock"), and both waits were registered again.
+- **Learned:**
+  - The launcher adds about 0.2 s to a broker's start.
+  - Hooks started before 7.6 still start brokers directly, until they end (at most 12 h).
+
+## Next
+
+- **Live checks with the user:**
+  - 7.4: from `/sessions`, tap a waiting session and write to it;
+  - 7.5: `/sessions` during a new session's first turn shows its title.
+  - 7.6's live part: once a hook started after 7.6 has started a broker, its parent is launchd. The
+    process test covers the hook's path.
+- Push when the user asks: `origin/main` is at `33d6b2f`.
+- A live uninstall rehearsal stays the user's choice (6.1 tested it with real processes).
