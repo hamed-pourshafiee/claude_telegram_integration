@@ -1491,8 +1491,48 @@ Committed as `9b28532` (2026-09-30).
 
 ## Next
 
-The plan is complete. Possible later steps, from the plan: a Telegram topic per session, `/new` to start
-a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin. Two
-choices remain the user's: a live uninstall rehearsal (6.1 tested it with real processes), and a git
-remote (O3). Both VS Code windows still run Claude Code 2.1.283; once they reload into 2.1.284,
-`ctl doctor`'s stops line will show whether its stops are read.
+Committed as `9654bdd` (2026-09-30). Then the user asked for the commands to show up in the bot, with a
+menu and a guide: step 7.1 (plan rev. 12).
+
+## 7.1 The bot's menu and a guide
+
+- **Date:** 2026-09-30
+- **Result:** passed, with the user one small step at a time.
+- **Built** (on `dev`, `d77f5f0`; design rev. 16, plan rev. 12):
+  - The paired chat gets the commands as its menu: `setMyCommands` with that chat's scope only, at every
+    broker start and on pairing. Other chats see none. A failure is only logged; the next start tries
+    again.
+  - `/help`, and `/start` (which Telegram sends when a bot is first opened), answer with a guide: what
+    comes to the chat (✅ ❓ 📋 🔐), how to answer it, when you count as away, and each command with its
+    line. The menu and the guide share one list, so they can't drift apart.
+  - "Paired ✅" now ends with "/help shows how."
+  - Gate: typecheck exit 0, "Checked 143 files", "611 pass, 0 fail" across 58 files, twice.
+  - Positive controls, 8, each caught (failing tests):
+    - no menu on pairing (2);
+    - a menu on any pairing attempt (1);
+    - no menu at start (1);
+    - the menu for every chat (2);
+    - `/start` not the guide (1);
+    - `/local` left out of the menu (1);
+    - `/help` answering with the status (1);
+    - any answer taken as the menu set (1).
+- **Going live:** `main` was fast-forwarded to `d77f5f0`, and the broker restarted (pid 52237);
+  Telegram accepted the menu 1.6 s later (`menu.set`). No settings or schema change.
+- **Evidence** (the user's phone):
+  - "/" listed the commands, each with its line.
+  - The Menu button showed the same six.
+  - `/help`, tapped in the menu, brought the guide.
+- **Decisions (mine, open to change):**
+  - The menu is for the paired chat only: a stranger who opens the bot sees no commands.
+  - `/pair` isn't in it: it is used once, from `ctl pair`'s instructions.
+  - The menu and the guide are in English, like the bot's other messages.
+
+## Next
+
+The plan and 7.1 are done. Possible later steps, from the plan: a Telegram topic per session, `/new` to
+start a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin.
+- The user is creating a GitHub repository (O3). Once it exists: add it as the remote, scan the whole
+  history for secrets, and push only when the user says so.
+- A live uninstall rehearsal stays the user's choice (6.1 tested it with real processes).
+- Both VS Code windows still run Claude Code 2.1.283. Once they reload into 2.1.284, `ctl doctor`'s
+  stops line will show whether its stops are read.
