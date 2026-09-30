@@ -1351,6 +1351,85 @@ Committed as `5d85a97` (2026-09-30).
 
 ## Next
 
-Phase 6. 6.1: `README.md`, `ctl doctor`'s remaining checks, log rotation, and uninstall in the order of
-design §6, passing while a Stop waiter, a held question and a permission request are all active. 6.2: the
-full gate; then the user decides whether Codex reviews the project (reviews were paused until the end).
+Committed as `a3001e5` (2026-09-30).
+
+## 6.1 Hardening and handover
+
+- **Date:** 2026-09-30
+- **Result:** passed. The pass check is a test with real processes; no settings change was needed, so
+  the user had nothing to do.
+- **Built** (on `dev`, `232efc9`):
+  - **`ctl uninstall` in the order of design §6:** the disabled flag, then only our hooks, then the
+    broker. `stopBroker` takes a broker that exits by itself on the way (it saw the flag) as stopped,
+    instead of crashing on the signal. `ctl install` says so while the bridge is disabled.
+  - **A race, found by the process test below:** hooks that start together each spawn a broker, and the
+    losers wait up to 0.5 s for the lock. When the winner stopped within that time (uninstall), a loser
+    got the lock after the flag was set: it ran its recovery and a Telegram poll before its flag watch
+    stopped it. A broker now checks the flag again once it holds the lock.
+  - **`ctl doctor`** (`src/ctl/doctor-local.ts`) also checks:
+    - the broker: schema, token and environment;
+    - the privacy of `.state/`: its folders 0700, what is in them 0600, the socket included;
+    - our hooks, against what this version installs;
+    - the Bun the hooks run;
+    - whether the last 10 stops were read (F16), with the Claude Code versions they name. The Stop hook
+      now logs the version from the stop's summary.
+  - **Log rotation:** each `.state/logs/*.log` past 5 MB becomes `.1`, and 3 copies are kept. The broker
+    does it at start and hourly; it alone rotates, so two rotations never race.
+  - **`readSettings`** refuses a dangling symlink too; before, it read as "no file yet", so install
+    would have replaced the link. A test meant to use such a link found it.
+  - **`README.md`:** setup, pairing, daily use, commands, uninstall, security, troubleshooting, and the
+    tested versions (a test keeps them in step with the doctor's).
+  - Gate: typecheck exit 0, "Checked 141 files", "598 pass, 0 fail", twice.
+  - Positive controls, 14, each caught by its own tests (failing tests):
+    - the flag after the hooks (1);
+    - no disabled flag (4);
+    - the broker left running (2);
+    - no flag check after the lock (1);
+    - no rotation at start (1);
+    - rotation overwriting `.1` (1);
+    - rotated at the limit, not past it (2);
+    - the state check skipping files (1);
+    - hooks counted, not compared (1);
+    - the rotated `hooks.log.1` unread (1);
+    - untested versions unmarked (1);
+    - the version dropped (2);
+    - a dangling symlink replaced (1);
+    - no note while disabled (1).
+  - The first control run also showed a flaky assertion of mine: that the broker's last log line is
+    `broker.started`, which presence can follow. The test now checks the order instead.
+- **The pass check** (`tests/ctl/uninstall-process.test.ts`, 5 runs of 5 before the gate): real hooks and
+  a real broker in a throwaway copy of the repo. The broker is paired and in away mode, and talks to a
+  stand-in for the Bot API. The settings file lies in the copy.
+  - Before uninstall: a Stop waiter, a question held in the chat and a Bash permission prompt, all
+    waiting (the ✅, ❓ and 🔐 were sent), and the settings edited after install (a setting and a hook of
+    the user's own).
+  - `uninstallBridge` set the flag, removed our 9 hooks and stopped the broker, in that order.
+  - Each hook exited 0 with nothing on stdout (no answer, no decision) and nothing on stderr (no wake).
+    - The Stop hook's reason: "disabled".
+    - The others: "disabled" or "no broker", depending on whether the stopping broker's answer reached
+      them first.
+  - Only ours went; the edit stayed. No broker started again (looked 2.5 s later), and a new
+    `SessionStart` hook did nothing.
+- **Going live:**
+  - `main` was fast-forwarded to `232efc9`. The broker restarted on it (pid 39328): a waiting hook
+    started it 14 ms after the stop, and the race's other broker gave up on the lock, as designed.
+  - `bun run ctl doctor` on the live setup: all 13 checks pass, exit 0.
+- **Decisions (mine, open to change):**
+  - Logs rotate past 5 MB and keep 3 copies, about 20 MB per log at most; `audit.log` too.
+  - The doctor's stops check fails if any of the last 10 stops had no summary in time.
+  - After an uninstall, `install` says the bridge is disabled rather than enabling it: a disable may
+    have been deliberate.
+  - No live uninstall rehearsal: the process test runs the real broker and hooks, and a live one would
+    take the bridge away from every session on the Mac. It remains an option for the user.
+- **Learned:**
+  - A broker that loses the start race waits up to 0.5 s for the lock: long enough to outlive a winner
+    that stops at once.
+  - In a process test, pick the broker by its `/health`, not by `pgrep`, which can also list a race
+    loser still waiting for the lock.
+  - Both VS Code windows here still run Claude Code 2.1.283, as their stops' summaries say, though the
+    2.1.284 extension is installed too.
+
+## Next
+
+6.2: the full gate with its summary lines, then the user decides whether Codex reviews the project
+(reviews were paused until the end).
