@@ -1,7 +1,8 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 26, D11: /new offers the open VS Code windows, and its sessions are served by their id (F27,
-F28) (rev. 25: F26 and O4, Bun's userInfo() reads $SHELL and $HOME; rev. 24: D11, /new starts a session
+Status: rev. 27, F29: in -p a Stop hook can't read its stop's summary, so a /new session's stop is a
+finish (rev. 26: D11, /new offers the open VS Code windows, and its sessions are served by their id, F27,
+F28; rev. 25: F26 and O4, Bun's userInfo() reads $SHELL and $HOME; rev. 24: D11, /new starts a session
 the broker runs, F25; rev. 23: F24, no hook can start a new session working; rev. 22: F23, a Claude Code
 tab can be opened from outside, but its prompt isn't sent; rev. 21: F22: Claude Code kills a hook's whole
 process tree, so the broker starts through a launcher (D3, plan 7.6); F21: a title can come during the
@@ -69,6 +70,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F26 | Bun's `os.userInfo()` takes `shell` from `$SHELL` ("unknown" without it, as in the broker) and `homedir` from `$HOME` (the user database only without it). The user database has both: `dscl . -read /Users/<name> UserShell NFSHomeDirectory`, about 12 ms. | Bun 1.4.1, 2026-09-30: the first `/new` failed with `Executable not found in $PATH: "unknown"` (plan 7.7) |
 | F27 | In `-p` mode Claude Code calls the session `sdk-cli` (`CLAUDE_CODE_ENTRYPOINT`, and the transcript's `entrypoint`), whatever its environment set, so hooks that serve only `cli` and `claude-vscode` skip it. | 2.1.274, 2026-09-30 20:38: the first `/new` session ran with `cli` in its environment and was recorded `sdk-cli` 25 times, and no hook reached the broker (plan 7.7) |
 | F28 | VS Code keeps its windows in `~/Library/Application Support/Code/User/globalStorage/storage.json`, `windowsState`: `openedWindows` and `lastActiveWindow`, each a `folder` URI or a workspace's `configURIPath`. They stay there after VS Code quits, to restore them. A multi-root workspace's Claude sessions run in its first folder. | VS Code on this Mac, 2026-10-01: the two windows the user has open, one the workspace `insureq-studio` of 20 folders, whose sessions run in `agent-panel-frontend`; undocumented |
+| F29 | In `-p`, the `stop_hook_summary` entry that F16 reads is written only after the Stop hooks end, and there they block, so a Stop hook can't classify its own stop from the transcript: it would wait for an entry that comes after it. | 2.1.274, 2026-10-01: two `/new` sessions' stops came out `unknown` after the 30 s wait, their transcripts ending at the assistant's text (plan 7.7) |
 
 ## 3. Architecture
 
@@ -231,11 +233,12 @@ Taken (say so before the step if you disagree):
   restart. It chooses the session id and puts it in the session's environment
   (`CLAUDE_TELEGRAM_SESSION`), which is how the hooks know to serve it though Claude Code calls it
   `sdk-cli` (F27), and passes the message on stdin, marked "📨 From … on Telegram". The bridge's hooks run
-  it like any session (F25): its ✅, questions and permission prompts come to the chat whatever your
-  presence, since you started it there (not with `/off`), and your replies continue it. It has no dialog
-  at the Mac, so nothing moves back there, and a prompt the chat can't show is denied. At most 3 run at
-  once. One ends 12 h after its last turn, when its Stop hook stops waiting. Every start goes to the
-  audit log, without the text.
+  it like any session (F25), except that its stop counts as a finish, as its hook can't read the stop's
+  summary in `-p` (F29): its ✅, questions and permission prompts come to the chat whatever your presence,
+  since you started it there (not with `/off`), and your replies continue it. It has no dialog at the
+  Mac, so nothing moves back there, and a prompt the chat can't show is denied. At most 3 run at once.
+  One ends 12 h after its last turn, when its Stop hook stops waiting. Every start goes to the audit log,
+  without the text.
 
 Open:
 

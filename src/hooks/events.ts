@@ -56,6 +56,11 @@ export interface HookContext {
   readonly pending: (item: Pending) => void;
   /** Where a plan's file may be read from (plan 4.2); ~/.claude unless a test says otherwise. */
   readonly claudeDir?: string;
+  /**
+   * A session /new started (D11): it runs in `claude -p`, where this hook blocks, so the summary that
+   * tells a finish from a continuation comes only after the hook ends (F29). Its stop is a finish.
+   */
+  readonly fromChat?: boolean;
   /** Tests wait less for a stop's summary… */
   readonly classify?: ClassifyOptions;
   /** …and retry sooner while waiting. */
@@ -129,7 +134,9 @@ async function stop(context: HookContext): Promise<void> {
     lastMessage: input.lastAssistantMessage,
     promptId: input.promptId,
   };
-  const { outcome, reason, version } = await classifyStop(facts, context.classify);
+  const { outcome, reason, version } = context.fromChat
+    ? { outcome: "finish" as const, reason: "started from the chat (F29)", version: undefined }
+    : await classifyStop(facts, context.classify);
   const text = input.lastAssistantMessage ?? "";
   context.log("hook.stop", {
     session: input.sessionId,

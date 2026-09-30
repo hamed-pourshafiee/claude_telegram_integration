@@ -1900,6 +1900,18 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
     - a workspace run in its last folder;
     - comments left in a workspace file;
     - unserved windows offered.
+- **Live check, third try** (2026-10-01, 23:21 and 23:53 UTC): the hooks reached the broker, and still no ✅.
+  - Both sessions' stops came out `unknown`, 30 s after the Stop, so no ✅ was sent. An unknown stop
+    waits for idle_prompt, which `-p` never sends.
+  - In `-p` the Stop hook blocks, and Claude Code writes the `stop_hook_summary` it waits for only
+    after it (F29): the transcripts end at the assistant's text.
+  - The user also still expects a VS Code tab: `/new` runs the session in the window's folder, not as a
+    tab.
+- **Fixed** (on `dev`, hooks only): a session /new started (its id in its environment) has its stop
+  counted as a finish at once.
+  - Tests: the handler, and a real hook as `sdk-cli` with the id and a transcript without the summary.
+  - Positive controls, 2, each caught: the stop classified from the transcript, and `main.ts` not
+    passing the flag.
 
 ## Next
 

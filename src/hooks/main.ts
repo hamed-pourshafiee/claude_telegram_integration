@@ -81,6 +81,7 @@ async function main(): Promise<void> {
     },
     claudePid,
     claudeAlive: () => process.ppid === claudePid && processAlive(claudePid),
+    fromChat,
     disabled: () => isDisabled(STATE),
     pending: (item) => writePending(STATE, item),
   });

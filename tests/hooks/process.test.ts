@@ -90,3 +90,24 @@ test("a session /new started is served as sdk-cli, by its own id in its environm
   expect(await until(() => starts().includes("started-here"), 5000)).toBe(true);
   expect(starts()).not.toContain("stranger");
 });
+
+test("its stop, with no summary yet in its transcript (claude -p), is a finish at once (F29)", async () => {
+  const transcript = join(project, "from-chat.jsonl");
+  writeFileSync(transcript, new Transcript().prompt("p7").assistant("Here are the files.").jsonl());
+  const input = {
+    session_id: "from-chat",
+    hook_event_name: "Stop",
+    transcript_path: transcript,
+    prompt_id: "p7",
+    last_assistant_message: "Here are the files.",
+  };
+  const own = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", CLAUDE_TELEGRAM_SESSION: "from-chat" };
+  const started = Date.now();
+  const run = copy.run("hooks", ["Stop"], { cwd: project, stdin: JSON.stringify(input), env: own });
+  expect(run.exitCode).toBe(0);
+  expect(Date.now() - started).toBeLessThan(10_000);
+  const results = () =>
+    brokerEvents("stop.result").filter((entry) => entry.session === "from-chat");
+  expect(await until(() => results().length === 1, 5000)).toBe(true);
+  expect(results()[0]).toMatchObject({ outcome: "finish" });
+}, 20_000);

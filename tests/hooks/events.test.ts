@@ -35,6 +35,7 @@ interface RunOptions {
   readonly wait?: boolean;
   readonly signal?: AbortSignal;
   readonly log?: Log;
+  readonly fromChat?: boolean;
 }
 
 async function run(event: string, fields: Record<string, unknown> = {}, options: RunOptions = {}) {
@@ -66,6 +67,7 @@ async function run(event: string, fields: Record<string, unknown> = {}, options:
     pending: (item) => pending.push(item),
     classify: { timeoutMs: 500, pollMs: 20 },
     waiting: { retryMs: 5, watchMs: 20 },
+    fromChat: options.fromChat ?? false,
   };
   await HANDLERS[event]?.(context);
 }
@@ -234,5 +236,25 @@ describe("the others", () => {
       { name: "StopFailure", body: { error: "rate_limit" } },
       { name: "SessionEnd", body: { reason: "prompt_input_exit" }, timeoutMs: 1000 },
     ]);
+  });
+});
+
+test("a session /new started: its stop is a finish at once, with no summary to wait for (F29)", async () => {
+  const transcript = join(dir, "from-chat.jsonl");
+  // In claude -p this hook blocks, so the stop's summary isn't written yet.
+  writeFileSync(transcript, new Transcript().prompt("p1").assistant("Here are the files.").jsonl());
+  respond = (name) => (name === "Stop" ? { generation: 2 } : {});
+  const stop = {
+    transcript_path: transcript,
+    prompt_id: "p1",
+    last_assistant_message: "Here are the files.",
+  };
+  const started = Date.now();
+  await run("Stop", stop, { fromChat: true });
+  expect(Date.now() - started).toBeLessThan(400);
+  expect(calls.find((call) => call.name === "StopResult")?.body).toMatchObject({
+    generation: 2,
+    outcome: "finish",
+    text: "Here are the files.",
   });
 });
