@@ -138,6 +138,23 @@ describe("a plain message", () => {
   });
 });
 
+describe("the picker's buttons name sessions by title (plan 7.2)", () => {
+  test("two of the same title get the start of their id, so each can be told apart", async () => {
+    for (const id of ["aaaa1111", "bbbb2222", "cccc3333"]) void stopAndWait(id);
+    parts.sessions.retitle("aaaa1111", "Fix the login bug");
+    parts.sessions.retitle("bbbb2222", "Fix the login bug");
+    parts.sessions.retitle("cccc3333", "Write the README");
+    await parts.router.route(incoming("which of you?"));
+    const names = sent[0]?.reply_markup?.inline_keyboard.flat().map((button) => button.text);
+    expect(names).toEqual([
+      "Fix the login bug · aaaa",
+      "Fix the login bug · bbbb",
+      "Write the README",
+      "Don't send it",
+    ]);
+  });
+});
+
 describe("the picker, with several sessions waiting", () => {
   test("asks which one, with a button each; the chosen one gets it", async () => {
     const first = stopAndWait("aaaa1111");

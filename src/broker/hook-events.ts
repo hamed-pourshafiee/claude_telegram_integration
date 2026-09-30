@@ -8,7 +8,7 @@ import { failureNotice, finishNotice, permissionNotice, questionNotice } from ".
 import type { NoticeOf, Notifier } from "./notifier.ts";
 import type { Pairing } from "./pairing.ts";
 import type { Relay } from "./relay.ts";
-import type { Session, SessionRef, Sessions } from "./sessions.ts";
+import { cleanTitle, type Session, type SessionRef, type Sessions } from "./sessions.ts";
 
 export interface HookEventsDeps {
   readonly sessions: Sessions;
@@ -19,6 +19,11 @@ export interface HookEventsDeps {
   /** Waiting question hooks and your answers (plan 4.1). */
   readonly asks: Pick<AskRelay, "ask" | "confirm" | "end" | "asked" | "moved" | "sessionEnded">;
   readonly log: Log;
+  /**
+   * Whether Claude's text may leave the Mac for sessions of this folder (D8): only then do messages name
+   * a session by its title (plan 7.2). Without it, none is kept.
+   */
+  readonly showsText?: (projectDir: string) => boolean;
 }
 
 /** A session's latest stop, kept in memory for idle_prompt, which may come a minute later (F6). */
@@ -45,8 +50,11 @@ export class HookEvents {
 
   handle(event: string, body: unknown): Answer | Promise<Answer> {
     const fields = asFields(body) ?? {};
-    const ref = sessionRef(fields);
-    if (ref === undefined) return bad("no session");
+    const named = sessionRef(fields);
+    if (named === undefined) return bad("no session");
+    const ref = this.#titled(named);
+    // Every call brings the title as it is now, a waiting hook's too (plan 7.2).
+    if (ref.title !== undefined) this.#deps.sessions.retitle(ref.id, ref.title);
     const waiting = this.#waiting(event, ref, fields);
     if (waiting !== undefined) return waiting;
     this.#deps.log("hook.event", { hook: event, session: ref.id });
@@ -83,6 +91,14 @@ export class HookEvents {
         // Reports of what happened (a stop's result, idle, an API error): they never reopen a session.
         return this.#notify(event, sessions.seen(ref), fields);
     }
+  }
+
+  /** The ref with its title fit for the chat, or without one where Claude's text stays on the Mac. */
+  #titled(ref: SessionRef): SessionRef {
+    const { title, ...rest } = ref;
+    const shown = this.#deps.showsText?.(ref.projectDir) === true ? title : undefined;
+    const clean = shown === undefined ? undefined : cleanTitle(shown);
+    return clean === undefined ? rest : { ...rest, title: clean };
   }
 
   /**
@@ -188,9 +204,10 @@ export class HookEvents {
 }
 
 function sessionRef(fields: Fields): SessionRef | undefined {
-  const { session_id: id, project_dir: projectDir, entrypoint } = fields;
+  const { session_id: id, project_dir: projectDir, entrypoint, title } = fields;
   if (typeof id !== "string" || id === "" || typeof projectDir !== "string") return undefined;
-  return { id, projectDir, entrypoint: typeof entrypoint === "string" ? entrypoint : "" };
+  const ref = { id, projectDir, entrypoint: typeof entrypoint === "string" ? entrypoint : "" };
+  return typeof title === "string" ? { ...ref, title } : ref;
 }
 
 /** The first name in a paired user's name, as pairing stores it: "Hamed (@someone)" → "Hamed". */

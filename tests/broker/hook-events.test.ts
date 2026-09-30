@@ -49,7 +49,17 @@ beforeEach(() => {
     log: noLog,
   });
   const pairing = { pairedUser: () => user };
-  events = new HookEvents({ sessions, notifier, pairing, relay, asks: noAskRelay, log: noLog });
+  // Folders under /work/private are ping-only: Claude's text, a session's title too, stays on the Mac.
+  const showsText = (projectDir: string) => !projectDir.startsWith("/work/private");
+  events = new HookEvents({
+    sessions,
+    notifier,
+    pairing,
+    relay,
+    asks: noAskRelay,
+    log: noLog,
+    showsText,
+  });
 });
 
 const ref = { session_id: "b1e81638", project_dir: "/work/sandbox", entrypoint: "cli" };
@@ -129,6 +139,27 @@ describe("after SessionEnd", () => {
     // Resumed: it lives again.
     call("SessionStart");
     expect(sessions.get(ref.session_id)?.ended).toBe(false);
+  });
+});
+
+describe("a session's title (plan 7.2)", () => {
+  test("a hook's call brings it, and the ✅ names the session by it", async () => {
+    const generation = (call("Stop", { title: "Fix the login bug" }).body as { generation: number })
+      .generation;
+    result(generation, "finish");
+    expect(await until(() => sends.length === 1)).toBe(true);
+    expect(sends[0]?.notice.header).toBe("✅ Fix the login bug");
+  });
+
+  test("a waiting hook's call brings a new one too", () => {
+    call("SessionStart", { title: "First title" });
+    call("Confirm", { title: "Renamed", generation: 1, update_id: 1 });
+    expect(sessions.get(ref.session_id)?.title).toBe("Renamed");
+  });
+
+  test("a ping-only folder keeps its sessions' titles off the chat", () => {
+    call("SessionStart", { project_dir: "/work/private/app", title: "Secret plan" });
+    expect(sessions.get(ref.session_id)?.title).toBe("");
   });
 });
 

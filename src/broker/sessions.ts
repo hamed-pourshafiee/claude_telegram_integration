@@ -1,5 +1,6 @@
 import { basename } from "node:path";
 import type { BrokerDb } from "./db.ts";
+import { redact } from "./redact.ts";
 
 /** A session as a hook names it. */
 export interface SessionRef {
@@ -7,6 +8,8 @@ export interface SessionRef {
   /** Where it started (CLAUDE_PROJECT_DIR, resolved; F15). */
   readonly projectDir: string;
   readonly entrypoint: string;
+  /** Its title, made fit for the chat (cleanTitle), when its folder may show Claude's text (plan 7.2). */
+  readonly title?: string;
 }
 
 export interface Session extends SessionRef {
@@ -15,6 +18,8 @@ export interface Session extends SessionRef {
   readonly ended: boolean;
   /** When its latest Stop came, in ms since the epoch; 0 before the first. */
   readonly stoppedAt: number;
+  /** "" until it has one. */
+  readonly title: string;
 }
 
 interface Row {
@@ -25,7 +30,11 @@ interface Row {
   readonly ended_at: string | null;
   readonly generation: number;
   readonly stopped_at: number;
+  readonly title: string;
 }
+
+/** The most of a title the chat shows, in characters. */
+const TITLE_CHARS = 60;
 
 /**
  * The sessions the hooks report (design §3). Each has a generation: every Stop starts a new one, and so
@@ -59,15 +68,19 @@ export class Sessions {
 
   #record(ref: SessionRef, branch: string | undefined, reopen: boolean): Session {
     const reopened = reopen ? ", ended_at = NULL" : "";
+    // A title comes with the ref once the session has one; one that comes without keeps it.
     this.#db.run(
-      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at) VALUES (?, ?, ?, ?, ?)
+      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at, title)
+       VALUES (?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET project_dir = excluded.project_dir,
-         entrypoint = excluded.entrypoint${reopened}`,
+         entrypoint = excluded.entrypoint${reopened},
+         title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE sessions.title END`,
       ref.id,
       ref.projectDir,
       ref.entrypoint,
       branch ?? "",
       this.#now().toISOString(),
+      ref.title ?? "",
     );
     if (branch !== undefined)
       this.#db.run("UPDATE sessions SET branch = ? WHERE id = ?", branch, ref.id);
@@ -78,8 +91,25 @@ export class Sessions {
         generation: 0,
         ended: false,
         stoppedAt: 0,
+        title: ref.title ?? "",
       }
     );
+  }
+
+  /** The session's title now (plan 7.2): calls that don't record the session bring it too. */
+  retitle(id: string, title: string): void {
+    this.#db.run("UPDATE sessions SET title = ? WHERE id = ? AND title <> ?", title, id, title);
+  }
+
+  /**
+   * Forgets the titles of sessions whose folder no longer shows Claude's text (D8): config.json made it
+   * ping-only since. How many.
+   */
+  forgetTitles(showsText: (projectDir: string) => boolean): number {
+    const titled = this.#db.all<Row>("SELECT * FROM sessions WHERE title <> ''");
+    const hidden = titled.filter((row) => !showsText(row.project_dir));
+    for (const row of hidden) this.#db.run("UPDATE sessions SET title = '' WHERE id = ?", row.id);
+    return hidden.length;
   }
 
   get(id: string): Session | undefined {
@@ -112,11 +142,32 @@ export class Sessions {
   }
 }
 
-/** How messages name a session: its folder, branch and the start of its id, e.g. "sandbox (main) · b1e8". */
-export function label(session: Pick<Session, "id" | "projectDir" | "branch">): string {
+/**
+ * How messages name a session (plan 7.2): by its title, as Claude Code shows it; until it has one, by
+ * its folder, branch and the start of its id, e.g. "sandbox (main) · b1e8".
+ */
+export function label(
+  session: Pick<Session, "id" | "projectDir" | "branch"> & { readonly title?: string },
+): string {
+  if (session.title) return session.title;
   const folder = basename(session.projectDir) || session.projectDir;
   const branch = session.branch ? ` (${session.branch})` : "";
   return `${folder}${branch} · ${session.id.slice(0, 4)}`;
+}
+
+/**
+ * A title as the chat may show it (D8): secrets masked, on one line, at most 60 characters; undefined
+ * when nothing is left.
+ */
+export function cleanTitle(raw: string): string | undefined {
+  const text = redact(raw).text.replace(/\s+/g, " ").trim();
+  const chars = Array.from(text);
+  if (chars.length === 0) return undefined;
+  if (chars.length <= TITLE_CHARS) return text;
+  return `${chars
+    .slice(0, TITLE_CHARS - 1)
+    .join("")
+    .trimEnd()}…`;
 }
 
 function fromRow(row: Row): Session {
@@ -128,5 +179,6 @@ function fromRow(row: Row): Session {
     generation: row.generation,
     ended: row.ended_at !== null,
     stoppedAt: row.stopped_at,
+    title: row.title,
   };
 }

@@ -19,6 +19,7 @@ import { sessionEnv, sessionScope } from "../shared/scope.ts";
 import { isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
 import { HANDLERS } from "./events.ts";
+import { sessionTitle } from "./title.ts";
 
 const log = fileLog(join(STATE.logs, "hooks.log"), "hook");
 const [event = "", ...flags] = Bun.argv.slice(2);
@@ -48,10 +49,13 @@ async function main(): Promise<void> {
   const config = loadConfig(CONFIG_FILE, { repoRoot: REPO_ROOT, home: HOME_DIR });
   const env = sessionEnv(process.env);
   if (!sessionScope(config, env).served || env.projectDir === undefined) return;
+  // Every call names the session; with its title, once it has one, messages go by that (plan 7.2).
+  const title = sessionTitle(input.transcriptPath, log);
   const session = {
     session_id: input.sessionId,
     project_dir: realpathSync(env.projectDir),
     entrypoint: env.entrypoint ?? "",
+    ...(title === undefined ? {} : { title }),
   };
   await handler({
     input,

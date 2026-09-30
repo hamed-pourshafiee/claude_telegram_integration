@@ -1,9 +1,10 @@
-import { afterAll, expect, test } from "bun:test";
+import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { BrokerDb } from "../../src/broker/db.ts";
-import { label, Sessions } from "../../src/broker/sessions.ts";
+import { cleanTitle, label, Sessions } from "../../src/broker/sessions.ts";
+import { SAMPLES } from "../helpers/secret-samples.ts";
 
 // Plan 2.7: the sessions hooks report, and the generation a stop's result must still match (flow 2).
 const dir = mkdtempSync(join(tmpdir(), "tg-sessions-"));
@@ -17,7 +18,14 @@ const ref = { id: "b1e81638-e169", projectDir: "/work/sandbox", entrypoint: "cla
 
 test("a session is recorded on its first hook, SessionStart or not, and keeps its branch", () => {
   const all = sessions();
-  expect(all.touch(ref)).toEqual({ ...ref, branch: "", generation: 0, ended: false, stoppedAt: 0 });
+  expect(all.touch(ref)).toEqual({
+    ...ref,
+    branch: "",
+    generation: 0,
+    ended: false,
+    stoppedAt: 0,
+    title: "",
+  });
   expect(all.touch(ref, "main").branch).toBe("main");
   expect(all.touch(ref).branch).toBe("main");
 });
@@ -44,4 +52,36 @@ test("the label: folder, branch and the start of the id", () => {
     "sandbox (main) · b1e8",
   );
   expect(label({ id: "67c68fde", projectDir: "/work/app", branch: "" })).toBe("app · 67c6");
+});
+
+describe("titles (plan 7.2)", () => {
+  test("the label is the title once there is one; a call without one keeps it", () => {
+    const all = sessions();
+    expect(label(all.touch(ref))).toBe("sandbox · b1e8");
+    expect(label(all.touch({ ...ref, title: "Fix the login bug" }))).toBe("Fix the login bug");
+    expect(all.seen(ref).title).toBe("Fix the login bug");
+    all.retitle(ref.id, "Renamed at the Mac");
+    expect(label(all.get(ref.id) ?? all.touch(ref))).toBe("Renamed at the Mac");
+  });
+
+  test("a folder made ping-only since: its sessions' titles go", () => {
+    const all = sessions();
+    all.touch({ ...ref, title: "Sandbox work" });
+    const other = { ...ref, id: "c2f9", projectDir: "/work/private", title: "Private work" };
+    all.touch(other);
+    expect(all.forgetTitles((dir) => dir !== "/work/private")).toBe(1);
+    expect(all.get("c2f9")?.title).toBe("");
+    expect(all.get(ref.id)?.title).toBe("Sandbox work");
+  });
+
+  test("a title for the chat: secrets masked, one line, at most 60 characters, an emoji kept whole", () => {
+    const github = SAMPLES.find((sample) => sample.family === "GitHub token");
+    const masked = cleanTitle(`Rotate ${github?.secret ?? ""}`);
+    expect(masked).toBe("Rotate [redacted GitHub token]");
+    expect(cleanTitle("  Two\n  lines  ")).toBe("Two lines");
+    expect(cleanTitle(" \n ")).toBeUndefined();
+    const long = cleanTitle(`${"a".repeat(58)}🙂🙂 and more`);
+    expect(long).toBe(`${"a".repeat(58)}🙂…`);
+    expect(Array.from(long ?? "")).toHaveLength(60);
+  });
 });

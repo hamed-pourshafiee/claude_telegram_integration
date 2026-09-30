@@ -165,9 +165,14 @@ export class Router {
         await this.#deps.telegram.sendMessage({ ...thread, text: note.text });
         return;
       }
-      const rows: InlineKeyboardButton[][] = note.sessions.map((sessionId) => [
-        { text: this.#name(sessionId), callback_data: `to:${reply.updateId}:${sessionId}` },
-      ]);
+      // Sessions of the same title get the start of their id, so each button can be told apart.
+      const names = note.sessions.map((sessionId) => this.#name(sessionId));
+      const rows: InlineKeyboardButton[][] = note.sessions.map((sessionId, at) => {
+        const name = names[at] ?? "";
+        const twins = names.filter((other) => other === name).length > 1;
+        const text = twins ? `${name} · ${sessionId.slice(0, 4)}` : name;
+        return [{ text, callback_data: `to:${reply.updateId}:${sessionId}` }];
+      });
       rows.push([{ text: "Don't send it", callback_data: `drop:${reply.updateId}` }]);
       const reply_markup = { inline_keyboard: rows };
       await this.#deps.telegram.sendMessage({ ...thread, text: TEXTS.ask, reply_markup });

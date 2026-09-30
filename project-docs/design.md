@@ -1,13 +1,13 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 17, D10: the git remote is GitHub (O3) (rev. 16: the bot's menu of commands and /help, plan
-7.1; rev. 15: permission prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so
-plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built
-in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake
-fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded
-stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes,
-§8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 18, F21: messages name a session by its title (plan 7.2) (rev. 17: D10, the git remote is
+GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission prompts in flow
+3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are reviewed from the phone; rev. 13:
+O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev.
+11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's
+parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1
+decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
+Codex review) · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -54,6 +54,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F18 | A command hook runs as a direct child of the Claude Code process, with no shell in between, for synchronous and `asyncRewake` hooks alike, so a hook's parent pid is its Claude. | probed 2026-09-29 with 2.1.283 (plan 3.1) |
 | F19 | A command hook's `statusMessage` is shown in the spinner while the hook runs. The `AskUserQuestion` dialog can resolve itself after a stretch of idle, telling Claude the user may be away (`afkTimeoutMs` in its result); `PostToolUse` follows as usual. | 2.1.284 binary (plan 4.1); the idle timeout not seen live |
 | F20 | No hook can approve a plan (`ExitPlanMode`): after a hook's allow, Claude Code runs the tool's own permission check, and ExitPlanMode's always asks, so the plan dialog opens anyway. That holds for a `PreToolUse` allow (seen live) and a `PermissionRequest` allow, which the dialog ignores without `updatedInput` and re-asks with one. A deny from either stops the call; `AskUserQuestion`'s check is satisfied by the answers in `updatedInput`. The hook's input holds `plan` and `planFilePath` (seen live). | 2.1.284 binary; seen live 2026-09-29 (plan 4.2) |
+| F21 | Claude Code writes a session's title into its transcript, and again every few turns: `{"type":"custom-title","customTitle":…}` for one you gave it, `{"type":"ai-title","aiTitle":…}` for the one it made; it shows `customTitle || aiTitle`. A new session may get its title only after its first turn. | 2.1.284 binary; transcripts, 2026-09-30 (plan 7.2); undocumented |
 
 ## 3. Architecture
 
@@ -103,7 +104,8 @@ Key flows:
    - a continuation entry, without `preventedContinuation`: another hook, such as the Codex checkpoint,
      made Claude continue, so nothing is sent and the next stop decides;
    - anything else, including `hookErrors` from a hook that crashed: a real finish, so the
-     "✅ `<repo>` · `<session>`" + final message goes out if you are away;
+     "✅ `<session>`" + final message goes out if you are away, the session named by its title (F21) or,
+     until it has one, by its folder, branch and the start of its id;
    - no summary within 30 s, or an unreadable format: unknown, so nothing is sent (D5) and the log says
      why; in the terminal `idle_prompt` still reports a finish.
 
@@ -189,7 +191,8 @@ Taken (say so before the step if you disagree):
   Telegram. The chat shows Claude's Markdown as Telegram formatting (bold, italics, code, code blocks,
   tables as preformatted text with their columns lined up, web links), with file names and paths as code
   so that Telegram doesn't turn them into links (decided with you on 2026-09-29, at the phase 2
-  checkpoint). Markup that Telegram refuses goes again as plain text.
+  checkpoint). Markup that Telegram refuses goes again as plain text. A session's title, which names it
+  in messages (plan 7.2), counts as Claude's text: redacted, and not shown for ping-only folders.
 - **D9 Permission prompts may be approved from Telegram** (O2, decided with you on 2026-09-29 after plan
   step 4.1): Allow once only, for Bash, Edit and Write; never for MCP tools or WebFetch; the complete
   operation shown; every decision in an audit log (phase 5).

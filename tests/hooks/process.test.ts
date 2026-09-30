@@ -1,5 +1,6 @@
+import { Database } from "bun:sqlite";
 import { afterAll, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { RepoCopy } from "../helpers/repo-copy.ts";
 import { Transcript } from "../helpers/transcript.ts";
@@ -48,3 +49,21 @@ test("Stop: the hook finds the finish in the transcript and the broker records i
   const logs = JSON.stringify([copy.logged("broker"), copy.logged("hooks")]);
   expect(logs).not.toContain("All done.");
 }, 20_000);
+
+test("the session's title in its transcript comes with the hook's call, and the broker keeps it (plan 7.2)", async () => {
+  const transcript = join(project, "titled.jsonl");
+  writeFileSync(transcript, new Transcript().prompt("p1").assistant("Hi.").jsonl());
+  const title = { type: "ai-title", aiTitle: "Fix the login bug", sessionId: "proc-session" };
+  appendFileSync(transcript, `${JSON.stringify(title)}\n`);
+  expect(hook("SessionStart", { transcript_path: transcript, source: "startup" }).exitCode).toBe(0);
+  const stored = () => {
+    const db = new Database(copy.state.db, { readonly: true });
+    try {
+      const row = db.query("SELECT title FROM sessions WHERE id = 'proc-session'").get();
+      return (row as { title?: string } | null)?.title;
+    } finally {
+      db.close();
+    }
+  };
+  expect(await until(() => stored() === "Fix the login bug", 5000)).toBe(true);
+});

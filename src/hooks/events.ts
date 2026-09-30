@@ -15,6 +15,8 @@ export interface SessionRef {
   /** CLAUDE_PROJECT_DIR, resolved: where the session started (F15). */
   readonly project_dir: string;
   readonly entrypoint: string;
+  /** The session's title, as Claude Code shows it, once it has one (F21, plan 7.2). */
+  readonly title?: string;
 }
 
 export interface HookContext {

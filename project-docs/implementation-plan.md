@@ -1,13 +1,13 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 13 (O3 decided: D10, GitHub; rev. 12: 7.1, the bot's menu of commands and /help, asked for
-after the plan; rev. 11: 4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2
-chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on
-their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection
-by the stop's continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 14 (7.2: sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the
+bot's menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone,
+approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
+chat; rev. 8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex
+review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter)
+· 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F20), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F21), architecture and
 flows 1–4, decisions (D1–D10), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -240,6 +240,15 @@ flows 1–4, decisions (D1–D10), security, rollback, risks and the review log.
   it, and the commands. **Pass:** tests for the menu (every command, as Telegram allows), the guide, the
   menu set on pairing and at start for that chat only, and none before pairing; live, "/" and the Menu
   button list the commands on your phone, and `/help` answers.
+
+- **7.2 Sessions named by their titles** (asked 2026-09-30). Messages and the picker name a session by
+  the title Claude Code shows for it (F21), not its folder: every hook reads it from the transcript's end
+  and sends it with its calls, and the broker keeps the latest. Until a session has one, the folder label
+  stays. A title is Claude's text (D8): redacted, one line, at most 60 characters, and never kept for a
+  ping-only folder. Two sessions of the same title in the picker get the start of their id. **Pass:**
+  tests for reading the title (yours over the one Claude Code made, only the latest), the label, the
+  cleaning, ping-only folders, the picker, and a real hook's title reaching the broker; live, a sandbox
+  session's ✅ carries its title.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.

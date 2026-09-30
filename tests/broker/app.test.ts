@@ -7,6 +7,7 @@ import { MENU } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import type { Reading } from "../../src/broker/ioreg.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
+import { Sessions } from "../../src/broker/sessions.ts";
 import { pairingInstructions } from "../../src/ctl/pair.ts";
 import { parseConfig } from "../../src/shared/config.ts";
 import { asFields } from "../../src/shared/json.ts";
@@ -221,4 +222,22 @@ test("ctl pair shows the code and what to send", () => {
   expect(text).toContain("Pairing code: K7QX-M4PD");
   expect(text).toContain("    /pair K7QX-M4PD");
   expect(text).toMatch(/valid until \d\d:\d\d/);
+});
+
+test("at start, titles of sessions whose folder no longer shows text go (D8, plan 7.2)", () => {
+  const db = BrokerDb.open(join(dir, "titles.db"));
+  const sessions = new Sessions(db);
+  // The config serves this repo's sandbox/ with its text; a folder that isn't there is ping-only.
+  const sandbox = join(dir, "sandbox");
+  mkdirSync(sandbox, { recursive: true });
+  sessions.touch({ id: "kept", projectDir: sandbox, entrypoint: "cli", title: "Sandbox work" });
+  sessions.touch({
+    id: "gone",
+    projectDir: join(dir, "moved"),
+    entrypoint: "cli",
+    title: "Old work",
+  });
+  app(db);
+  expect(sessions.get("kept")?.title).toBe("Sandbox work");
+  expect(sessions.get("gone")?.title).toBe("");
 });

@@ -35,6 +35,7 @@ const session = (folder: string) => ({
   generation: 1,
   ended: false,
   stoppedAt: 0,
+  title: "",
 });
 const away: Snapshot = {
   mode: "auto",

@@ -2,6 +2,7 @@ import type { Config } from "../shared/config.ts";
 import { messageOf } from "../shared/errors.ts";
 import { type Log, noLog } from "../shared/log.ts";
 import type { StatePaths } from "../shared/paths.ts";
+import { contentModeFor } from "../shared/scope.ts";
 import type { Secret } from "../shared/secret.ts";
 import { TelegramClient } from "../shared/telegram/client.ts";
 import type { Update } from "../shared/telegram/types.ts";
@@ -14,7 +15,7 @@ import { MENU, runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
 import { FullTexts } from "./full-texts.ts";
 import { type GateDeps, handleUpdate, replyOf } from "./gate.ts";
-import { firstName, HookEvents } from "./hook-events.ts";
+import { firstName, HookEvents, type HookEventsDeps } from "./hook-events.ts";
 import { Inbox } from "./inbox.ts";
 import type { Reading } from "./ioreg.ts";
 import { Notifier } from "./notifier.ts";
@@ -78,7 +79,10 @@ export function createApp(deps: AppDeps): App {
   const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, audit, notifier });
   const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
   const { relay, router } = replyParts(parts);
-  const hookEvents = new HookEvents({ sessions, notifier, pairing, relay, asks: ask.relay, log });
+  const hookEvents = hookEventsOf(
+    { sessions, notifier, pairing, relay, asks: ask.relay, log },
+    config,
+  );
   const gate = gateOf({ telegram, pairing, log, presence, notifier, router, asks: ask.chat });
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
@@ -104,6 +108,16 @@ export function createApp(deps: AppDeps): App {
   if (paired !== undefined) setMenu(telegram, paired.id, log);
   if (paired !== undefined || pairing.pendingUntil() !== undefined) poller.start();
   return { routes, poller, presence, relay, asks: ask.relay };
+}
+
+/**
+ * The hooks' calls. Messages name a session by its title only where Claude's text may leave the Mac
+ * (D8, plan 7.2), so titles kept for a folder that config.json has since made ping-only go.
+ */
+function hookEventsOf(deps: Omit<HookEventsDeps, "showsText">, config: Config): HookEvents {
+  const showsText = (projectDir: string) => contentModeFor(config, projectDir) === "full";
+  deps.sessions.forgetTitles(showsText);
+  return new HookEvents({ ...deps, showsText });
 }
 
 interface GateParts {

@@ -97,6 +97,8 @@ const MIGRATIONS: readonly (readonly string[])[] = [
       PRIMARY KEY (chat_id, message_id)
     ) STRICT`,
   ],
+  // 6 (plan 7.2): a session's title, as Claude Code shows it, which messages name it by; '' until known.
+  ["ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT ''"],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;
