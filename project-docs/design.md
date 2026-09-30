@@ -1,18 +1,18 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 22, F23: a Claude Code tab can be opened from outside, but its prompt isn't sent (rev. 21:
-F22: Claude Code kills a hook's whole process tree, so the broker starts through a launcher (D3, plan
-7.6); F21: a title can come during the first turn, so `/sessions` reads titles as it lists, plan 7.5;
-rev. 20: D4, a tap on a session under `/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists the
-open sessions, whose Claude still runs by F18, plan 7.3; rev. 18: F21, messages name a session by its
-title, plan 7.2; rev. 17: D10, the git remote is GitHub, O3; rev. 16: the bot's menu of commands and
-/help, plan 7.1; rev. 15: permission prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a
-plan, so plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3
-as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a
-wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's
-recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike
-changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 23, F24: no hook can start a new session working (rev. 22: F23, a Claude Code tab can be
+opened from outside, but its prompt isn't sent; rev. 21: F22: Claude Code kills a hook's whole process
+tree, so the broker starts through a launcher (D3, plan 7.6); F21: a title can come during the first
+turn, so `/sessions` reads titles as it lists, plan 7.5; rev. 20: D4, a tap on a session under
+`/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists the open sessions, whose Claude still runs
+by F18, plan 7.3; rev. 18: F21, messages name a session by its title, plan 7.2; rev. 17: D10, the git
+remote is GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission
+prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are reviewed from the
+phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from
+2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9:
+F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen
+lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev.
+3: F14; rev. 2: Codex review) · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -62,6 +62,7 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F21 | Claude Code writes a session's title into its transcript, and again every few turns: `{"type":"custom-title","customTitle":…}` for one you gave it, `{"type":"ai-title","aiTitle":…}` for the one it made; it shows `customTitle || aiTitle`. The made title can come a second after the first prompt, or only after the first turn; a hook sees it only when the session's next hook runs, often at the end of the turn. | 2.1.284 binary; transcripts, 2026-09-30 (plans 7.2, 7.5); undocumented |
 | F22 | When Claude Code stops a hook (its `timeout`, likely a closed panel too), it kills the hook's whole process tree, found by parent pid (`ps -A -o pid= -o ppid=`), whatever session each process is in: a process the hook started that is still its child dies with it, even after `setsid`. One whose parent has exited, adopted by launchd, is outside the tree. | 2.1.283 live, 2026-09-30 08:25:12: the broker got SIGTERM 6 ms after a Stop hook reached its 12 h timeout; `killProcessTree` in the 2.1.284 binary (plan 7.6); undocumented |
 | F23 | The Claude Code extension handles `vscode://anthropic.claude-code/open`, with an optional `session=<id>` and `prompt=<text>`. VS Code sends it to the window used last; without a session the extension opens a new Claude Code tab there, and its new session starts at once (SessionStart). The prompt is only typed into the input box (`setInputText`), not sent. | 2.1.284 `extension.js` and `webview/index.js`; tried 2026-09-30 16:50: the tab opened in this repo's window 16 s later, and the prompt ran only when sent at the Mac; undocumented |
+| F24 | A SessionStart hook runs to completion before the session answers anything, `asyncRewake` or not, and its exit 2 wakes nothing: no hook can start a new session working. A Stop hook's `asyncRewake` does wake it (F2), in the SDK's stream-json mode too, which the VS Code tab uses. | 2.1.284, tried 2026-09-30 21:17 to 21:19 with the SDK's launch flags: `initialize` answered only after a 6 s SessionStart hook, no turn from its exit 2; after a first turn, a Stop hook's exit 2 started one with no input |
 
 ## 3. Architecture
 

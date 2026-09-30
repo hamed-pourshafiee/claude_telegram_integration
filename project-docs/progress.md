@@ -1787,6 +1787,18 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   - This needs a spike first: does `asyncRewake` wake a new session from SessionStart? F2 was proven on
     Stop.
   - It also needs a new hook entry, so a settings change with the user's OK.
+- **The wake-up tested** (asked "run", 21:15 to 21:19; F24): Claude Code 2.1.284 was started the way
+  the extension's SDK starts it (`--output-format stream-json --verbose --input-format stream-json`),
+  in the scratchpad (outside `~`, not served), with only a throwaway settings file.
+  - A SessionStart hook with `asyncRewake` exited 2 after 2 s: no turn came, in 60 s. With the SDK's
+    `initialize` sent first and a 6 s hook, `initialize` was answered only after the hook ended. So
+    SessionStart hooks run to completion first, and their exit 2 is dropped: the first message, at
+    12 s, got only its own answer.
+  - In the same session, after that first turn, a Stop hook with `asyncRewake` exited 2 after 3 s, and
+    Claude took a turn with no input ("pong-stop"), as F2 found in the panel.
+- **So:** a tab opened from the phone can't be started working. What the bot can start is a session
+  it runs itself, as the plan's `/new <repo> <prompt>` has it; you follow it and answer it from the
+  chat, and can open it at the Mac later.
 
 ## Next
 
