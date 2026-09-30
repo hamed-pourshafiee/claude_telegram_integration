@@ -43,6 +43,7 @@ export class RepoCopy {
   readonly sandbox: string = join(this.root, "sandbox");
   readonly state: StatePaths = statePaths(this.root);
   readonly brokerMain: string = join(this.root, "src/broker/main.ts");
+  readonly brokerLauncher: string = join(this.root, "src/broker/launch.ts");
   #sessions = 0;
 
   /**
@@ -109,10 +110,19 @@ export class RepoCopy {
     return brokerHealth(this.state, noLog);
   }
 
-  /** The pids of the copy's broker processes, found by their command line. */
+  /**
+   * The pids of the copy's broker processes, found by their command line; not the launcher's, which
+   * names the broker's entry file too, for the moment it runs (plan 7.6).
+   */
   brokerPids(): number[] {
     const pgrep = Bun.spawnSync(["/usr/bin/pgrep", "-f", this.brokerMain], { stderr: "ignore" });
-    return pgrep.stdout.toString().split("\n").filter(Boolean).map(Number);
+    const pids = pgrep.stdout.toString().split("\n").filter(Boolean).map(Number);
+    return pids.filter((pid) => {
+      const ps = Bun.spawnSync(["/bin/ps", "-o", "command=", "-p", String(pid)], {
+        stderr: "ignore",
+      });
+      return !ps.stdout.toString().includes(this.brokerLauncher);
+    });
   }
 
   /** The events in one of the copy's logs (broker, hooks or ctl). */

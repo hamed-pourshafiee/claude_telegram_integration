@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { errorCode } from "./errors.ts";
 import { asFields } from "./json.ts";
 import { type Log, noLog } from "./log.ts";
-import { BROKER_MAIN, BUNFIG_FILE, REPO_ROOT, type StatePaths } from "./paths.ts";
+import { BROKER_LAUNCHER, BROKER_MAIN, BUNFIG_FILE, REPO_ROOT, type StatePaths } from "./paths.ts";
 import { ensureStateDir, isDisabled } from "./state.ts";
 
 /** The broker's answer to /health. */
@@ -38,10 +38,14 @@ export interface PresenceHealth {
   readonly locked: boolean | null;
 }
 
-/** How to start a broker: a Bun binary, the entry file and the bunfig.toml to load (F14). */
+/**
+ * How to start a broker: a Bun binary, the entry file and the bunfig.toml to load (F14), and the
+ * launcher that starts it and exits (plan 7.6).
+ */
 export interface BrokerLaunch {
   readonly bun: string;
   readonly main: string;
+  readonly launcher: string;
   readonly bunfig: string;
   readonly cwd: string;
 }
@@ -50,6 +54,7 @@ export interface BrokerLaunch {
 export const BROKER_LAUNCH: BrokerLaunch = {
   bun: process.execPath,
   main: BROKER_MAIN,
+  launcher: BROKER_LAUNCHER,
   bunfig: BUNFIG_FILE,
   cwd: REPO_ROOT,
 };
@@ -104,15 +109,18 @@ export async function ensureBroker(
 }
 
 /**
- * Starts a broker in a session of its own (setsid), so it outlives the hook that started it, with
- * brokerEnv() as its whole environment. Its stderr goes to .state/logs/broker.stderr.log.
+ * Starts a broker through the launcher, which exits at once, so launchd adopts the broker: Claude Code
+ * kills a hook's whole process tree when it stops the hook (F22, plan 7.6). Each runs in a session of
+ * its own (setsid), with brokerEnv() as its whole environment; stderr goes to
+ * .state/logs/broker.stderr.log.
  */
 export function spawnBroker(paths: StatePaths, launch: BrokerLaunch): void {
   ensureStateDir(paths);
   const stderr = openSync(join(paths.logs, "broker.stderr.log"), "a", 0o600);
+  const bun = [launch.bun, "--no-env-file", `--config=${launch.bunfig}`];
   try {
     const child = Bun.spawn({
-      cmd: [launch.bun, "--no-env-file", `--config=${launch.bunfig}`, launch.main],
+      cmd: [...bun, launch.launcher, ...bun, launch.main],
       cwd: launch.cwd,
       env: brokerEnv(),
       detached: true,

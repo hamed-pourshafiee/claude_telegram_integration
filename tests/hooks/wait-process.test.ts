@@ -6,7 +6,7 @@ import { BASE_ENV, RepoCopy } from "../helpers/repo-copy.ts";
 import { Transcript } from "../helpers/transcript.ts";
 import { until } from "../helpers/wait.ts";
 
-// Plan 3.1 with real processes: a Stop hook installed with --wait, against a real broker, in a throwaway
+// Plans 3.1 and 7.6 with real processes: a Stop hook installed with --wait, against a real broker, in a throwaway
 // copy of the repo whose broker is not paired (so nothing reaches Telegram). The test process stands in
 // for Claude Code: it is the hook's parent.
 const copy = new RepoCopy();
@@ -99,3 +99,44 @@ test("a broker crash after storing a reply: the hook starts a broker, gets it, c
   expect(events("broker", "reply.confirmed")).toMatchObject([{ update: 500, delivered: true }]);
   expect(events("hooks", "hook.waited").at(-1)).toMatchObject({ result: "reply" });
 }, 40_000);
+
+/** The processes under `root`, by parent pid, as Claude Code finds a hook's tree to kill (F22). */
+function treeOf(root: number): number[] {
+  const ps = Bun.spawnSync(["/bin/ps", "-A", "-o", "pid=", "-o", "ppid="]);
+  const children = new Map<number, number[]>();
+  for (const line of ps.stdout.toString().split("\n")) {
+    const [pid = 0, ppid = 0] = line.trim().split(/\s+/).map(Number);
+    if (pid > 0) children.set(ppid, [...(children.get(ppid) ?? []), pid]);
+  }
+  const found: number[] = [];
+  const queue = [root];
+  for (let next = queue.shift(); next !== undefined; next = queue.shift()) {
+    for (const child of children.get(next) ?? []) {
+      found.push(child);
+      queue.push(child);
+    }
+  }
+  return found;
+}
+
+const parentOf = (pid: number) =>
+  Number(
+    Bun.spawnSync(["/bin/ps", "-o", "ppid=", "-p", String(pid)])
+      .stdout.toString()
+      .trim(),
+  );
+
+test("the hook's tree, killed as Claude Code kills it, leaves the broker the hook started (F22, plan 7.6)", async () => {
+  for (const pid of copy.brokerPids()) process.kill(pid, "SIGKILL");
+  expect(await until(() => copy.brokerPids().length === 0)).toBe(true);
+  const hook = waitingStop("tree-session");
+  expect(await until(() => waiterState("tree-session") === "waiting", 15_000)).toBe(true);
+  const [broker = 0] = copy.brokerPids();
+  const tree = [hook.pid, ...treeOf(hook.pid)];
+  expect(tree).not.toContain(broker);
+  for (const pid of tree) process.kill(pid, "SIGTERM");
+  expect(await hook.exited).toBe(0);
+  await Bun.sleep(500);
+  expect((await copy.health())?.pid).toBe(broker);
+  expect(parentOf(broker)).toBe(1);
+}, 30_000);

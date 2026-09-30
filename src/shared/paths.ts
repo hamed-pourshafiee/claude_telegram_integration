@@ -7,6 +7,8 @@ export const ENV_FILE: string = join(REPO_ROOT, ".env");
 export const CONFIG_FILE: string = join(REPO_ROOT, "config.json");
 export const BUNFIG_FILE: string = join(REPO_ROOT, "bunfig.toml");
 export const BROKER_MAIN: string = join(REPO_ROOT, "src/broker/main.ts");
+/** Starts the broker and exits, so no hook is its parent (plan 7.6). */
+export const BROKER_LAUNCHER: string = join(REPO_ROOT, "src/broker/launch.ts");
 
 /** The home folder from the user database, not from $HOME, which a session's environment could set. */
 export const HOME_DIR: string = userInfo().homedir;

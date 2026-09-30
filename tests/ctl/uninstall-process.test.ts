@@ -43,6 +43,7 @@ const bridge = {
   launch: {
     bun: process.execPath,
     main: copy.brokerMain,
+    launcher: copy.brokerLauncher,
     bunfig: join(copy.root, "bunfig.toml"),
     cwd: copy.root,
   },

@@ -29,6 +29,7 @@ beforeEach(() => {
   const launch = {
     bun: process.execPath,
     main: join(repoRoot, "main.ts"),
+    launcher: join(repoRoot, "launch.ts"),
     bunfig: "",
     cwd: repoRoot,
   };

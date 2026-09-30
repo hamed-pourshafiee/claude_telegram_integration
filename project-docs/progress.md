@@ -1718,3 +1718,29 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
 - **Decisions (mine, open to change):**
   - The broker reads transcripts only for `/sessions` and its taps, and only their title entries.
     Notices keep the title their hooks read.
+
+## 7.6 A broker no hook can take down
+
+- **Date:** 2026-09-30
+- **Found first** (F22, design rev. 21):
+  - At 08:25:12.290 Claude Code stopped the Stop hook waiting for session `219eee4a`, at its 12 h
+    timeout. The broker (pid 47544) got SIGTERM 6 ms later.
+  - That hook had started the broker at 08:18:38, when `ctl stop` left no broker for the step 7.4
+    restart. So the broker was still the hook's child, setsid or not.
+  - Claude Code 2.1.284's `killProcessTree` lists every process (`ps -A -o pid= -o ppid=`) and kills
+    the whole tree under the process it stops. Another waiting hook started a new broker at once
+    (53265), so nothing was lost.
+  - `ctl`'s own restarts, the other SIGTERMs in the log, were never near a hook's end.
+- **Built** (on `dev`):
+  - `src/broker/launch.ts`: started by `spawnBroker` (hooks and `ctl start`), it starts the broker
+    with the same environment, folder and stderr, and exits at once, so launchd adopts the broker.
+  - Both still run in a session of their own (setsid).
+  - A process test starts a broker from a real waiting Stop hook, then kills the hook's tree as
+    Claude Code does: every process under it by parent pid. The broker is not in the tree, still
+    answers, and has launchd (1) as its parent.
+  - The copy's `brokerPids()` skips the launcher, which names the broker's entry file for the moment
+    it runs.
+  - Gate: typecheck exit 0, "Checked 156 files", "648 pass, 0 fail" across 63 files, twice.
+  - Positive controls, 2, each caught by the tree test:
+    - no launcher, the hook being the broker's parent, as before;
+    - a launcher that waits for the broker.
