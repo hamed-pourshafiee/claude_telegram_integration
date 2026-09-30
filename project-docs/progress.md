@@ -1431,5 +1431,68 @@ Committed as `a3001e5` (2026-09-30).
 
 ## Next
 
-6.2: the full gate with its summary lines, then the user decides whether Codex reviews the project
-(reviews were paused until the end).
+Committed as `9b28532` (2026-09-30).
+
+## 6.2 Full gate and the Codex review
+
+- **Date:** 2026-09-30
+- **Result:** passed. The implementation plan is complete.
+- **The gate before the review** (`9b28532`): typecheck exit 0, "Checked 141 files", "598 pass, 0 fail"
+  across 57 files, twice. None of the 212 tracked files holds token-shaped text or a name that must stay
+  out; `.env`, `config.json`, `.state/` and `sandbox/` are ignored.
+- **The review** (the user chose the whole project):
+  - `codex review --base` the scaffold commit, run in a clean clone, so only tracked files could be read.
+  - This repo's `.env` stayed at mode 000 the whole time, and a trap put it back: "[.env mode after:
+    600]".
+  - Saved as `~/.claude/codex-reviews/code-claude_telegram_integration-20260930-100835.md`.
+- **Findings, 6: each confirmed in the code, and reproduced by a failing test before its fix.** None
+  was rejected.
+  1. [P1] Buttons, and the answer a tap leaves, weren't redacted (D8): an option holding a secret showed
+     it on its button. Both are redacted now, the answer before it is cut; Claude still gets the option
+     as written.
+  2. [P1] Edit and Write prompts had the file's path only in the header, which `formatReply` cuts at 200
+     characters even for a whole prompt. The body now opens with the whole path, and a path or folder
+     with a backtick sends the operation as a file.
+  3. [P2] Only a question's last message was linked to it: a reply to an earlier message of a long one
+     went to the session's oldest waiting call. Schema 5 (`ask_parts`) links every message.
+  4. [P2] Presence's first look told no one. A broker restarted while a question waited in the chat,
+     with you at the Mac, kept it there until your state changed. The first look is told too.
+  5. [P2] A late report (a stop, its result, idle) reopened a session that had ended. Only
+     `SessionStart` and a typed prompt reopen one now.
+  6. [P2] At start, a call whose messages never all went out waited in the chat unseen. It goes to the
+     Mac now, as a failed send does.
+- **The gate after the fixes** (`31d4269`): typecheck exit 0, "Checked 143 files", "606 pass, 0 fail"
+  across 58 files, twice.
+- **Positive controls, 10:** each fix undone alone, and each caught by its own test:
+  - buttons showing secrets;
+  - the answer's echo showing them;
+  - an edit's path only in the header;
+  - a write's path only in the header;
+  - a backtick path in a code span;
+  - only the last message linked;
+  - the first look untold;
+  - a late report reopening;
+  - a late Stop reopening;
+  - a never-sent call left in the chat.
+- **Going live:**
+  - The live database was backed up at schema 4 (`VACUUM INTO`, 13 sessions, 17 asks, integrity ok):
+    `.state/backups/broker.pre-schema5.2026-09-30T06-57-25Z.db` (0600).
+  - `main` was fast-forwarded to `31d4269`, and the broker restarted on it (pid 18639, schema 5).
+  - `bun run ctl doctor` on the live setup: all 13 checks pass. The stops line now names Claude Code
+    2.1.283.
+- **Decisions (mine, open to change):**
+  - All six were fixed, the P2s too: each was small and could be tested.
+  - Finding 3 keeps a long prompt in up to four messages (the design) and links them all, rather than
+    sending every long prompt as a file.
+  - Finding 6 sends a never-sent call to the Mac rather than sending it again: that is what a failed
+    send does, and it can't leave duplicate messages.
+- **Learned:** a review of the whole project found gaps between modules that each module's tests
+  couldn't see, such as display paths that went around the redaction.
+
+## Next
+
+The plan is complete. Possible later steps, from the plan: a Telegram topic per session, `/new` to start
+a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin. Two
+choices remain the user's: a live uninstall rehearsal (6.1 tested it with real processes), and a git
+remote (O3). Both VS Code windows still run Claude Code 2.1.283; once they reload into 2.1.284,
+`ctl doctor`'s stops line will show whether its stops are read.
