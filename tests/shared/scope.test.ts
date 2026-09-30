@@ -3,7 +3,13 @@ import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseConfig } from "../../src/shared/config.ts";
-import { contentModeFor, isInside, sessionEnv, sessionScope } from "../../src/shared/scope.ts";
+import {
+  contentModeFor,
+  isInside,
+  sessionEnv,
+  sessionScope,
+  startedHere,
+} from "../../src/shared/scope.ts";
 
 // Real folders, so that symlinks resolve: <root>/home/{bridge/sandbox, work, other}
 const root = realpathSync(mkdtempSync(join(tmpdir(), "tg-scope-")));
@@ -159,5 +165,25 @@ describe("content policy (D8)", () => {
     const config = parseConfig({ content: { default: "full", pingOnly: ["~/work"] } }, places);
     expect(contentModeFor(config, join(home, "work/client"))).toBe("ping-only");
     expect(contentModeFor(config, join(home, "other"))).toBe("full");
+  });
+});
+
+describe("a session /new started (D11, plan 7.7)", () => {
+  test("its environment names its own id: served though Claude Code calls it sdk-cli (F27)", () => {
+    const env = { CLAUDE_TELEGRAM_SESSION: "5e7d-uuid", CLAUDE_CODE_ENTRYPOINT: "sdk-cli" };
+    expect(startedHere(env, "5e7d-uuid")).toBe(true);
+    const session = { projectDir: join(repo, "sandbox"), entrypoint: "sdk-cli" };
+    expect(sessionScope(defaults, session, true)).toEqual({ served: true });
+  });
+
+  test("another session's id, none, or an empty one: an sdk-cli session stays unserved", () => {
+    expect(startedHere({ CLAUDE_TELEGRAM_SESSION: "5e7d-uuid" }, "other")).toBe(false);
+    expect(startedHere({}, "5e7d-uuid")).toBe(false);
+    expect(startedHere({ CLAUDE_TELEGRAM_SESSION: "" }, "")).toBe(false);
+  });
+
+  test("its folder must still be served, and not skipped", () => {
+    const skipped = { projectDir: join(home, "work/client"), entrypoint: "sdk-cli" };
+    expect(sessionScope(wide, skipped, true).served).toBe(false);
   });
 });

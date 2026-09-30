@@ -10,7 +10,7 @@ reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish d
 continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-30 · Repo:
 `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F26), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F28), architecture and
 flows 1–4, decisions (D1–D11), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -292,17 +292,18 @@ flows 1–4, decisions (D1–D11), security, rollback, risks and the review log.
   still answering, with launchd as its parent; live, the broker a waiting hook started has launchd (1) as
   its parent.
 - **7.7 `/new`: a session started from the chat** (asked 2026-09-30, after the spikes F23 to F25; design
-  D11). `/new` answers with a button for each folder offered; a tap asks for the first message with the
-  reply box open, and the reply starts `claude -p` there (D11). The broker records the session as started
-  from the chat (schema 9, with the questions it asked), so notices and questions go to the chat whatever
-  your presence and never move back to the Mac. `/sessions` marks it. A reply that is delivered marks its
-  session as working, since a continuation fires no UserPromptSubmit (F25). **Pass:** tests for the
-  folders offered (recent, served, with text, existing), the question and its link, the start (command,
-  environment, the marked message on stdin, the session recorded), the limit of 3, an expired or unknown
-  choice, a start that fails, notices and questions of such a session going to the chat while you're at
-  the Mac, nothing handed back to the Mac, and end to end, `/new`, a tap and a reply starting a stand-in
-  `claude`; live, from the phone, `/new` in the sandbox, its ✅ in the chat, and a reply that continues
-  it.
+  D11). `/new` answers with a button for each VS Code window open (F28, asked by the user on 2026-10-01
+  after the first live try); a tap asks for the first message with the reply box open, and the reply
+  starts `claude -p` there (D11). The broker records the session as started from the chat (schema 9, with
+  the questions it asked), so notices and questions go to the chat whatever your presence and never move
+  back to the Mac. `/sessions` marks it. A reply that is delivered marks its session as working, since a
+  continuation fires no UserPromptSubmit (F25). **Pass:** tests for the windows offered (open, served,
+  with text, existing; a workspace in its first folder), the hooks serving such a session by its id
+  though it runs as `sdk-cli` (F27), the question and its link, the start (command, environment, the
+  marked message on stdin, the session recorded), the limit of 3, an expired or unknown choice, a start
+  that fails, notices and questions of such a session going to the chat while you're at the Mac, nothing
+  handed back to the Mac, and end to end, `/new`, a tap and a reply starting a stand-in `claude`; live,
+  from the phone, `/new` in the sandbox, its ✅ in the chat, and a reply that continues it.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.

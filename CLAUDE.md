@@ -8,7 +8,7 @@ replies come back into the same session.
 
 Read these completely before doing anything in a new session:
 
-1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F26, architecture
+1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F28, architecture
    and flows 1–4, decisions D1–D11, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.

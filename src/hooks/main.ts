@@ -15,7 +15,7 @@ import { type HookInput, parseHookInput } from "../shared/hook-input.ts";
 import { CONFIG_FILE, HOME_DIR, REPO_ROOT, STATE } from "../shared/paths.ts";
 import { writePending } from "../shared/pending.ts";
 import { processAlive } from "../shared/process.ts";
-import { sessionEnv, sessionScope } from "../shared/scope.ts";
+import { sessionEnv, sessionScope, startedHere } from "../shared/scope.ts";
 import { isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
 import { sessionTitle } from "../shared/title.ts";
@@ -48,7 +48,8 @@ async function main(): Promise<void> {
   if (input === undefined || input.agentId !== undefined) return;
   const config = loadConfig(CONFIG_FILE, { repoRoot: REPO_ROOT, home: HOME_DIR });
   const env = sessionEnv(process.env);
-  if (!sessionScope(config, env).served || env.projectDir === undefined) return;
+  const fromChat = startedHere(process.env, input.sessionId);
+  if (!sessionScope(config, env, fromChat).served || env.projectDir === undefined) return;
   // Every call names the session; with its title, once it has one, messages go by that (plan 7.2).
   const title = sessionTitle(input.transcriptPath, log);
   const session = {

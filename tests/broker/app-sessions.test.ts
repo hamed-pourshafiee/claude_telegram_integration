@@ -110,21 +110,25 @@ test("a title Claude Code made after the session's last hook is in /sessions (pl
   expect(text).toMatch(/^1 open session:\n⏳ IQ-1572: working for \d+ s\n/);
 });
 
-test("/new: a tap on a folder and a reply start a session there, marked as from here (plan 7.7)", async () => {
-  const launched: string[][] = [];
-  const launchSession = (id: string, folder: string, message: string) => {
-    launched.push([id, folder, message]);
+test("/new: a tap on an open window and a reply start a session in its folder (plan 7.7)", async () => {
+  const launched: unknown[][] = [];
+  const launchSession = (
+    id: string,
+    folder: string,
+    message: string,
+    addDirs: readonly string[],
+  ) => {
+    launched.push([id, folder, message, addDirs]);
     return { pid: 4321, exited: new Promise<number>(() => undefined) };
   };
+  mkdirSync(join(dir, "sandbox", "api"), { recursive: true });
+  const sandbox = realpathSync(join(dir, "sandbox"));
+  const studio = { name: "studio", folder: sandbox, addDirs: [join(sandbox, "api")] };
   const db = BrokerDb.open(join(dir, "new.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: YOU.id, name: "Hamed" });
-  const { routes } = app(db, { launchSession });
-  mkdirSync(join(dir, "sandbox"), { recursive: true });
-  const sandbox = realpathSync(join(dir, "sandbox"));
-  // A session used the sandbox before, so /new offers it.
-  await routes.hook("SessionStart", { session_id: "old", project_dir: sandbox, entrypoint: "cli" });
-  fake.answer("sendMessage", ok({ message_id: 71, date: 0, chat, text: "folders" }));
+  app(db, { launchSession, openWindows: () => [studio] });
+  fake.answer("sendMessage", ok({ message_id: 71, date: 0, chat, text: "windows" }));
   fake.answer("sendMessage", ok({ message_id: 72, date: 0, chat, text: "✏️" }));
   fake.fallback("sendMessage", ok({ message_id: 73, date: 0, chat, text: "🚀" }));
   fake.fallback("answerCallbackQuery", ok(true));
@@ -134,24 +138,20 @@ test("/new: a tap on a folder and a reply start a session there, marked as from 
     asFields(fake.calls("sendMessage")[0]?.body)?.reply_markup,
   )?.inline_keyboard;
   const button = Array.isArray(rows) ? asFields(rows[0]?.[0]) : undefined;
-  expect(button?.text).toBe("📂 sandbox");
-  from({
-    callback_query: {
-      id: "cbq2",
-      from: YOU,
-      data: button?.callback_data,
-      message: { message_id: 71, chat },
-    },
-  });
+  expect(button?.text).toBe("🖥 studio");
+  const tap = {
+    id: "cbq2",
+    from: YOU,
+    data: button?.callback_data,
+    message: { message_id: 71, chat },
+  };
+  from({ callback_query: tap });
   expect(await until(() => fake.calls("sendMessage").length === 2)).toBe(true);
   from(message(74, "Fix the tests", { reply_to_message: { message_id: 72, date: 0, chat } }));
   expect(await until(() => launched.length === 1)).toBe(true);
-  expect(launched[0]).toEqual([
-    expect.any(String),
-    sandbox,
-    "📨 From Hamed on Telegram: Fix the tests",
-  ]);
+  const first = "📨 From Hamed on Telegram: Fix the tests";
+  expect(launched[0]).toEqual([expect.any(String), sandbox, first, [join(sandbox, "api")]]);
   expect(await until(() => fake.calls("sendMessage").length === 3)).toBe(true);
   const note = String(asFields(fake.calls("sendMessage")[2]?.body)?.text);
-  expect(note).toStartWith("🚀 Starting a session in sandbox.");
+  expect(note).toStartWith("🚀 Starting a session in studio.");
 });

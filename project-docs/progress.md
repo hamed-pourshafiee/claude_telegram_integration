@@ -1874,6 +1874,32 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   - Positive controls, 2, each caught: the old `userInfo().shell`, and any path taken for a shell.
 - **Found too** (O4): the home folder that hooks and ctl resolve `~/` with also comes from `$HOME`, not
   from the user database as `paths.ts` says. Proposed to the user; not changed.
+- **Live check, second try** (20:38): the session started, and nothing came back.
+  - Session `fa5c0598` ran in the sandbox: Claude listed the files and it ended with code 0 after 15 s.
+    None of its hooks reached the broker, so the chat only had "🚀 Starting…".
+  - Its transcript records the entrypoint `sdk-cli` 25 times: in `-p` mode Claude Code sets that itself,
+    over the `cli` the broker gave it (F27). The hooks serve only `cli` and `claude-vscode`, so they did
+    nothing.
+  - The user also asked to pick among their open VS Code windows (2026-10-01). They have two:
+    `claude_telegram_integration`, and the workspace `insureq-studio`. `sandbox` is closed.
+- **Changed** (on `dev`, design rev. 26):
+  - `/new` offers the windows VS Code has open, read from its window state (F28), only while VS Code
+    runs. A workspace's session runs in its first folder, with the others as `--add-dir`, as its
+    window's do. On this Mac: `insureq-studio`, in `agent-panel-frontend` with 19 more folders, and
+    `claude_telegram_integration`.
+  - The broker puts the session's id in its environment (`CLAUDE_TELEGRAM_SESSION`). A hook serves a
+    session whose environment names its own id, whatever its entrypoint; a stranger `sdk-cli` session
+    stays unserved.
+  - Gate: typecheck exit 0, "Checked 166 files", "678 pass, 0 fail" across 68 files, twice.
+  - Positive controls, 9, each caught:
+    - the hooks ignoring the id;
+    - any id serving;
+    - the id not given;
+    - a workspace's folders not added, in the command and when started;
+    - a closed VS Code's windows offered;
+    - a workspace run in its last folder;
+    - comments left in a workspace file;
+    - unserved windows offered.
 
 ## Next
 

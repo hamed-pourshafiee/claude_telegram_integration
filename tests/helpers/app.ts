@@ -21,10 +21,10 @@ export interface AppHarness {
   readonly dir: string;
   /** What the stand-in Mac shows; each test starts at the Mac. */
   mac: Reading;
-  /** The broker's parts on a new database, or on `db`; /new starts `launchSession`, if given. */
+  /** The broker's parts on a new database, or on `db`; /new uses the stand-ins in `extra`, if given. */
   readonly app: (
     db?: BrokerDb,
-    extra?: Pick<AppDeps, "launchSession">,
+    extra?: Pick<AppDeps, "launchSession" | "openWindows">,
   ) => App & { readonly db: BrokerDb };
 }
 

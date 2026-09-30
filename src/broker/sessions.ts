@@ -145,16 +145,6 @@ export class Sessions {
     return row === undefined ? undefined : fromRow(row);
   }
 
-  /** The folders sessions started in, the one used last first: those /new offers (plan 7.7). */
-  folders(): string[] {
-    return this.#db
-      .all<{ project_dir: string }>(
-        `SELECT project_dir FROM sessions GROUP BY project_dir
-         ORDER BY MAX(MAX(stopped_at, prompted_at)) DESC, MAX(started_at) DESC`,
-      )
-      .map((row) => row.project_dir);
-  }
-
   /** The sessions no SessionEnd has ended; a crashed one among them too (plan 7.3). */
   open(): Session[] {
     return this.#db.all<Row>("SELECT * FROM sessions WHERE ended_at IS NULL").map(fromRow);

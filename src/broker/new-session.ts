@@ -11,12 +11,15 @@ import type { CommandAnswer } from "./commands.ts";
 import type { Launch, Launched } from "./session-launch.ts";
 import type { Sessions } from "./sessions.ts";
 import type { Start, Starts } from "./starts.ts";
+import type { VsWindow } from "./vscode-windows.ts";
 
 export interface NewSessionsDeps {
-  readonly sessions: Pick<Sessions, "folders" | "open" | "get" | "startedHere" | "end">;
+  readonly sessions: Pick<Sessions, "open" | "get" | "startedHere" | "end">;
   readonly starts: Pick<Starts, "record" | "use">;
   readonly telegram: Pick<TelegramClient, "sendMessage" | "answerCallbackQuery">;
   readonly config: Config;
+  /** The windows VS Code has open (F28): /new offers their folders. */
+  readonly windows: () => readonly VsWindow[];
   readonly launch: Launch;
   /** The paired user's first name, for the mark on the first message. */
   readonly senderName: () => string | null;
@@ -38,19 +41,17 @@ export interface Started {
 
 /** The most sessions started from the chat that run at once (D11). */
 export const MOST_RUNNING = 3;
-/** The most folders /new offers. */
-const MOST_FOLDERS = 8;
+/** The most windows /new offers. */
+const MOST_WINDOWS = 8;
 /** The most characters of the reply box's placeholder. */
 const PLACEHOLDER_CHARS = 64;
 const BUTTON = /^new:([0-9a-f]{16})$/;
 
 const TEXTS = {
   which:
-    "📂 A new session: in which folder?\nIt runs on the Mac in the background, not in a VS Code tab, and reports here.",
-  none: "No folder to offer yet: a folder shows up here once a session there has used the bridge.",
-  noCli:
-    "Sessions started here run as terminal sessions, and config.json doesn't serve those (entrypoints).",
-  gone: "That folder isn't offered any more.",
+    "🖥 A new session: in which VS Code window?\nIt runs in that window's folder on the Mac, in the background, and reports here. Claude Code can't start a tab from outside.",
+  none: "No VS Code window is open whose folder the bridge serves, so there's nowhere to start a session.",
+  gone: "That window isn't open any more.",
   full: `${MOST_RUNNING} sessions started here still run. Wait for one to end.`,
   expired: "That question has expired, so nothing was started. Send /new again.",
   taken: "A session was already started from that question.",
@@ -66,8 +67,9 @@ const TEXTS = {
 
 /**
  * /new (D11, plan 7.7). No hook can start a VS Code tab working (F24), so the bridge starts the session
- * itself: you pick a folder, write the first message in the reply box, and the broker runs `claude -p`
- * there. Its hooks then send its messages here like any session's, and your replies continue it (F25).
+ * itself: you pick one of the windows VS Code has open, write the first message in the reply box, and
+ * the broker runs `claude -p` in that window's folder. Its hooks send its messages here like any
+ * session's, and your replies continue it (F25).
  */
 export class NewSessions {
   readonly #deps: NewSessionsDeps;
@@ -76,32 +78,31 @@ export class NewSessions {
     this.#deps = deps;
   }
 
-  /** The answer to /new: a button for each folder offered, the one used last first. */
+  /** The answer to /new: a button for each window whose folder is offered. */
   answer(): CommandAnswer {
-    if (!this.#deps.config.entrypoints.includes("cli")) return { text: TEXTS.noCli };
-    const folders = this.#folders();
-    if (folders.length === 0) return { text: TEXTS.none };
-    const names = folderNames(folders);
-    const inline_keyboard = folders.map((dir, at) => [
-      { text: `📂 ${names[at] ?? dir}`, callback_data: `new:${keyOf(dir)}` },
+    const windows = this.#windows();
+    if (windows.length === 0) return { text: TEXTS.none };
+    const names = windowNames(windows);
+    const inline_keyboard = windows.map((window, at) => [
+      { text: `🖥 ${names[at] ?? window.name}`, callback_data: `new:${keyOf(window.folder)}` },
     ]);
     return { text: TEXTS.which, reply_markup: { inline_keyboard } };
   }
 
-  /** A tap on a folder: the question for the first message, with the reply box open on it. */
+  /** A tap on a window: the question for the first message, with the reply box open on it. */
   async press(data: string, chat: number, queryId: string): Promise<void> {
     const key = BUTTON.exec(data)?.[1];
-    const folders = this.#folders();
-    const at = folders.findIndex((dir) => keyOf(dir) === key);
-    const dir = folders[at];
+    const windows = this.#windows();
+    const at = windows.findIndex((window) => keyOf(window.folder) === key);
+    const window = windows[at];
     const toast = (text?: string) =>
       this.#deps.telegram.answerCallbackQuery({
         callback_query_id: queryId,
         ...(text === undefined ? {} : { text }),
       });
-    if (dir === undefined) return toast(TEXTS.gone);
+    if (window === undefined) return toast(TEXTS.gone);
     if (this.#running() >= MOST_RUNNING) return toast(TEXTS.full);
-    const name = folderNames(folders)[at] ?? basename(dir);
+    const name = windowNames(windows)[at] ?? window.name;
     try {
       const placeholder = Array.from(`First message for ${name}`).slice(0, PLACEHOLDER_CHARS);
       const sent = await this.#deps.telegram.sendMessage({
@@ -109,7 +110,7 @@ export class NewSessions {
         text: TEXTS.ask(name),
         reply_markup: { force_reply: true, input_field_placeholder: placeholder.join("") },
       });
-      this.#deps.starts.record(chat, sent.message_id, dir);
+      this.#deps.starts.record(chat, sent.message_id, window.folder);
     } catch (error) {
       this.#deps.log("new.ask-failed", { error: messageOf(error) });
       return toast(TEXTS.failed);
@@ -118,9 +119,13 @@ export class NewSessions {
     return toast();
   }
 
-  /** A reply to a /new question: a session starts in its folder, with the reply as its first message. */
+  /**
+   * A reply to a /new question: a session starts in its window's folder, with the reply as its first
+   * message, and the workspace's other folders if the window is still open.
+   */
   start(text: string, start: Start): Started {
-    const name = basename(start.projectDir);
+    const window = this.#deps.windows().find((open) => open.folder === start.projectDir);
+    const name = window?.name ?? basename(start.projectDir);
     const taken = this.#deps.starts.use(start);
     if (taken !== "used") {
       return { started: false, text: taken === "expired" ? TEXTS.expired : TEXTS.taken };
@@ -128,11 +133,11 @@ export class NewSessions {
     if (!this.#offers(start.projectDir)) return { started: false, text: TEXTS.gone };
     if (this.#running() >= MOST_RUNNING) return { started: false, text: TEXTS.full };
     const id = this.#deps.newId?.() ?? randomUUID();
-    const from = this.#deps.senderName() ?? "the user";
-    this.#deps.sessions.startedHere({ id, projectDir: start.projectDir, entrypoint: "cli" });
+    const message = `📨 From ${this.#deps.senderName() ?? "the user"} on Telegram: ${text}`;
+    this.#deps.sessions.startedHere({ id, projectDir: start.projectDir, entrypoint: "sdk-cli" });
     let launched: Launched;
     try {
-      launched = this.#deps.launch(id, start.projectDir, `📨 From ${from} on Telegram: ${text}`);
+      launched = this.#deps.launch(id, start.projectDir, message, window?.addDirs ?? []);
     } catch (error) {
       this.#deps.sessions.end(id);
       this.#deps.log("new.failed", { session: id, error: messageOf(error) });
@@ -156,20 +161,21 @@ export class NewSessions {
       .catch((error: unknown) => log("new.watch-failed", { session: id, error: messageOf(error) }));
   }
 
-  #folders(): string[] {
-    return this.#deps.sessions
-      .folders()
-      .filter((dir) => this.#offers(dir))
-      .slice(0, MOST_FOLDERS);
+  #windows(): VsWindow[] {
+    return this.#deps
+      .windows()
+      .filter((window) => this.#offers(window.folder))
+      .slice(0, MOST_WINDOWS);
   }
 
   /**
-   * A folder /new may start a session in: served for terminal sessions, which these are, showing
-   * Claude's text (not ping-only: its messages are what the session is for), and still a folder.
+   * A folder /new may start a session in: served (whatever the entrypoint, as its session's hooks will
+   * find it: F27), showing Claude's text, since its messages are what it's for, and still a folder.
    */
   #offers(dir: string): boolean {
     const { config } = this.#deps;
-    if (!sessionScope(config, { projectDir: dir, entrypoint: "cli" }).served) return false;
+    if (!sessionScope(config, { projectDir: dir, entrypoint: undefined }, true).served)
+      return false;
     if (contentModeFor(config, dir) !== "full") return false;
     return statSync(dir, { throwIfNoEntry: false })?.isDirectory() === true;
   }
@@ -190,12 +196,10 @@ function keyOf(dir: string): string {
   return createHash("sha256").update(dir).digest("hex").slice(0, 16);
 }
 
-/** Each folder's name: its own, or with its parent's where two share one. */
-function folderNames(dirs: readonly string[]): string[] {
-  const names = dirs.map((dir) => basename(dir));
-  return dirs.map((dir, at) => {
-    const name = names[at] ?? dir;
-    const twins = names.filter((other) => other === name).length > 1;
-    return twins ? `${basename(dirname(dir))}/${name}` : name;
+/** Each window's name: its own, or with its folder's parent where two share one. */
+function windowNames(windows: readonly VsWindow[]): string[] {
+  return windows.map((window) => {
+    const twins = windows.filter((other) => other.name === window.name).length > 1;
+    return twins ? `${basename(dirname(window.folder))}/${window.name}` : window.name;
   });
 }

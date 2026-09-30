@@ -20,6 +20,7 @@ import { Router } from "./router.ts";
 import { launchSession, loginShell } from "./session-launch.ts";
 import type { Sessions } from "./sessions.ts";
 import { type Start, Starts } from "./starts.ts";
+import { openWindows } from "./vscode-windows.ts";
 import { type Waiter, Waiters } from "./waiters.ts";
 
 // The broker's parts for Claude's questions and for your replies, which createApp() puts together.
@@ -104,6 +105,7 @@ function newParts(parts: NewParts, deps: AppDeps) {
   starts.prune();
   const launch = deps.launchSession ?? launchSession(deps.paths.logs, loginShell());
   const audit = deps.audit ?? noLog;
-  const fresh = new NewSessions({ ...parts, starts, config: deps.config, launch, audit });
+  const windows = deps.openWindows ?? (() => openWindows(parts.log));
+  const fresh = new NewSessions({ ...parts, starts, config: deps.config, windows, launch, audit });
   return { starts, fresh };
 }

@@ -17,15 +17,29 @@ export function sessionEnv(env: Readonly<Record<string, string | undefined>>): S
 }
 
 /**
- * Whether the hooks act for this session. Decided by where the session started, never by the hook
- * input's cwd, which follows a cd (F15).
+ * The variable the broker gives a session /new starts: that session's id (D11). Claude Code calls such a
+ * session sdk-cli whatever its environment says (F27), so the id is what tells the hooks it's served.
  */
-export function sessionScope(config: Config, session: SessionEnv): Scope {
+export const STARTED_HERE_VAR = "CLAUDE_TELEGRAM_SESSION";
+
+/** Whether the session is one /new started: its environment names its own id. */
+export function startedHere(
+  env: Readonly<Record<string, string | undefined>>,
+  sessionId: string,
+): boolean {
+  return sessionId !== "" && env[STARTED_HERE_VAR] === sessionId;
+}
+
+/**
+ * Whether the hooks act for this session. Decided by where the session started, never by the hook
+ * input's cwd, which follows a cd (F15). A session /new started is served whatever its entrypoint.
+ */
+export function sessionScope(config: Config, session: SessionEnv, fromChat = false): Scope {
   const { projectDir, entrypoint } = session;
   if (projectDir === undefined || !isAbsolute(projectDir)) {
     return { served: false, reason: "CLAUDE_PROJECT_DIR is not an absolute path" };
   }
-  if (entrypoint === undefined || !config.entrypoints.includes(entrypoint)) {
+  if (!fromChat && (entrypoint === undefined || !config.entrypoints.includes(entrypoint))) {
     return { served: false, reason: `entrypoint ${entrypoint ?? "(unset)"} is not served` };
   }
   // A start folder deleted since can't be resolved, and comparing its path as spelled with resolved

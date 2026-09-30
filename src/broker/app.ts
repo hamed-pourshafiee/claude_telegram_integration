@@ -27,6 +27,7 @@ import type { Routes } from "./server.ts";
 import type { Launch } from "./session-launch.ts";
 import { type Session, Sessions } from "./sessions.ts";
 import { sessionsParts } from "./sessions-command.ts";
+import type { VsWindow } from "./vscode-windows.ts";
 
 export interface AppDeps {
   readonly token: Secret;
@@ -43,8 +44,9 @@ export interface AppDeps {
   readonly apiBase?: string;
   /** …and look at a stand-in Mac… */
   readonly readPresence?: () => Promise<Reading>;
-  /** …and start a stand-in for the sessions /new starts (plan 7.7). */
+  /** …and start a stand-in for the sessions /new starts, in stand-in VS Code windows (plan 7.7). */
   readonly launchSession?: Launch;
+  readonly openWindows?: () => readonly VsWindow[];
 }
 
 export interface App {

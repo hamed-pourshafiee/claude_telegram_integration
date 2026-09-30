@@ -73,3 +73,20 @@ test("the session's title, its transcript and its Claude come with the hook's ca
   // The hook runs as a child of this test, as it would of Claude Code (F18).
   expect(stored()).toMatchObject({ transcript, claude_pid: process.pid });
 });
+
+test("a session /new started is served as sdk-cli, by its own id in its environment; another isn't (F27)", async () => {
+  const sdk = (id: string, marker: string) => {
+    const stdin = JSON.stringify({
+      session_id: id,
+      hook_event_name: "SessionStart",
+      source: "startup",
+    });
+    const own = { ...env, CLAUDE_CODE_ENTRYPOINT: "sdk-cli", CLAUDE_TELEGRAM_SESSION: marker };
+    return copy.run("hooks", ["SessionStart"], { cwd: project, stdin, env: own });
+  };
+  expect(sdk("started-here", "started-here").exitCode).toBe(0);
+  expect(sdk("stranger", "started-here").exitCode).toBe(0);
+  const starts = () => brokerEvents("hook.event").map((entry) => entry.session);
+  expect(await until(() => starts().includes("started-here"), 5000)).toBe(true);
+  expect(starts()).not.toContain("stranger");
+});
