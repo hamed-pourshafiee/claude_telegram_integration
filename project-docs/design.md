@@ -1,13 +1,14 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 18, F21: messages name a session by its title (plan 7.2) (rev. 17: D10, the git remote is
-GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission prompts in flow
-3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are reviewed from the phone; rev. 13:
-O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev.
-11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's
-parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1
-decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2:
-Codex review) · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 19, D4: `/sessions` lists the open sessions, whose Claude still runs by F18 (plan 7.3) (rev.
+18: F21, messages name a session by its title, plan 7.2; rev. 17: D10, the git remote is GitHub, O3; rev.
+16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission prompts in flow 3, phase 5, D9;
+rev. 14: F20, no hook can approve a plan, so plans are reviewed from the phone; rev. 13: O2 decided as
+D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown
+shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8:
+F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8;
+rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
+2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -176,8 +177,11 @@ Taken (say so before the step if you disagree):
 - **D4 Presence** as in flow 3: active < 30 s since your last input (F12); away after 3 min, when the
   screen is locked (F17), or on `/away`. An unreadable idle value counts as present, and `/status` shows
   it. Commands: `/away`, `/auto`, `/off` (mute), `/status`; `/local` hands questions back to the Mac (plan
-  4.1), and `/help` (also `/start`) is the guide. The paired chat alone gets them as its menu
-  (`setMyCommands`), listed when "/" is typed and under the Menu button (plan 7.1).
+  4.1), `/sessions` lists the open sessions and what each is doing (plan 7.3), and `/help` (also
+  `/start`) is the guide. The paired chat alone gets them as its menu (`setMyCommands`), listed when "/"
+  is typed and under the Menu button (plan 7.1). A session is open until its SessionEnd, which a crash
+  never sends, so `/sessions` lists only those whose Claude process still runs: the broker keeps each
+  session's, the parent pid its hooks bring (F18).
 - **D5 Fail safe.** On any error the hook logs it and exits with no decision, so Claude behaves as if the
   hook were not there. Nothing is ever approved or answered because of an error.
 - **D6 The Mac stays awake while you're away.** The display may sleep, the system may not; with the lid

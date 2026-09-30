@@ -2,11 +2,19 @@ import type { BotCommand } from "../shared/telegram/types.ts";
 import type { Mode, Presence, Snapshot, State, Thresholds } from "./presence.ts";
 
 /**
- * The bot's commands (D4): /local hands Claude's questions back to the Mac (plan 4.1), and /help is the
- * guide (plan 7.1).
+ * The bot's commands (D4): /local hands Claude's questions back to the Mac (plan 4.1), /help is the
+ * guide (plan 7.1), and /sessions lists the open sessions (plan 7.3).
  */
-export type CommandName = Mode | "status" | "local" | "help";
-const NAMES: readonly CommandName[] = ["away", "auto", "off", "status", "local", "help"];
+export type CommandName = Mode | "status" | "local" | "help" | "sessions";
+const NAMES: readonly CommandName[] = [
+  "away",
+  "auto",
+  "off",
+  "status",
+  "local",
+  "help",
+  "sessions",
+];
 /** Telegram sends /start when you first open the bot: it gets the guide. */
 const ALIASES: ReadonlyMap<string, CommandName> = new Map([["start", "help"]]);
 
@@ -16,6 +24,7 @@ const ALIASES: ReadonlyMap<string, CommandName> = new Map([["start", "help"]]);
  */
 export const MENU: readonly BotCommand[] = [
   { command: "status", description: "Where the bridge thinks you are, and why" },
+  { command: "sessions", description: "Your open sessions, and which wait for you" },
   { command: "away", description: "Send everything here until /auto" },
   { command: "auto", description: "Decide from your idle time and the screen lock" },
   { command: "off", description: "Mute everything until /auto or /away" },
@@ -30,7 +39,7 @@ export function parseCommand(text: string): CommandName | undefined {
   return ALIASES.get(name) ?? NAMES.find((known) => known === name);
 }
 
-/** Carries out a command of the paired user, other than /local, and returns the answer for the chat. */
+/** Carries out a command of the paired user about presence, or the guide; the answer for the chat. */
 export function runCommand(name: Mode | "status" | "help", presence: Presence): string {
   if (name === "status") return statusText(presence.snapshot(), presence.limits);
   if (name === "help") return helpText(presence.limits);

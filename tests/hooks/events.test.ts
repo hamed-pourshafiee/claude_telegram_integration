@@ -11,7 +11,12 @@ import { Transcript } from "../helpers/transcript.ts";
 // Plans 2.7 and 3.1: what each hook asks of the broker. The broker is a stand-in that records the calls.
 const dir = mkdtempSync(join(tmpdir(), "tg-events-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
-const session = { session_id: "b1e81638", project_dir: dir, entrypoint: "claude-vscode" };
+const session = {
+  session_id: "b1e81638",
+  project_dir: dir,
+  entrypoint: "claude-vscode",
+  claude_pid: 1234,
+};
 
 type Respond = (name: string, body: Record<string, unknown>) => unknown;
 let calls: { name: string; body: Record<string, unknown>; timeoutMs: number | undefined }[];

@@ -6,7 +6,7 @@ import type { AskChat, Target } from "./ask-chat.ts";
 import type { Inbox, StoredReply } from "./inbox.ts";
 import type { Outbox } from "./outbox.ts";
 import type { Relay } from "./relay.ts";
-import { label, type Sessions } from "./sessions.ts";
+import { label, labels, type Sessions } from "./sessions.ts";
 import type { Waiters } from "./waiters.ts";
 
 export interface RouterDeps {
@@ -165,14 +165,11 @@ export class Router {
         await this.#deps.telegram.sendMessage({ ...thread, text: note.text });
         return;
       }
-      // Sessions of the same title get the start of their id, so each button can be told apart.
-      const names = note.sessions.map((sessionId) => this.#name(sessionId));
-      const rows: InlineKeyboardButton[][] = note.sessions.map((sessionId, at) => {
-        const name = names[at] ?? "";
-        const twins = names.filter((other) => other === name).length > 1;
-        const text = twins ? `${name} · ${sessionId.slice(0, 4)}` : name;
-        return [{ text, callback_data: `to:${reply.updateId}:${sessionId}` }];
-      });
+      const found = note.sessions.flatMap((sessionId) => this.#deps.sessions.get(sessionId) ?? []);
+      const names = labels(found);
+      const rows: InlineKeyboardButton[][] = found.map((session, at) => [
+        { text: names[at] ?? "", callback_data: `to:${reply.updateId}:${session.id}` },
+      ]);
       rows.push([{ text: "Don't send it", callback_data: `drop:${reply.updateId}` }]);
       const reply_markup = { inline_keyboard: rows };
       await this.#deps.telegram.sendMessage({ ...thread, text: TEXTS.ask, reply_markup });

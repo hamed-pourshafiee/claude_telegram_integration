@@ -10,6 +10,8 @@ export interface SessionRef {
   readonly entrypoint: string;
   /** Its title, made fit for the chat (cleanTitle), when its folder may show Claude's text (plan 7.2). */
   readonly title?: string;
+  /** Its Claude process (F18), which every hook's call brings (plan 7.3). */
+  readonly claudePid?: number;
 }
 
 export interface Session extends SessionRef {
@@ -20,6 +22,10 @@ export interface Session extends SessionRef {
   readonly stoppedAt: number;
   /** "" until it has one. */
   readonly title: string;
+  /** 0 until a hook brings it. */
+  readonly claudePid: number;
+  /** When a prompt last started a turn, in ms since the epoch; 0 before the first (plan 7.3). */
+  readonly promptedAt: number;
 }
 
 interface Row {
@@ -31,6 +37,8 @@ interface Row {
   readonly generation: number;
   readonly stopped_at: number;
   readonly title: string;
+  readonly claude_pid: number;
+  readonly prompted_at: number;
 }
 
 /** The most of a title the chat shows, in characters. */
@@ -68,19 +76,22 @@ export class Sessions {
 
   #record(ref: SessionRef, branch: string | undefined, reopen: boolean): Session {
     const reopened = reopen ? ", ended_at = NULL" : "";
-    // A title comes with the ref once the session has one; one that comes without keeps it.
+    // A title and a pid come with the ref once they're known; a ref without them keeps the old ones.
     this.#db.run(
-      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at, title)
-       VALUES (?, ?, ?, ?, ?, ?)
+      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at, title, claude_pid)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET project_dir = excluded.project_dir,
          entrypoint = excluded.entrypoint${reopened},
-         title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE sessions.title END`,
+         title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE sessions.title END,
+         claude_pid = CASE WHEN excluded.claude_pid > 0 THEN excluded.claude_pid
+           ELSE sessions.claude_pid END`,
       ref.id,
       ref.projectDir,
       ref.entrypoint,
       branch ?? "",
       this.#now().toISOString(),
       ref.title ?? "",
+      ref.claudePid ?? 0,
     );
     if (branch !== undefined)
       this.#db.run("UPDATE sessions SET branch = ? WHERE id = ?", branch, ref.id);
@@ -92,6 +103,8 @@ export class Sessions {
         ended: false,
         stoppedAt: 0,
         title: ref.title ?? "",
+        claudePid: ref.claudePid ?? 0,
+        promptedAt: 0,
       }
     );
   }
@@ -115,6 +128,16 @@ export class Sessions {
   get(id: string): Session | undefined {
     const row = this.#db.get<Row>("SELECT * FROM sessions WHERE id = ?", id);
     return row === undefined ? undefined : fromRow(row);
+  }
+
+  /** The sessions no SessionEnd has ended; a crashed one among them too (plan 7.3). */
+  open(): Session[] {
+    return this.#db.all<Row>("SELECT * FROM sessions WHERE ended_at IS NULL").map(fromRow);
+  }
+
+  /** A prompt started a turn at `at` (UserPromptSubmit): the session is at work (plan 7.3). */
+  prompted(id: string, at: number): void {
+    this.#db.run("UPDATE sessions SET prompted_at = ? WHERE id = ?", at, id);
   }
 
   /** Starts the session's next generation, which ends the one before; returns its number. */
@@ -155,6 +178,15 @@ export function label(
   return `${folder}${branch} · ${session.id.slice(0, 4)}`;
 }
 
+/** Each session's label; sessions of the same title get the start of their id, to tell them apart. */
+export function labels(sessions: readonly Session[]): string[] {
+  const names = sessions.map(label);
+  return names.map((name, at) => {
+    const twins = names.filter((other) => other === name).length > 1;
+    return twins ? `${name} · ${sessions[at]?.id.slice(0, 4) ?? ""}` : name;
+  });
+}
+
 /**
  * A title as the chat may show it (D8): secrets masked, on one line, at most 60 characters; undefined
  * when nothing is left.
@@ -180,5 +212,7 @@ function fromRow(row: Row): Session {
     ended: row.ended_at !== null,
     stoppedAt: row.stopped_at,
     title: row.title,
+    claudePid: row.claude_pid,
+    promptedAt: row.prompted_at,
   };
 }

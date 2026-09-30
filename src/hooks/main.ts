@@ -56,6 +56,7 @@ async function main(): Promise<void> {
     project_dir: realpathSync(env.projectDir),
     entrypoint: env.entrypoint ?? "",
     ...(title === undefined ? {} : { title }),
+    claude_pid: claudePid,
   };
   await handler({
     input,

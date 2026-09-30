@@ -9,7 +9,8 @@ import { Presence } from "../../src/broker/presence.ts";
 import { DEFAULTS } from "../../src/shared/config.ts";
 import { noLog } from "../../src/shared/log.ts";
 
-// Plan 2.6: /away /auto /off /status, and what /status says; plan 7.1: the menu and /help.
+// Plan 2.6: /away /auto /off /status, and what /status says; plan 7.1: the menu and /help; plan 7.3:
+// /sessions.
 const dir = mkdtempSync(join(tmpdir(), "tg-commands-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 let files = 0;
@@ -36,6 +37,7 @@ describe("which texts are commands", () => {
     ["/off", "off"],
     ["/local", "local"],
     ["/help", "help"],
+    ["/sessions", "sessions"],
     ["/start", "help"],
     ["/status@SomeBot", "status"],
     ["  /AWAY \n", "away"],
@@ -106,7 +108,7 @@ test.each([
 describe("the menu and the guide (plan 7.1)", () => {
   test("the menu holds every command the bot knows, each as Telegram allows it", () => {
     const names = MENU.map((entry) => entry.command);
-    expect(names).toEqual(["status", "away", "auto", "off", "local", "help"]);
+    expect(names).toEqual(["status", "sessions", "away", "auto", "off", "local", "help"]);
     for (const { command, description } of MENU) {
       expect(String(parseCommand(`/${command}`))).toBe(command);
       expect(command).toMatch(/^[a-z0-9_]{1,32}$/);

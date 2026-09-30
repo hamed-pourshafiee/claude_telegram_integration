@@ -17,6 +17,8 @@ export interface SessionRef {
   readonly entrypoint: string;
   /** The session's title, as Claude Code shows it, once it has one (F21, plan 7.2). */
   readonly title?: string;
+  /** Its Claude process, the hook's parent (F18): /sessions lists only those still running (plan 7.3). */
+  readonly claude_pid: number;
 }
 
 export interface HookContext {
@@ -154,7 +156,7 @@ const UNTOLD: ReadonlySet<string> = new Set([
 /** Waits for a reply to this stop and wakes Claude with it (flow 1). */
 async function replyAfter(context: HookContext, generation: number): Promise<void> {
   const { session, log } = context;
-  const body = { ...session, generation, pid: process.pid, claude_pid: context.claudePid };
+  const body = { ...session, generation, pid: process.pid };
   const result = await waitForReply(body, {
     call: (name, fields, timeoutMs, signal) => context.call(name, fields, timeoutMs, signal),
     ensureBroker: context.ensureBroker,

@@ -26,6 +26,7 @@ import { Presence } from "./presence.ts";
 import { Relay } from "./relay.ts";
 import { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
+import { sessionList } from "./session-list.ts";
 import { type Session, Sessions } from "./sessions.ts";
 import { type Waiter, Waiters } from "./waiters.ts";
 
@@ -78,12 +79,13 @@ export function createApp(deps: AppDeps): App {
   const audit = deps.audit ?? noLog;
   const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, audit, notifier });
   const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
-  const { relay, router } = replyParts(parts);
+  const { relay, router, waiters } = replyParts(parts);
   const hookEvents = hookEventsOf(
     { sessions, notifier, pairing, relay, asks: ask.relay, log },
     config,
   );
-  const gate = gateOf({ telegram, pairing, log, presence, notifier, router, asks: ask.chat });
+  const list = () => sessionList({ sessions, waiters, asks: ask.asks });
+  const gate = gateOf({ telegram, pairing, log, presence, notifier, router, asks: ask.chat, list });
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
   const accept = (update: Update) => {
@@ -128,15 +130,22 @@ interface GateParts {
   readonly notifier: Notifier;
   readonly router: Router;
   readonly asks: AskChat;
+  /** The answer to /sessions (plan 7.3). */
+  readonly list: () => string;
 }
 
 /** What the gate does with the paired user's commands, buttons and replies. */
-function gateOf({ telegram, pairing, log, presence, notifier, router, asks }: GateParts): GateDeps {
+function gateOf(parts: GateParts): GateDeps {
+  const { telegram, pairing, log, presence, notifier, router, asks, list } = parts;
   return {
     telegram,
     pairing,
     log,
-    command: (name) => (name === "local" ? asks.handBack() : runCommand(name, presence)),
+    command: (name) => {
+      if (name === "local") return asks.handBack();
+      if (name === "sessions") return list();
+      return runCommand(name, presence);
+    },
     press: (data, chat, queryId) => {
       if (data.startsWith("full:")) return notifier.press(data, chat, queryId);
       if (data.startsWith("ask:")) return asks.press(data, queryId);
@@ -183,7 +192,7 @@ function askParts(parts: AskParts) {
   const relay = new AskRelay({ sessions, asks, messages, where, presence, log, onLocal, audit });
   const chat = new AskChat({ asks, relay, messages, sessions, presence, telegram, log, audit });
   presence.watch((now, before) => chat.presenceChanged(now, before));
-  return { relay, chat };
+  return { relay, chat, asks };
 }
 
 interface ReplyParts {
@@ -216,7 +225,7 @@ function replyParts({ db, sessions, telegram, pairing, log, outbox, notifier, as
   const inbox = new Inbox(db);
   const relay = new Relay({ db, sessions, waiters, inbox, tell, senderName, log, onCancelled });
   const router = new Router({ relay, waiters, asks, inbox, outbox, sessions, telegram, log });
-  return { relay, router };
+  return { relay, router, waiters };
 }
 
 /** `ctl pair` (plan 2.4): a new code, and polling from now on to hear it. */

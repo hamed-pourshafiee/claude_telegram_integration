@@ -8,6 +8,7 @@ const session = {
   session_id: "b1e81638",
   project_dir: "/work/sandbox",
   entrypoint: "claude-vscode",
+  claude_pid: 1234,
 };
 const npmTest = { command: "npm test", description: "Run the tests" };
 

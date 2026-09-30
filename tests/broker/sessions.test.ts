@@ -25,6 +25,8 @@ test("a session is recorded on its first hook, SessionStart or not, and keeps it
     ended: false,
     stoppedAt: 0,
     title: "",
+    claudePid: 0,
+    promptedAt: 0,
   });
   expect(all.touch(ref, "main").branch).toBe("main");
   expect(all.touch(ref).branch).toBe("main");
@@ -83,5 +85,25 @@ describe("titles (plan 7.2)", () => {
     const long = cleanTitle(`${"a".repeat(58)}🙂🙂 and more`);
     expect(long).toBe(`${"a".repeat(58)}🙂…`);
     expect(Array.from(long ?? "")).toHaveLength(60);
+  });
+});
+
+describe("what /sessions needs (plan 7.3)", () => {
+  test("the Claude process a hook brings is kept; a call without one keeps the one before", () => {
+    const all = sessions();
+    expect(all.touch(ref).claudePid).toBe(0);
+    expect(all.touch({ ...ref, claudePid: 4321 }).claudePid).toBe(4321);
+    expect(all.seen(ref).claudePid).toBe(4321);
+    expect(all.touch({ ...ref, claudePid: 5555 }).claudePid).toBe(5555);
+  });
+
+  test("when a prompt started a turn, and which sessions no SessionEnd has ended", () => {
+    const all = sessions();
+    all.touch(ref);
+    all.prompted(ref.id, 1_700_000_000_000);
+    expect(all.get(ref.id)?.promptedAt).toBe(1_700_000_000_000);
+    all.touch({ ...ref, id: "c2f9" });
+    all.end("c2f9");
+    expect(all.open().map((session) => session.id)).toEqual([ref.id]);
   });
 });

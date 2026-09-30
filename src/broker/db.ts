@@ -99,6 +99,12 @@ const MIGRATIONS: readonly (readonly string[])[] = [
   ],
   // 6 (plan 7.2): a session's title, as Claude Code shows it, which messages name it by; '' until known.
   ["ALTER TABLE sessions ADD COLUMN title TEXT NOT NULL DEFAULT ''"],
+  // 7 (plan 7.3): the session's Claude process (F18), 0 until a hook brings it, and when a prompt last
+  // started a turn, which tells a session at work from one that stopped.
+  [
+    "ALTER TABLE sessions ADD COLUMN claude_pid INTEGER NOT NULL DEFAULT 0",
+    "ALTER TABLE sessions ADD COLUMN prompted_at INTEGER NOT NULL DEFAULT 0",
+  ],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;

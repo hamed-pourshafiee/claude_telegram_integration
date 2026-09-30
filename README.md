@@ -99,6 +99,7 @@ what it does.
 | Command | Does |
 |---|---|
 | `/status` | Where the bridge thinks you are, and why |
+| `/sessions` | Your open sessions, one line each: which ask you something, which wait for your reply, which are working. Only sessions whose Claude still runs are listed, so one left by a crash or a restart isn't. |
 | `/away` | Relay everything until `/auto`, even while you're at the Mac |
 | `/auto` | Decide from your idle time and the screen lock again |
 | `/off` | Mute everything until `/auto` or `/away` |

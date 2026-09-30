@@ -241,3 +241,29 @@ test("at start, titles of sessions whose folder no longer shows text go (D8, pla
   expect(sessions.get("kept")?.title).toBe("Sandbox work");
   expect(sessions.get("gone")?.title).toBe("");
 });
+
+test("/sessions lists the sessions whose Claude runs, and what each is doing (plan 7.3)", async () => {
+  const db = BrokerDb.open(join(dir, "sessions.db"));
+  const pairing = new Pairing(db);
+  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
+  const { routes } = app(db);
+  mkdirSync(join(dir, "sandbox"), { recursive: true });
+  const exited = Bun.spawn(["true"]);
+  await exited.exited;
+  const live = {
+    session_id: "a11ce000",
+    project_dir: join(dir, "sandbox"),
+    entrypoint: "cli",
+    title: "Fix the login bug",
+    claude_pid: process.pid,
+  };
+  await routes.hook("SessionStart", { ...live, session_id: "c0a5ed00", claude_pid: exited.pid });
+  await routes.hook("UserPromptSubmit", { ...live, at: Date.now() });
+  const chat = { id: you.id, type: "private" };
+  const command = { message_id: 40, date: 0, chat, from: you, text: "/sessions" };
+  fake.answer("getUpdates", ok([{ update_id: 900, message: command }]));
+  fake.answer("sendMessage", ok({ message_id: 41, date: 0, chat, text: "1 open session" }));
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  const text = String(asFields(fake.calls("sendMessage")[0]?.body)?.text);
+  expect(text).toMatch(/^1 open session:\n⏳ Fix the login bug: working for \d+ s$/);
+});

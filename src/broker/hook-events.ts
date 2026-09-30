@@ -68,6 +68,7 @@ export class HookEvents {
         asks.moved(ref.id);
         // When you typed, as the hook saw it: a cancel that arrives after a newer stop is late.
         const at = typeof fields.at === "number" ? fields.at : Date.now();
+        sessions.prompted(ref.id, at);
         return ok({ generation: relay.cancel(ref.id, at) });
       }
       case "Stop": {
@@ -204,10 +205,13 @@ export class HookEvents {
 }
 
 function sessionRef(fields: Fields): SessionRef | undefined {
-  const { session_id: id, project_dir: projectDir, entrypoint, title } = fields;
+  const { session_id: id, project_dir: projectDir, entrypoint, title, claude_pid: pid } = fields;
   if (typeof id !== "string" || id === "" || typeof projectDir !== "string") return undefined;
   const ref = { id, projectDir, entrypoint: typeof entrypoint === "string" ? entrypoint : "" };
-  return typeof title === "string" ? { ...ref, title } : ref;
+  const titled = typeof title === "string" ? { ...ref, title } : ref;
+  return Number.isSafeInteger(pid) && Number(pid) > 1
+    ? { ...titled, claudePid: Number(pid) }
+    : titled;
 }
 
 /** The first name in a paired user's name, as pairing stores it: "Hamed (@someone)" → "Hamed". */

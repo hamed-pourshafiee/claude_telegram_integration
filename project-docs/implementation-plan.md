@@ -1,10 +1,11 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 14 (7.2: sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the
-bot's menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone,
-approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
-chat; rev. 8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex
-review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter)
+Status: rev. 15 (7.3: /sessions lists the open sessions; rev. 14: 7.2, sessions named by their titles;
+rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu of commands and /help, asked for after the
+plan; rev. 11: 4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
+on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
+reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
+continuation entries, proven in 2.8, SIGTERM per waiter)
 · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 What we build and why is in [design.md](design.md): the goal, platform facts (F1–F21), architecture and
@@ -249,6 +250,17 @@ flows 1–4, decisions (D1–D10), security, rollback, risks and the review log.
   tests for reading the title (yours over the one Claude Code made, only the latest), the label, the
   cleaning, ping-only folders, the picker, and a real hook's title reaching the broker; live, a sandbox
   session's ✅ carries its title.
+- **7.3 `/sessions`** (asked 2026-09-30). The bot lists the open sessions, one line each, by the name
+  messages use, with what each is doing: asking you in the chat (❓, 📋, 🔐), finished and waiting for your
+  reply (✅), a question, plan or permission prompt open at the Mac (🖥), working (⏳), or stopped (💤); what
+  needs you comes first. A session counts as open until its SessionEnd, which a crash or a restart never
+  sends, so only sessions whose Claude still runs are listed: every hook's call brings its parent pid
+  (F18), and the broker keeps it with the session (schema 7), along with when a prompt last started a
+  turn. A session whose pid isn't known yet (from before this step) is listed while a hook of it waits
+  for you. At most 30 lines. **Pass:** tests for which sessions are listed (running, crashed, ended, not
+  known yet but waiting), what each is doing and the order, the pid and the prompt time kept, the menu,
+  and the command end to end; live, `/sessions` from the phone lists the sessions open at the Mac, and
+  none that closed.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.

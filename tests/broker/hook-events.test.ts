@@ -163,6 +163,21 @@ describe("a session's title (plan 7.2)", () => {
   });
 });
 
+describe("what /sessions needs (plan 7.3)", () => {
+  test("every call brings the session's Claude process; one that can't be a pid is ignored", () => {
+    call("SessionStart", { claude_pid: 4321 });
+    for (const pid of ["4321", 1, -5, 1.5]) call("StopFailure", { claude_pid: pid });
+    expect(sessions.get(ref.session_id)?.claudePid).toBe(4321);
+    call("Stop", { claude_pid: 7777 });
+    expect(sessions.get(ref.session_id)?.claudePid).toBe(7777);
+  });
+
+  test("a prompt records when its turn started, as the hook saw it", () => {
+    call("UserPromptSubmit", { at: 1_700_000_000_000 });
+    expect(sessions.get(ref.session_id)?.promptedAt).toBe(1_700_000_000_000);
+  });
+});
+
 describe("the other events", () => {
   test("SessionStart answers the paired user's first name, for the note", () => {
     expect(call("SessionStart", { branch: "main" }).body).toMatchObject({ name: "Hamed" });

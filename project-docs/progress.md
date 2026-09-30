@@ -1576,10 +1576,46 @@ their titles in the chat, not by their folders: step 7.2 (plan rev. 14).
 
 ## Next
 
-The plan, 7.1 and 7.2 are done. Possible later steps, from the plan: a Telegram topic per session, `/new`
-to start a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin.
-- O3 is decided: GitHub, as `origin` (D10, 2026-09-30). The user pushed `main` up to `9654bdd`; later
-  commits go up when they ask, each push after a scan of its commits for secrets.
-- A live uninstall rehearsal stays the user's choice (6.1 tested it with real processes).
-- Both VS Code windows still run Claude Code 2.1.283. Once they reload into 2.1.284, `ctl doctor`'s
-  stops line will show whether its stops are read.
+Committed as `33d6b2f` and pushed (2026-09-30). Then the user asked for a bot command that lists the open
+sessions: step 7.3 (plan rev. 15).
+
+## 7.3 `/sessions`
+
+- **Date:** 2026-09-30
+- **Built** (on `dev`):
+  - `/sessions` lists the open sessions, one line each, by the name messages use, with what each is
+    doing. What needs you comes first:
+    - ❓ 📋 🔐 asking you in the chat;
+    - ✅ finished, waiting for your reply;
+    - 🖥 a question, plan or permission prompt open at the Mac;
+    - ⏳ working;
+    - 💤 stopped.
+  - A session is open until its SessionEnd, which a crash or a restart never sends. So only sessions
+    whose Claude still runs are listed. Every hook's call now brings its parent pid (F18), and the
+    broker keeps it with the session (schema 7), along with when a prompt last started a turn. A
+    session from before this step, whose pid isn't known yet, is listed while a hook of it waits for
+    you.
+  - At most 30 lines; two sessions of the same title get the start of their id, as in the picker,
+    which now shares that code.
+  - `/sessions` is in the menu, after `/status`, so `/help` lists it too.
+  - Gate: typecheck exit 0, "Checked 147 files", "634 pass, 0 fail" across 60 files, twice.
+  - Positive controls, 11, each caught by its own tests:
+    - every open session listed;
+    - a waiting hook's Claude not looked at;
+    - a question's Claude not looked at;
+    - no order;
+    - no limit on the lines;
+    - the prompt time not recorded;
+    - a call without a pid forgetting it;
+    - any number taken for a pid;
+    - ended sessions counted as open;
+    - same-title sessions alike;
+    - `/sessions` missing from the menu.
+- **Decisions (mine, open to change):**
+  - The pid from the hooks (F18), not Claude Code's own `~/.claude/sessions/<pid>.json`, which is
+    undocumented.
+  - A pid Claude has since reused could keep a crashed session listed. That needs a crash, then a new
+    process with the same pid, so it is left as is.
+  - A permission prompt answered at the Mac stays 🖥 until the turn stops, because no hook says it was
+    answered.
+  - No buttons: a reply to a session's message already goes to it.
