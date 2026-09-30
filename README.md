@@ -72,9 +72,10 @@ Remote Control, no cloud service in between, no open port.
 Your Mac has to stay awake while you're away: the display may sleep, the system not. With the lid
 closed, a MacBook sleeps unless it's on power with an external display.
 
-**Which session.** Each message names its session by the title Claude Code shows for it, such as
-"✅ Fix the login bug". A new session goes by its folder until Claude Code has given it a title, often
-after its first turn. Ping-only folders always go by the folder.
+**Which session.** Each message names its session by the title Claude Code shows for it, such as "✅ Fix
+the login bug". `/sessions` reads each title when you send it. Elsewhere a new session goes by its folder
+until the bridge has seen its title, at the latest when its first turn ends. Ping-only folders always go
+by the folder.
 
 **Answering.** Reply to a bot message and your answer goes to that message's session. A plain message
 goes to the only session waiting for you; with several waiting, the bot asks which one. A question's

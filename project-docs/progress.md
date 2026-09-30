@@ -1674,3 +1674,47 @@ rev. 16).
     session it's for, and the existing routing takes it, with no state to go stale.
   - No confirmation once the message has gone in: the session's next ✅ answers it, as after a reply
     to a ✅.
+
+## Next
+
+`main` moved to `7af6228` and the broker restarted on it; 7.4's live check is still to come. The user
+then opened a new session, "IQ-1572", and `/sessions` didn't show it: step 7.5. Looking into that found
+the broker killed along with a hook: step 7.6. The user approved both, with their doc changes (design
+rev. 21: F21 refined, F22, D3; plan rev. 17).
+
+## 7.5 Titles in `/sessions` as they are now
+
+- **Date:** 2026-09-30
+- **Found first:**
+  - Claude Code wrote the new session's title, `ai-title` "IQ-1572", at 15:41:03, a second after its
+    first prompt (15:41:02), whose hook had already run. The session's next hook came with the next
+    prompt, at 15:46:57.
+  - So both `/sessions` of 15:42 and 15:44 listed it by its folder, as "⏳ agent-panel-frontend … ·
+    93c4: working", with its pid known and alive. F21 said a title may come only after the first turn;
+    it can come during it, and a hook sees it only when it runs next (F21 refined).
+- **Built** (on `dev`):
+  - Hooks send the transcript's path with every call, and the broker keeps it with the session
+    (schema 8). Only an absolute path of a `.jsonl` file is kept.
+  - `/sessions` and a tap on one of its sessions read each running session's title from its
+    transcript's end, with the code the hooks use, now in `src/shared/title.ts` (`readTail` in
+    `src/shared/transcript.ts`). The title read is kept for the messages after.
+  - Not for ping-only folders (D8), and not for sessions whose Claude has gone.
+  - The real hook's process test now also checks that the transcript path and Claude's pid (its
+    parent's, F18) reach the broker.
+  - The app tests' harness waits, before each test, for the last test's pollers to stop and for the
+    fake Bot API to answer any poll still pending. One such poll took the next test's update: the fake
+    hands a queued update to whichever poll it reads first, which Telegram never does.
+  - Gate: typecheck exit 0, "Checked 155 files", "647 pass, 0 fail" across 63 files, twice.
+  - Positive controls, 9, each caught by its own tests:
+    - hooks sending no transcript;
+    - the broker dropping it;
+    - any path taken;
+    - a call without it forgetting it;
+    - titles not read when listing;
+    - ping-only transcripts read;
+    - the title read not kept;
+    - the title read ignored;
+    - transcripts of gone sessions read.
+- **Decisions (mine, open to change):**
+  - The broker reads transcripts only for `/sessions` and its taps, and only their title entries.
+    Notices keep the title their hooks read.

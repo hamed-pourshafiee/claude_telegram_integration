@@ -12,6 +12,8 @@ export interface SessionRef {
   readonly title?: string;
   /** Its Claude process (F18), which every hook's call brings (plan 7.3). */
   readonly claudePid?: number;
+  /** Its transcript's path, where /sessions reads its title as it is now (plan 7.5). */
+  readonly transcript?: string;
 }
 
 export interface Session extends SessionRef {
@@ -26,6 +28,8 @@ export interface Session extends SessionRef {
   readonly claudePid: number;
   /** When a prompt last started a turn, in ms since the epoch; 0 before the first (plan 7.3). */
   readonly promptedAt: number;
+  /** "" until a hook brings it. */
+  readonly transcript: string;
 }
 
 interface Row {
@@ -39,6 +43,7 @@ interface Row {
   readonly title: string;
   readonly claude_pid: number;
   readonly prompted_at: number;
+  readonly transcript: string;
 }
 
 /** The most of a title the chat shows, in characters. */
@@ -76,15 +81,19 @@ export class Sessions {
 
   #record(ref: SessionRef, branch: string | undefined, reopen: boolean): Session {
     const reopened = reopen ? ", ended_at = NULL" : "";
-    // A title and a pid come with the ref once they're known; a ref without them keeps the old ones.
+    // A title, a pid and a transcript come with the ref once they're known; a ref without them keeps
+    // the old ones.
     this.#db.run(
-      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at, title, claude_pid)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO sessions (id, project_dir, entrypoint, branch, started_at, title, claude_pid,
+         transcript)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT (id) DO UPDATE SET project_dir = excluded.project_dir,
          entrypoint = excluded.entrypoint${reopened},
          title = CASE WHEN excluded.title <> '' THEN excluded.title ELSE sessions.title END,
          claude_pid = CASE WHEN excluded.claude_pid > 0 THEN excluded.claude_pid
-           ELSE sessions.claude_pid END`,
+           ELSE sessions.claude_pid END,
+         transcript = CASE WHEN excluded.transcript <> '' THEN excluded.transcript
+           ELSE sessions.transcript END`,
       ref.id,
       ref.projectDir,
       ref.entrypoint,
@@ -92,6 +101,7 @@ export class Sessions {
       this.#now().toISOString(),
       ref.title ?? "",
       ref.claudePid ?? 0,
+      ref.transcript ?? "",
     );
     if (branch !== undefined)
       this.#db.run("UPDATE sessions SET branch = ? WHERE id = ?", branch, ref.id);
@@ -105,6 +115,7 @@ export class Sessions {
         title: ref.title ?? "",
         claudePid: ref.claudePid ?? 0,
         promptedAt: 0,
+        transcript: ref.transcript ?? "",
       }
     );
   }
@@ -214,5 +225,6 @@ function fromRow(row: Row): Session {
     title: row.title,
     claudePid: row.claude_pid,
     promptedAt: row.prompted_at,
+    transcript: row.transcript,
   };
 }

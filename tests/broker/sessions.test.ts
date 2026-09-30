@@ -27,6 +27,7 @@ test("a session is recorded on its first hook, SessionStart or not, and keeps it
     title: "",
     claudePid: 0,
     promptedAt: 0,
+    transcript: "",
   });
   expect(all.touch(ref, "main").branch).toBe("main");
   expect(all.touch(ref).branch).toBe("main");
@@ -95,6 +96,13 @@ describe("what /sessions needs (plan 7.3)", () => {
     expect(all.touch({ ...ref, claudePid: 4321 }).claudePid).toBe(4321);
     expect(all.seen(ref).claudePid).toBe(4321);
     expect(all.touch({ ...ref, claudePid: 5555 }).claudePid).toBe(5555);
+  });
+
+  test("so is its transcript's path, where /sessions reads the title as it is now (plan 7.5)", () => {
+    const all = sessions();
+    expect(all.touch(ref).transcript).toBe("");
+    expect(all.touch({ ...ref, transcript: "/t/one.jsonl" }).transcript).toBe("/t/one.jsonl");
+    expect(all.seen(ref).transcript).toBe("/t/one.jsonl");
   });
 
   test("when a prompt started a turn, and which sessions no SessionEnd has ended", () => {

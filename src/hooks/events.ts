@@ -19,6 +19,8 @@ export interface SessionRef {
   readonly title?: string;
   /** Its Claude process, the hook's parent (F18): /sessions lists only those still running (plan 7.3). */
   readonly claude_pid: number;
+  /** Its transcript, where /sessions reads the title as it is when you ask (plan 7.5). */
+  readonly transcript?: string;
 }
 
 export interface HookContext {

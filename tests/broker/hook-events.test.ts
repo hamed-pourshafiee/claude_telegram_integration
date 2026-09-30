@@ -172,6 +172,13 @@ describe("what /sessions needs (plan 7.3)", () => {
     expect(sessions.get(ref.session_id)?.claudePid).toBe(7777);
   });
 
+  test("and its transcript's path, only an absolute one of a .jsonl file (plan 7.5)", () => {
+    call("SessionStart", { transcript: "/home/t/93c4408c.jsonl" });
+    for (const path of ["t/relative.jsonl", "/etc/passwd", 42])
+      call("StopFailure", { transcript: path });
+    expect(sessions.get(ref.session_id)?.transcript).toBe("/home/t/93c4408c.jsonl");
+  });
+
   test("a prompt records when its turn started, as the hook saw it", () => {
     call("UserPromptSubmit", { at: 1_700_000_000_000 });
     expect(sessions.get(ref.session_id)?.promptedAt).toBe(1_700_000_000_000);

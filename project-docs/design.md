@@ -1,15 +1,17 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 20, D4: a tap on a session under `/sessions` writes to it (plan 7.4) (rev. 19: `/sessions`
-lists the open sessions, whose Claude still runs by F18, plan 7.3; rev. 18: F21, messages name a session
-by its title, plan 7.2; rev. 17: D10, the git remote is GitHub, O3; rev. 16: the bot's menu of commands
-and /help, plan 7.1; rev. 15: permission prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can
-approve a plan, so plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev.
-12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev.
-10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan
-2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the
-spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 21, F22: Claude Code kills a hook's whole process tree, so the broker starts through a
+launcher (D3, plan 7.6); F21: a title can come during the first turn, so `/sessions` reads titles as it
+lists (plan 7.5) (rev. 20: D4, a tap on a session under `/sessions` writes to it, plan 7.4; rev. 19:
+`/sessions` lists the open sessions, whose Claude still runs by F18, plan 7.3; rev. 18: F21, messages
+name a session by its title, plan 7.2; rev. 17: D10, the git remote is GitHub, O3; rev. 16: the bot's
+menu of commands and /help, plan 7.1; rev. 15: permission prompts in flow 3, phase 5, D9; rev. 14: F20,
+no hook can approve a plan, so plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in
+flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as
+formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and
+flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5:
+Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) ·
+2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -56,7 +58,8 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F18 | A command hook runs as a direct child of the Claude Code process, with no shell in between, for synchronous and `asyncRewake` hooks alike, so a hook's parent pid is its Claude. | probed 2026-09-29 with 2.1.283 (plan 3.1) |
 | F19 | A command hook's `statusMessage` is shown in the spinner while the hook runs. The `AskUserQuestion` dialog can resolve itself after a stretch of idle, telling Claude the user may be away (`afkTimeoutMs` in its result); `PostToolUse` follows as usual. | 2.1.284 binary (plan 4.1); the idle timeout not seen live |
 | F20 | No hook can approve a plan (`ExitPlanMode`): after a hook's allow, Claude Code runs the tool's own permission check, and ExitPlanMode's always asks, so the plan dialog opens anyway. That holds for a `PreToolUse` allow (seen live) and a `PermissionRequest` allow, which the dialog ignores without `updatedInput` and re-asks with one. A deny from either stops the call; `AskUserQuestion`'s check is satisfied by the answers in `updatedInput`. The hook's input holds `plan` and `planFilePath` (seen live). | 2.1.284 binary; seen live 2026-09-29 (plan 4.2) |
-| F21 | Claude Code writes a session's title into its transcript, and again every few turns: `{"type":"custom-title","customTitle":…}` for one you gave it, `{"type":"ai-title","aiTitle":…}` for the one it made; it shows `customTitle || aiTitle`. A new session may get its title only after its first turn. | 2.1.284 binary; transcripts, 2026-09-30 (plan 7.2); undocumented |
+| F21 | Claude Code writes a session's title into its transcript, and again every few turns: `{"type":"custom-title","customTitle":…}` for one you gave it, `{"type":"ai-title","aiTitle":…}` for the one it made; it shows `customTitle || aiTitle`. The made title can come a second after the first prompt, or only after the first turn; a hook sees it only when the session's next hook runs, often at the end of the turn. | 2.1.284 binary; transcripts, 2026-09-30 (plans 7.2, 7.5); undocumented |
+| F22 | When Claude Code stops a hook (its `timeout`, likely a closed panel too), it kills the hook's whole process tree, found by parent pid (`ps -A -o pid= -o ppid=`), whatever session each process is in: a process the hook started that is still its child dies with it, even after `setsid`. One whose parent has exited, adopted by launchd, is outside the tree. | 2.1.283 live, 2026-09-30 08:25:12: the broker got SIGTERM 6 ms after a Stop hook reached its 12 h timeout; `killProcessTree` in the 2.1.284 binary (plan 7.6); undocumented |
 
 ## 3. Architecture
 
@@ -173,8 +176,10 @@ Taken (say so before the step if you disagree):
   and Unix-socket HTTP are built in. Checks: `tsc --noEmit`, Biome lint, `bun test`. No Telegram library:
   a handful of Bot API calls go over `fetch`.
 - **D3 Hooks start the broker on demand** from `<repo>`, with a minimal environment, so inherited
-  variables such as `BUN_CONFIG_VERBOSE_FETCH` can't log token-bearing URLs. No launchd plist. A
-  persistent "disabled" flag stops every hook, waiter and restart.
+  variables such as `BUN_CONFIG_VERBOSE_FETCH` can't log token-bearing URLs. No launchd plist. A hook
+  starts it through a launcher that exits at once, so launchd adopts the broker and it is never in a
+  hook's process tree, which Claude Code kills with the hook (F22, plan 7.6). A persistent "disabled"
+  flag stops every hook, waiter and restart.
 - **D4 Presence** as in flow 3: active < 30 s since your last input (F12); away after 3 min, when the
   screen is locked (F17), or on `/away`. An unreadable idle value counts as present, and `/status` shows
   it. Commands: `/away`, `/auto`, `/off` (mute), `/status`; `/local` hands questions back to the Mac (plan
@@ -182,7 +187,9 @@ Taken (say so before the step if you disagree):
   `/start`) is the guide. The paired chat alone gets them as its menu (`setMyCommands`), listed when "/"
   is typed and under the Menu button (plan 7.1). A session is open until its SessionEnd, which a crash
   never sends, so `/sessions` lists only those whose Claude process still runs: the broker keeps each
-  session's, the parent pid its hooks bring (F18). Under the list, a button for each session that can
+  session's, the parent pid its hooks bring (F18). Each is named by its title as it is when you ask,
+  read from its transcript then, since a hook may not have run since Claude Code made it (F21, plan
+  7.5). Under the list, a button for each session that can
   take a message (not one that stopped: no hook of it waits, so nothing would wake it). A tap sends a
   question with Telegram's reply box open on it (`force_reply`), linked to the session like a notice, so
   what you type goes to that session as in flow 4 (plan 7.4).

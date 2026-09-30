@@ -1,7 +1,7 @@
-import { closeSync, fstatSync, openSync, readSync } from "node:fs";
 import { errorCode } from "../shared/errors.ts";
 import { asFields, type Fields } from "../shared/json.ts";
 import { pause } from "../shared/pause.ts";
+import { readTail } from "../shared/transcript.ts";
 
 /** How a stop ended (flow 1): a real finish, Claude going on because a hook said so, or unknown. */
 export type StopOutcome = "finish" | "continuing" | "unknown";
@@ -177,33 +177,4 @@ function attachmentType(entry: Fields): string | undefined {
 
 function str(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
-}
-
-/**
- * The JSON entries in the last `bytes` of a JSONL file. A line cut at the start of the window, or a
- * partial last line still being written, is skipped.
- */
-export function readTail(path: string, bytes: number): Fields[] {
-  const fd = openSync(path, "r");
-  try {
-    const size = fstatSync(fd).size;
-    const start = Math.max(0, size - bytes);
-    const buffer = Buffer.alloc(size - start);
-    const read = readSync(fd, buffer, 0, buffer.length, start);
-    const lines = buffer.subarray(0, read).toString("utf8").split("\n");
-    if (start > 0) lines.shift();
-    return lines.flatMap((line) => parseLine(line));
-  } finally {
-    closeSync(fd);
-  }
-}
-
-function parseLine(line: string): Fields[] {
-  if (line.trim() === "") return [];
-  try {
-    const entry = asFields(JSON.parse(line));
-    return entry === undefined ? [] : [entry];
-  } catch {
-    return []; // a partial line: the next read has it whole
-  }
 }

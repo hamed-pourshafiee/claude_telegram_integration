@@ -2,8 +2,8 @@ import { afterAll, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { sessionTitle } from "../../src/hooks/title.ts";
 import type { LogFields } from "../../src/shared/log.ts";
+import { sessionTitle } from "../../src/shared/title.ts";
 
 // Plan 7.2 (F21): a session's title as Claude Code shows it, from the entries it writes into the
 // transcript, again and again: the one you gave it (custom-title), else the one it made (ai-title).
@@ -48,7 +48,7 @@ test("none yet (a first turn), no transcript yet, or none named: undefined, and 
   const folder = join(dir, "a-folder.jsonl");
   mkdirSync(folder);
   expect(sessionTitle(folder, log)).toBeUndefined();
-  expect(logged).toEqual([{ event: "hook.title-unreadable", fields: { error: "EISDIR" } }]);
+  expect(logged).toEqual([{ event: "title.unreadable", fields: { error: "EISDIR" } }]);
 });
 
 test("only the transcript's end is read: a title further back doesn't count", () => {

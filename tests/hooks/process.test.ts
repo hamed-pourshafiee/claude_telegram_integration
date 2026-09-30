@@ -50,7 +50,7 @@ test("Stop: the hook finds the finish in the transcript and the broker records i
   expect(logs).not.toContain("All done.");
 }, 20_000);
 
-test("the session's title in its transcript comes with the hook's call, and the broker keeps it (plan 7.2)", async () => {
+test("the session's title, its transcript and its Claude come with the hook's call, and the broker keeps them (plans 7.2, 7.3, 7.5)", async () => {
   const transcript = join(project, "titled.jsonl");
   writeFileSync(transcript, new Transcript().prompt("p1").assistant("Hi.").jsonl());
   const title = { type: "ai-title", aiTitle: "Fix the login bug", sessionId: "proc-session" };
@@ -59,11 +59,17 @@ test("the session's title in its transcript comes with the hook's call, and the 
   const stored = () => {
     const db = new Database(copy.state.db, { readonly: true });
     try {
-      const row = db.query("SELECT title FROM sessions WHERE id = 'proc-session'").get();
-      return (row as { title?: string } | null)?.title;
+      const query = "SELECT title, transcript, claude_pid FROM sessions WHERE id = 'proc-session'";
+      return db.query(query).get() as {
+        title: string;
+        transcript: string;
+        claude_pid: number;
+      } | null;
     } finally {
       db.close();
     }
   };
-  expect(await until(() => stored() === "Fix the login bug", 5000)).toBe(true);
+  expect(await until(() => stored()?.title === "Fix the login bug", 5000)).toBe(true);
+  // The hook runs as a child of this test, as it would of Claude Code (F18).
+  expect(stored()).toMatchObject({ transcript, claude_pid: process.pid });
 });

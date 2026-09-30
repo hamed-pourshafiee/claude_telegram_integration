@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { mkdirSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
@@ -8,7 +8,8 @@ import { appHarness, YOU } from "../helpers/app.ts";
 import { ok } from "../helpers/fake-telegram.ts";
 import { until } from "../helpers/wait.ts";
 
-// Plans 7.3 and 7.4 end to end: /sessions from the chat, and a tap on one of its sessions to write to it.
+// Plans 7.3 to 7.5 end to end: /sessions from the chat, with each session's title as it is now, and a
+// tap on one of its sessions to write to it.
 const harness = appHarness("app-sessions");
 const { fake, dir, app } = harness;
 const chat = { id: YOU.id, type: "private" };
@@ -88,4 +89,23 @@ test("a tap on a session opens the reply box, and what you send goes to it (plan
     text: "run the tests",
     from: "Hamed",
   });
+});
+
+test("a title Claude Code made after the session's last hook is in /sessions (plan 7.5)", async () => {
+  const { routes, session } = paired("titled");
+  const transcript = join(dir, "93c4408c.jsonl");
+  writeFileSync(
+    transcript,
+    `${JSON.stringify({ type: "user", message: { content: "IQ-1572" } })}\n`,
+  );
+  const untitled = { ...session, title: undefined, transcript };
+  await routes.hook("SessionStart", untitled);
+  await routes.hook("UserPromptSubmit", { ...untitled, at: Date.now() });
+  // A second later, during the first turn, when no hook of the session runs (F21).
+  appendFileSync(transcript, `${JSON.stringify({ type: "ai-title", aiTitle: "IQ-1572" })}\n`);
+  fake.answer("sendMessage", ok({ message_id: 61, date: 0, chat, text: "1 open session" }));
+  from(message(60, "/sessions"));
+  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
+  const text = String(asFields(fake.calls("sendMessage")[0]?.body)?.text);
+  expect(text).toMatch(/^1 open session:\n⏳ IQ-1572: working for \d+ s\n/);
 });

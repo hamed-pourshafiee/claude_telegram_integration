@@ -2,7 +2,8 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { appendFileSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { classifyEntries, classifyStop, readTail } from "../../src/hooks/finish.ts";
+import { classifyEntries, classifyStop } from "../../src/hooks/finish.ts";
+import { readTail } from "../../src/shared/transcript.ts";
 import {
   classifiedAt,
   EXPECTED,

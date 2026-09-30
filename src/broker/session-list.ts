@@ -11,6 +11,11 @@ export interface SessionListDeps {
   readonly asks: Pick<Asks, "inState">;
   /** Whether a process runs; default: a signal-0 kill. */
   readonly alive?: (pid: number) => boolean;
+  /**
+   * A running session's title as it is now, read from its transcript (plan 7.5): a hook may not have run
+   * since Claude Code made it (F21). Without it, or when it has none, the title kept is used.
+   */
+  readonly titleOf?: (session: Session) => string | undefined;
   readonly now?: () => number;
 }
 
@@ -38,7 +43,8 @@ const ID = /^[\w-]{1,40}$/;
 /**
  * The open sessions, what needs you first (plan 7.3). A session counts as open until its SessionEnd,
  * which a crash never sends, so only those whose Claude still runs are listed (F18): the session's
- * own, or that of a hook waiting for you. Sessions of the same title get the start of their id.
+ * own, or that of a hook waiting for you. Each is named by its title as it is now; sessions of the same
+ * title get the start of their id.
  */
 export function listed(deps: SessionListDeps): Listed[] {
   const alive = deps.alive ?? processAlive;
@@ -50,6 +56,10 @@ export function listed(deps: SessionListDeps): Listed[] {
       const pids = [session.claudePid, listening.get(session.id)?.claudePid];
       for (const ask of asks) if (ask.sessionId === session.id) pids.push(ask.claudePid);
       return pids.some((pid) => pid !== undefined && alive(pid));
+    })
+    .map((session) => {
+      const title = deps.titleOf?.(session);
+      return title === undefined ? session : { ...session, title };
     })
     .map((session) => ({ session, doing: doingOf(session, listening.get(session.id), asks) }))
     .sort((a, b) => rank(a.doing) - rank(b.doing) || since(b.doing) - since(a.doing));

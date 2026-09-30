@@ -18,8 +18,8 @@ import { processAlive } from "../shared/process.ts";
 import { sessionEnv, sessionScope } from "../shared/scope.ts";
 import { isDisabled } from "../shared/state.ts";
 import { refuseVerboseFetch } from "../shared/telegram/errors.ts";
+import { sessionTitle } from "../shared/title.ts";
 import { HANDLERS } from "./events.ts";
-import { sessionTitle } from "./title.ts";
 
 const log = fileLog(join(STATE.logs, "hooks.log"), "hook");
 const [event = "", ...flags] = Bun.argv.slice(2);
@@ -57,6 +57,7 @@ async function main(): Promise<void> {
     entrypoint: env.entrypoint ?? "",
     ...(title === undefined ? {} : { title }),
     claude_pid: claudePid,
+    ...(input.transcriptPath === undefined ? {} : { transcript: input.transcriptPath }),
   };
   await handler({
     input,

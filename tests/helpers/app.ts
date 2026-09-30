@@ -11,6 +11,7 @@ import { statePaths } from "../../src/shared/paths.ts";
 import { Secret } from "../../src/shared/secret.ts";
 import { FakeTelegram, ok } from "./fake-telegram.ts";
 import { FAKE_TOKEN } from "./secrets.ts";
+import { until } from "./wait.ts";
 
 /** The paired user, in the bot chat. */
 export const YOU = { id: 4242, is_bot: false, first_name: "Hamed", username: "hamed" };
@@ -33,6 +34,7 @@ export function appHarness(name: string): AppHarness {
   const dir = mkdtempSync(join(tmpdir(), `tg-${name}-`));
   let controller = new AbortController();
   let files = 0;
+  const apps: App[] = [];
   const harness: AppHarness = {
     fake,
     dir,
@@ -50,6 +52,7 @@ export function appHarness(name: string): AppHarness {
       const readPresence = () => Promise.resolve(harness.mac);
       const paths = statePaths(join(dir, `state-${files}`));
       const parts = createApp({ ...deps, config, paths, readPresence, apiBase: fake.url });
+      apps.push(parts);
       return { db: opened, ...parts };
     },
   };
@@ -58,8 +61,12 @@ export function appHarness(name: string): AppHarness {
     fake.stop();
     rmSync(dir, { recursive: true, force: true });
   });
-  beforeEach(() => {
+  beforeEach(async () => {
     controller.abort();
+    // A poller may have sent a getUpdates the fake hasn't read yet. It takes its answer now, not one
+    // this test queues: Telegram would send that update again, the fake can't.
+    await until(() => apps.every((app) => !app.poller.running));
+    await Bun.sleep(10);
     controller = new AbortController();
     harness.mac = { idleSeconds: 1, locked: false, problems: [] };
     fake.reset();

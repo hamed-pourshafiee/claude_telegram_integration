@@ -105,6 +105,8 @@ const MIGRATIONS: readonly (readonly string[])[] = [
     "ALTER TABLE sessions ADD COLUMN claude_pid INTEGER NOT NULL DEFAULT 0",
     "ALTER TABLE sessions ADD COLUMN prompted_at INTEGER NOT NULL DEFAULT 0",
   ],
+  // 8 (plan 7.5): the session's transcript, where /sessions reads its title as it is now (F21).
+  ["ALTER TABLE sessions ADD COLUMN transcript TEXT NOT NULL DEFAULT ''"],
 ];
 
 export const SCHEMA_VERSION: number = MIGRATIONS.length;

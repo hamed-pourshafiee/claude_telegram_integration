@@ -1,3 +1,4 @@
+import { isAbsolute } from "node:path";
 import { messageOf } from "../shared/errors.ts";
 import { type BackgroundTask, parseTasks } from "../shared/hook-input.ts";
 import { asFields, type Fields } from "../shared/json.ts";
@@ -207,11 +208,22 @@ export class HookEvents {
 function sessionRef(fields: Fields): SessionRef | undefined {
   const { session_id: id, project_dir: projectDir, entrypoint, title, claude_pid: pid } = fields;
   if (typeof id !== "string" || id === "" || typeof projectDir !== "string") return undefined;
-  const ref = { id, projectDir, entrypoint: typeof entrypoint === "string" ? entrypoint : "" };
-  const titled = typeof title === "string" ? { ...ref, title } : ref;
-  return Number.isSafeInteger(pid) && Number(pid) > 1
-    ? { ...titled, claudePid: Number(pid) }
-    : titled;
+  const { transcript } = fields;
+  return {
+    id,
+    projectDir,
+    entrypoint: typeof entrypoint === "string" ? entrypoint : "",
+    ...(typeof title === "string" ? { title } : {}),
+    ...(Number.isSafeInteger(pid) && Number(pid) > 1 ? { claudePid: Number(pid) } : {}),
+    ...(isTranscript(transcript) ? { transcript } : {}),
+  };
+}
+
+/** A transcript's path as Claude Code gives it to hooks: absolute, of a .jsonl file. */
+function isTranscript(path: unknown): path is string {
+  return (
+    typeof path === "string" && path.length <= 4096 && isAbsolute(path) && path.endsWith(".jsonl")
+  );
 }
 
 /** The first name in a paired user's name, as pairing stores it: "Hamed (@someone)" → "Hamed". */

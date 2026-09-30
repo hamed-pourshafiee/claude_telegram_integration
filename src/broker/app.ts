@@ -26,10 +26,9 @@ import { Presence } from "./presence.ts";
 import { Relay } from "./relay.ts";
 import { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
-import { sessionList } from "./session-list.ts";
 import { type Session, Sessions } from "./sessions.ts";
+import { sessionsParts } from "./sessions-command.ts";
 import { type Waiter, Waiters } from "./waiters.ts";
-import { type WriteToDeps, writeTo } from "./write-to.ts";
 
 export interface AppDeps {
   readonly token: Secret;
@@ -85,7 +84,10 @@ export function createApp(deps: AppDeps): App {
     { sessions, notifier, pairing, relay, asks: ask.relay, log },
     config,
   );
-  const listing = sessionsParts({ sessions, waiters, asks: ask.asks, telegram, outbox, log });
+  const listing = sessionsParts(
+    { sessions, waiters, asks: ask.asks, telegram, outbox, log },
+    config,
+  );
   const gateParts = { telegram, pairing, log, presence, notifier, router, asks: ask.chat };
   const gate = gateOf({ ...gateParts, ...listing });
   const botId = Number(token.reveal().split(":")[0]);
@@ -158,14 +160,6 @@ function gateOf(parts: GateParts): GateDeps {
     },
     reply: (updateId) => router.route(updateId),
     paired: (chat) => setMenu(telegram, chat, log),
-  };
-}
-
-/** /sessions, and a tap on one of its sessions to write to it (plans 7.3, 7.4). */
-function sessionsParts(deps: WriteToDeps) {
-  return {
-    list: () => sessionList(deps),
-    write: (data: string, chat: number, queryId: string) => writeTo(data, chat, queryId, deps),
   };
 }
 

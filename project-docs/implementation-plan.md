@@ -1,14 +1,15 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 16 (7.4: write to a session from /sessions; rev. 15: 7.3, /sessions lists the open sessions;
-rev. 14: 7.2, sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's
-menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone,
-approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
-chat; rev. 8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex
-review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter)
-· 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 17 (7.5: titles in /sessions as they are now, F21; 7.6: a broker no hook can take down, F22;
+rev. 16: 7.4, write to a session from /sessions; rev. 15: 7.3, /sessions lists the open sessions; rev.
+14: 7.2, sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu
+of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone, approved at
+the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev.
+8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of
+rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter) ·
+2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
-What we build and why is in [design.md](design.md): the goal, platform facts (F1–F21), architecture and
+What we build and why is in [design.md](design.md): the goal, platform facts (F1–F22), architecture and
 flows 1–4, decisions (D1–D10), security, rollback, risks and the review log. References such as
 "flow 3", "D6" or "F13" below point there. This file is the order of work.
 
@@ -272,6 +273,23 @@ flows 1–4, decisions (D1–D10), security, rollback, risks and the review log.
   tests for the buttons, the question and its link, the note for each state, a refused send, the
   placeholder's length, and end to end, `/sessions`, a tap and a reply reaching the session's waiting
   Stop hook; live, from the phone, a message written this way runs in a waiting session at the Mac.
+- **7.5 Titles in `/sessions` as they are now** (asked 2026-09-30, after 7.4). A session's made title can
+  come a second after its first prompt, while no hook of it runs until the turn ends (F21): the new
+  session "IQ-1572" was listed by its folder for six minutes. Hooks now send the transcript's path too,
+  and the broker keeps it with the session (schema 8). When you send `/sessions` or tap one of its
+  sessions, the broker reads each running session's title from its transcript's end, as the hooks do, and
+  keeps it for the messages after; not for ping-only folders (D8). **Pass:** tests for the path kept, the
+  title read when listing (a new title, none yet, a ping-only folder, a session not running), a real
+  hook's path and pid reaching the broker, and end to end, a title written after the session's last hook
+  shown by `/sessions`; live, a new session's title in `/sessions` during its first turn.
+- **7.6 A broker no hook can take down** (found 2026-09-30, looking into 7.5). Claude Code kills a hook's
+  whole process tree when it stops the hook (F22), and a broker a hook started stays that hook's child
+  while the hook runs: at 08:25:12 a Stop hook's 12 h timeout took the broker with it (another hook
+  started a new one at once). Hooks and `ctl start` now start the broker through a launcher that starts
+  it and exits at once, so launchd adopts it. **Pass:** a test that starts a broker from a real waiting
+  hook, kills that hook's tree the way Claude Code does (`ps -A -o pid= -o ppid=`), and finds the broker
+  still answering, with launchd as its parent; live, the broker a waiting hook started has launchd (1) as
+  its parent.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.
