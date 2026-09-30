@@ -1,11 +1,11 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 15 (7.3: /sessions lists the open sessions; rev. 14: 7.2, sessions named by their titles;
-rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu of commands and /help, asked for after the
-plan; rev. 11: 4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
-on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
-reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
-continuation entries, proven in 2.8, SIGTERM per waiter)
+Status: rev. 16 (7.4: write to a session from /sessions; rev. 15: 7.3, /sessions lists the open sessions;
+rev. 14: 7.2, sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's
+menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone,
+approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
+chat; rev. 8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex
+review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter)
 · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 What we build and why is in [design.md](design.md): the goal, platform facts (F1–F21), architecture and
@@ -261,6 +261,17 @@ flows 1–4, decisions (D1–D10), security, rollback, risks and the review log.
   known yet but waiting), what each is doing and the order, the pid and the prompt time kept, the menu,
   and the command end to end; live, `/sessions` from the phone lists the sessions open at the Mac, and
   none that closed.
+- **7.4 Write to a session from `/sessions`** (asked 2026-09-30, after 7.3's live check). Under the list,
+  a button for each session that can take a message: asking in the chat, waiting for your reply, at the
+  Mac or working. Not one that stopped: no hook of it waits, so nothing would wake it until it is used at
+  the Mac again. A tap sends "✏️ Your message for …" with Telegram's reply box open on it
+  (`force_reply`), linked to the session in the outbox like a notice, and saying what the message will
+  do: go in at once, answer its question, change its plan, deny its permission with a reason, or wait for
+  the end of its turn. What you type is then a reply to that question, and flow 4 takes it to the
+  session. A session that stopped, ended or whose Claude has gone since gets a note on the tap. **Pass:**
+  tests for the buttons, the question and its link, the note for each state, a refused send, the
+  placeholder's length, and end to end, `/sessions`, a tap and a reply reaching the session's waiting
+  Stop hook; live, from the phone, a message written this way runs in a waiting session at the Mac.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.

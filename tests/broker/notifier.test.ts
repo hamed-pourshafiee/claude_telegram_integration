@@ -16,6 +16,7 @@ import type {
   SendDocumentParams,
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
+import { buttonRows } from "../helpers/buttons.ts";
 import { SAMPLES } from "../helpers/secret-samples.ts";
 
 // Plan 2.7: notices go to the paired user only while they are away and not muted (D4); text is
@@ -187,7 +188,7 @@ describe("what leaves the Mac (D8)", () => {
   test("secrets are masked, in the chat and in the file; a ping-only folder sends no text", async () => {
     const secrets = SAMPLES.map((sample) => sample.line).join("\n");
     await notifier.send("finish", session("sandbox"), finish(secrets));
-    const button = sent.at(-1)?.reply_markup?.inline_keyboard[0]?.[0];
+    const button = buttonRows(sent.at(-1))[0]?.[0];
     await notifier.press(button?.callback_data ?? "", 4242, "q0");
     await notifier.send("finish", session("private"), finish("The private plan."));
     const text = [...sent.map((message) => message.text), documents[0]?.content].join("\n");
@@ -199,7 +200,7 @@ describe("what leaves the Mac (D8)", () => {
   test("a long reply is cut, and its 📄 button sends the whole of it as a file", async () => {
     const long = `${"word ".repeat(200)}END`;
     await notifier.send("finish", session("sandbox"), finish(long));
-    const button = sent.at(-1)?.reply_markup?.inline_keyboard[0]?.[0];
+    const button = buttonRows(sent.at(-1))[0]?.[0];
     expect(button?.text).toBe("📄 Full text as a file");
     expect(sent.at(-1)?.text).not.toContain("END");
     await notifier.press(button?.callback_data ?? "", 4242, "q1");

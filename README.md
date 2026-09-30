@@ -78,9 +78,11 @@ after its first turn. Ping-only folders always go by the folder.
 
 **Answering.** Reply to a bot message and your answer goes to that message's session. A plain message
 goes to the only session waiting for you; with several waiting, the bot asks which one. A question's
-buttons answer it; so does a reply to it. If you type at the Mac while a reply is on its way, the first
-one wins: a reply that comes after your typing isn't used, and if it went in just before, the bot tells
-you it crossed.
+buttons answer it; so does a reply to it. To write to any session, send `/sessions` and tap it: the bot
+opens the reply box for it, and what you send goes to that session, at once if it waits for you, or when
+its turn ends. A session that stopped more than 12 hours ago takes a message again only once it's used at
+the Mac. If you type at the Mac while a reply is on its way, the first one wins: a reply that comes after
+your typing isn't used, and if it went in just before, the bot tells you it crossed.
 
 **Permission prompts** (Bash, Edit and Write only). The message shows the whole command and where it
 runs, or the file and the full change, split over several messages or sent as a file if long. Allow
@@ -99,7 +101,7 @@ what it does.
 | Command | Does |
 |---|---|
 | `/status` | Where the bridge thinks you are, and why |
-| `/sessions` | Your open sessions, one line each: which ask you something, which wait for your reply, which are working. Only sessions whose Claude still runs are listed, so one left by a crash or a restart isn't. |
+| `/sessions` | Your open sessions, one line each: which ask you something, which wait for your reply, which are working. Only sessions whose Claude still runs are listed, so one left by a crash or a restart isn't. Tap one to write to it. |
 | `/away` | Relay everything until `/auto`, even while you're at the Mac |
 | `/auto` | Decide from your idle time and the screen lock again |
 | `/off` | Mute everything until `/auto` or `/away` |

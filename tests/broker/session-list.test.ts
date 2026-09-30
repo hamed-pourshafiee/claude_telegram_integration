@@ -38,7 +38,7 @@ function world() {
     sessions.stop(id);
     clock = NOW;
   };
-  const list = () =>
+  const answer = () =>
     sessionList({
       sessions,
       waiters: { listening: () => waiters },
@@ -46,7 +46,11 @@ function world() {
       alive: (pid) => RUNNING.has(pid),
       now: () => NOW,
     });
-  return { sessions, waiters, asks, open, stoppedAt, list };
+  const list = () => answer().text;
+  /** Each button under the list: its text and its data. */
+  const buttons = () =>
+    (answer().reply_markup?.inline_keyboard ?? []).flat().map((b) => [b.text, b.callback_data]);
+  return { sessions, waiters, asks, open, stoppedAt, list, buttons };
 }
 
 const waiter = (sessionId: string, claudePid: number): Waiter => ({
@@ -101,15 +105,16 @@ describe("which sessions are listed", () => {
   });
 
   test("none open says so", () => {
-    const { open, list } = world();
+    const { open, list, buttons } = world();
     open("crashed", 999);
     expect(list()).toBe("No sessions are open.");
+    expect(buttons()).toEqual([]);
   });
 });
 
 describe("what each is doing", () => {
   test("what needs you first: asked here, then waiting for a reply, at the Mac, working, stopped", () => {
-    const { sessions, waiters, asks, open, stoppedAt, list } = world();
+    const { sessions, waiters, asks, open, stoppedAt, list, buttons } = world();
     open("idle", 101, "Tidy the docs");
     stoppedAt("idle", NOW - 125 * MIN);
     open("works", 102, "Fix the login bug");
@@ -135,21 +140,36 @@ describe("what each is doing", () => {
         "⏳ Fix the login bug: working for 3 min",
         "💤 Tidy the docs: stopped 2 h 5 min ago",
         "💤 new · new: idle",
+        "",
+        "Tap one to write to it.",
+        "💤 A stopped session takes a message again once it's used at the Mac.",
       ].join("\n"),
     );
+    // Plan 7.4: a button for each session that can take a message, now or when its turn ends.
+    expect(buttons()).toEqual([
+      ["🔐 Run the tests", "write:allow"],
+      ["❓ Pick a library", "write:choose"],
+      ["✅ Hello.py markdown note", "write:replies"],
+      ["🖥 Plan the release", "write:mac"],
+      ["⏳ Fix the login bug", "write:works"],
+    ]);
   });
+});
 
+describe("names and length", () => {
   test("sessions of the same title get the start of their id; a long list is cut", () => {
-    const { open, list } = world();
+    const { waiters, open, list, buttons } = world();
     open("aaaa1111", 101, "Fix the bug");
     open("bbbb2222", 102, "Fix the bug");
-    expect(list()).toBe(
-      "2 open sessions:\n💤 Fix the bug · aaaa: idle\n💤 Fix the bug · bbbb: idle",
+    waiters.push(waiter("bbbb2222", 102));
+    expect(list()).toStartWith(
+      "2 open sessions:\n✅ Fix the bug · bbbb: waits for your reply\n💤 Fix the bug · aaaa: idle\n",
     );
+    expect(buttons()).toEqual([["✅ Fix the bug · bbbb", "write:bbbb2222"]]);
     for (let at = 0; at < 31; at += 1) open(`many-${at}`, 103, `Session ${at}`);
     const lines = list().split("\n");
     expect(lines[0]).toBe("33 open sessions:");
-    expect(lines).toHaveLength(32);
-    expect(lines.at(-1)).toBe("…and 3 more");
+    expect(lines[31]).toBe("…and 3 more");
+    expect(buttons()).toHaveLength(1);
   });
 });

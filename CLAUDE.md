@@ -77,10 +77,11 @@ bun scripts/record-stops.ts [claude]  # re-records tests/fixtures/transcripts/ (
 ```
 
 In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/sessions` lists
-the open sessions whose Claude still runs and what each is doing (plan 7.3), `/away` relays everything
-until `/auto`, `/auto` decides from the idle time and the screen lock, `/off` mutes, `/local` hands
-Claude's questions waiting in the chat back to the dialog at the Mac (plan 4.1), and `/help` (or
-`/start`) is the guide. The paired chat has them as its menu: "/" or the Menu button (plan 7.1).
+the open sessions whose Claude still runs and what each is doing, with a button to write to each (plans
+7.3, 7.4), `/away` relays everything until `/auto`, `/auto` decides from the idle time and the screen
+lock, `/off` mutes, `/local` hands Claude's questions waiting in the chat back to the dialog at the Mac
+(plan 4.1), and `/help` (or `/start`) is the guide. The paired chat has them as its menu: "/" or the Menu
+button (plan 7.1).
 
 Tests that need a real broker, hook or ctl process run them in a throwaway copy of the repo
 (`tests/helpers/repo-copy.ts`), never against this repo's `.state/` or `.env`.

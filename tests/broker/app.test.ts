@@ -1,59 +1,23 @@
-import { afterAll, beforeEach, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { expect, test } from "bun:test";
+import { mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { createApp } from "../../src/broker/app.ts";
 import { MENU } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
-import type { Reading } from "../../src/broker/ioreg.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
 import { Sessions } from "../../src/broker/sessions.ts";
 import { pairingInstructions } from "../../src/ctl/pair.ts";
-import { parseConfig } from "../../src/shared/config.ts";
 import { asFields } from "../../src/shared/json.ts";
-import { noLog } from "../../src/shared/log.ts";
-import { statePaths } from "../../src/shared/paths.ts";
-import { Secret } from "../../src/shared/secret.ts";
-import { FakeTelegram, ok } from "../helpers/fake-telegram.ts";
-import { FAKE_TOKEN } from "../helpers/secrets.ts";
+import { appHarness, YOU } from "../helpers/app.ts";
+import { ok } from "../helpers/fake-telegram.ts";
 import { until } from "../helpers/wait.ts";
 
 // The broker's parts together, in this process, against a fake Bot API: plan 2.4 end to end.
-const fake = new FakeTelegram();
-const dir = mkdtempSync(join(tmpdir(), "tg-app-"));
-let controller = new AbortController();
-let files = 0;
-/** What the stand-in Mac shows. */
-let mac: Reading = { idleSeconds: 1, locked: false, problems: [] };
-afterAll(() => {
-  controller.abort();
-  fake.stop();
-  rmSync(dir, { recursive: true, force: true });
-});
-beforeEach(() => {
-  controller.abort();
-  controller = new AbortController();
-  mac = { idleSeconds: 1, locked: false, problems: [] };
-  fake.reset();
-  // Like long polling: an empty answer after a short wait.
-  fake.fallback("getUpdates", { json: { ok: true, result: [] }, delayMs: 30 });
-  fake.fallback("setMyCommands", ok(true));
-});
+const harness = appHarness("app");
+const { fake, dir, app } = harness;
+const you = YOU;
 
 /** The menu of commands, for the paired chat only (plan 7.1). */
 const menuFor = (chatId: number) => ({ commands: MENU, scope: { type: "chat", chat_id: chatId } });
-
-function app(db?: BrokerDb) {
-  files += 1;
-  const opened = db ?? BrokerDb.open(join(dir, `app-${files}.db`));
-  const deps = { token: new Secret(FAKE_TOKEN), db: opened, log: noLog, signal: controller.signal };
-  const config = parseConfig({}, { repoRoot: dir, home: dir });
-  const readPresence = () => Promise.resolve(mac);
-  const paths = statePaths(join(dir, `state-${files}`));
-  return { db: opened, ...createApp({ ...deps, config, paths, readPresence, apiBase: fake.url }) };
-}
-
-const you = { id: 4242, is_bot: false, first_name: "Hamed", username: "hamed" };
 
 test("before any pairing the broker doesn't poll Telegram at all", async () => {
   const { routes, poller } = app();
@@ -100,7 +64,7 @@ test("once paired, a restarted broker polls at once", async () => {
 });
 
 test("/status from the paired user gets where the Mac says you are (plan 2.6)", async () => {
-  mac = { idleSeconds: 3, locked: true, problems: [] };
+  harness.mac = { idleSeconds: 3, locked: true, problems: [] };
   const db = BrokerDb.open(join(dir, "status.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
@@ -125,7 +89,7 @@ test("/status from the paired user gets where the Mac says you are (plan 2.6)", 
 });
 
 test("a finished turn while you're away: the ✅ arrives, and 📄 sends the whole reply (plan 2.7)", async () => {
-  mac = { idleSeconds: 400, locked: false, problems: [] };
+  harness.mac = { idleSeconds: 400, locked: false, problems: [] };
   const db = BrokerDb.open(join(dir, "notify.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
@@ -137,7 +101,13 @@ test("a finished turn while you're away: the ✅ arrives, and 📄 sends the who
   const chat = { id: you.id, type: "private" };
   fake.fallback("sendMessage", ok({ message_id: 11, date: 0, chat, text: "✅" }));
   const reply = `${"word ".repeat(1000)}END`;
-  routes.hook("StopResult", { ...ref, generation, outcome: "finish", text: reply, tasks: [] });
+  await routes.hook("StopResult", {
+    ...ref,
+    generation,
+    outcome: "finish",
+    text: reply,
+    tasks: [],
+  });
   expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
   const sent = asFields(fake.calls("sendMessage")[0]?.body);
   expect(String(sent?.text)).toStartWith("<b>✅ sandbox · b1e8</b>");
@@ -154,7 +124,7 @@ test("a finished turn while you're away: the ✅ arrives, and 📄 sends the who
 });
 
 test("your reply-to a ✅ reaches that session: queued while it's busy, then its next Wait (plan 3.2)", async () => {
-  mac = { idleSeconds: 400, locked: false, problems: [] };
+  harness.mac = { idleSeconds: 400, locked: false, problems: [] };
   const db = BrokerDb.open(join(dir, "reply.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
@@ -185,7 +155,7 @@ test("your reply-to a ✅ reaches that session: queued while it's busy, then its
 });
 
 test("Claude asks while you're away: the ❓ arrives with buttons, and your tap is the answer (plan 4.1)", async () => {
-  mac = { idleSeconds: 400, locked: false, problems: [] };
+  harness.mac = { idleSeconds: 400, locked: false, problems: [] };
   const db = BrokerDb.open(join(dir, "ask.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed (@hamed)" });
@@ -240,30 +210,4 @@ test("at start, titles of sessions whose folder no longer shows text go (D8, pla
   app(db);
   expect(sessions.get("kept")?.title).toBe("Sandbox work");
   expect(sessions.get("gone")?.title).toBe("");
-});
-
-test("/sessions lists the sessions whose Claude runs, and what each is doing (plan 7.3)", async () => {
-  const db = BrokerDb.open(join(dir, "sessions.db"));
-  const pairing = new Pairing(db);
-  pairing.attempt(pairing.start().code, { id: you.id, name: "Hamed" });
-  const { routes } = app(db);
-  mkdirSync(join(dir, "sandbox"), { recursive: true });
-  const exited = Bun.spawn(["true"]);
-  await exited.exited;
-  const live = {
-    session_id: "a11ce000",
-    project_dir: join(dir, "sandbox"),
-    entrypoint: "cli",
-    title: "Fix the login bug",
-    claude_pid: process.pid,
-  };
-  await routes.hook("SessionStart", { ...live, session_id: "c0a5ed00", claude_pid: exited.pid });
-  await routes.hook("UserPromptSubmit", { ...live, at: Date.now() });
-  const chat = { id: you.id, type: "private" };
-  const command = { message_id: 40, date: 0, chat, from: you, text: "/sessions" };
-  fake.answer("getUpdates", ok([{ update_id: 900, message: command }]));
-  fake.answer("sendMessage", ok({ message_id: 41, date: 0, chat, text: "1 open session" }));
-  expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
-  const text = String(asFields(fake.calls("sendMessage")[0]?.body)?.text);
-  expect(text).toMatch(/^1 open session:\n⏳ Fix the login bug: working for \d+ s$/);
 });

@@ -15,6 +15,7 @@ import type {
   AnswerCallbackQueryParams,
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
+import { buttonRows } from "../helpers/buttons.ts";
 import { noAskChat } from "../helpers/no-asks.ts";
 
 // Plan 3.2 (flow 4): where each reply goes. Sessions A and B stop and wait, or are busy.
@@ -145,7 +146,9 @@ describe("the picker's buttons name sessions by title (plan 7.2)", () => {
     parts.sessions.retitle("bbbb2222", "Fix the login bug");
     parts.sessions.retitle("cccc3333", "Write the README");
     await parts.router.route(incoming("which of you?"));
-    const names = sent[0]?.reply_markup?.inline_keyboard.flat().map((button) => button.text);
+    const names = buttonRows(sent[0])
+      .flat()
+      .map((button) => button.text);
     expect(names).toEqual([
       "Fix the login bug · aaaa",
       "Fix the login bug · bbbb",
@@ -162,7 +165,9 @@ describe("the picker, with several sessions waiting", () => {
     const update = incoming("which of you?");
     await parts.router.route(update);
     expect(texts()).toEqual([expect.stringContaining("Which one")]);
-    const buttons = sent[0]?.reply_markup?.inline_keyboard.flat().map((b) => b.callback_data);
+    const buttons = buttonRows(sent[0])
+      .flat()
+      .map((button) => button.callback_data);
     expect(buttons).toEqual([`to:${update}:aaaa1111`, `to:${update}:bbbb2222`, `drop:${update}`]);
     await parts.router.press(`to:${update}:aaaa1111`, "q1");
     expect(body(await first)).toMatchObject({ state: "reply", text: "which of you?" });

@@ -1,4 +1,4 @@
-import type { BotCommand } from "../shared/telegram/types.ts";
+import type { BotCommand, InlineKeyboardMarkup } from "../shared/telegram/types.ts";
 import type { Mode, Presence, Snapshot, State, Thresholds } from "./presence.ts";
 
 /**
@@ -15,6 +15,12 @@ const NAMES: readonly CommandName[] = [
   "help",
   "sessions",
 ];
+/** A command's answer with buttons under it, such as /sessions' (plan 7.4). */
+export interface CommandAnswer {
+  readonly text: string;
+  readonly reply_markup?: InlineKeyboardMarkup;
+}
+
 /** Telegram sends /start when you first open the bot: it gets the guide. */
 const ALIASES: ReadonlyMap<string, CommandName> = new Map([["start", "help"]]);
 

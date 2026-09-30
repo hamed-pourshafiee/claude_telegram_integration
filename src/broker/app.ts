@@ -11,7 +11,7 @@ import { AskChat } from "./ask-chat.ts";
 import { AskMessages } from "./ask-messages.ts";
 import { AskRelay } from "./ask-relay.ts";
 import { type Ask, Asks } from "./asks.ts";
-import { MENU, runCommand } from "./commands.ts";
+import { type CommandAnswer, MENU, runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
 import { FullTexts } from "./full-texts.ts";
 import { type GateDeps, handleUpdate, replyOf } from "./gate.ts";
@@ -29,6 +29,7 @@ import type { Routes } from "./server.ts";
 import { sessionList } from "./session-list.ts";
 import { type Session, Sessions } from "./sessions.ts";
 import { type Waiter, Waiters } from "./waiters.ts";
+import { type WriteToDeps, writeTo } from "./write-to.ts";
 
 export interface AppDeps {
   readonly token: Secret;
@@ -84,8 +85,9 @@ export function createApp(deps: AppDeps): App {
     { sessions, notifier, pairing, relay, asks: ask.relay, log },
     config,
   );
-  const list = () => sessionList({ sessions, waiters, asks: ask.asks });
-  const gate = gateOf({ telegram, pairing, log, presence, notifier, router, asks: ask.chat, list });
+  const listing = sessionsParts({ sessions, waiters, asks: ask.asks, telegram, outbox, log });
+  const gateParts = { telegram, pairing, log, presence, notifier, router, asks: ask.chat };
+  const gate = gateOf({ ...gateParts, ...listing });
   const botId = Number(token.reveal().split(":")[0]);
   const handle = (update: Update) => handleUpdate(update, gate);
   const accept = (update: Update) => {
@@ -130,13 +132,15 @@ interface GateParts {
   readonly notifier: Notifier;
   readonly router: Router;
   readonly asks: AskChat;
-  /** The answer to /sessions (plan 7.3). */
-  readonly list: () => string;
+  /** The answer to /sessions (plan 7.3)… */
+  readonly list: () => CommandAnswer;
+  /** …and a tap on one of its sessions (plan 7.4). */
+  readonly write: (data: string, chat: number, queryId: string) => Promise<void>;
 }
 
 /** What the gate does with the paired user's commands, buttons and replies. */
 function gateOf(parts: GateParts): GateDeps {
-  const { telegram, pairing, log, presence, notifier, router, asks, list } = parts;
+  const { telegram, pairing, log, presence, notifier, router, asks, list, write } = parts;
   return {
     telegram,
     pairing,
@@ -149,10 +153,19 @@ function gateOf(parts: GateParts): GateDeps {
     press: (data, chat, queryId) => {
       if (data.startsWith("full:")) return notifier.press(data, chat, queryId);
       if (data.startsWith("ask:")) return asks.press(data, queryId);
+      if (data.startsWith("write:")) return write(data, chat, queryId);
       return router.press(data, queryId);
     },
     reply: (updateId) => router.route(updateId),
     paired: (chat) => setMenu(telegram, chat, log),
+  };
+}
+
+/** /sessions, and a tap on one of its sessions to write to it (plans 7.3, 7.4). */
+function sessionsParts(deps: WriteToDeps) {
+  return {
+    list: () => sessionList(deps),
+    write: (data: string, chat: number, queryId: string) => writeTo(data, chat, queryId, deps),
   };
 }
 

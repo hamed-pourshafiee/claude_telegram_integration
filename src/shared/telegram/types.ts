@@ -54,6 +54,13 @@ export interface InlineKeyboardMarkup {
   readonly inline_keyboard: readonly (readonly InlineKeyboardButton[])[];
 }
 
+/** Opens the reply box on the bot's message, so what you type next answers it (plan 7.4). */
+export interface ForceReply {
+  readonly force_reply: true;
+  /** At most 64 characters, shown in the empty input field. */
+  readonly input_field_placeholder?: string;
+}
+
 export interface ReplyParameters {
   readonly message_id: number;
   readonly allow_sending_without_reply?: boolean;
@@ -71,7 +78,7 @@ export interface SendMessageParams {
   readonly text: string;
   readonly parse_mode?: "HTML";
   readonly reply_parameters?: ReplyParameters;
-  readonly reply_markup?: InlineKeyboardMarkup;
+  readonly reply_markup?: InlineKeyboardMarkup | ForceReply;
   readonly link_preview_options?: { readonly is_disabled: boolean };
   readonly disable_notification?: boolean;
 }

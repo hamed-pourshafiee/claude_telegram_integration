@@ -14,6 +14,7 @@ import type {
   SendMessageParams,
 } from "../../src/shared/telegram/types.ts";
 import { askHarness, CHAT, FOLDERS } from "../helpers/asks.ts";
+import { buttonRows } from "../helpers/buttons.ts";
 import { until } from "../helpers/wait.ts";
 
 // Plan 4.1 with flow 4: a reply finds Claude's question, whether it replies to it or is plain.
@@ -133,7 +134,7 @@ describe("replies to Claude's questions", () => {
     const other = parts.otherWaits();
     const update = parts.incoming("Bun");
     await parts.router.route(update);
-    const rows = parts.notes[0]?.reply_markup?.inline_keyboard ?? [];
+    const rows = buttonRows(parts.notes[0]);
     expect(rows.map((row) => row[0]?.callback_data)).toEqual([
       `to:${update}:0253aaaa`,
       `to:${update}:5e551011-aaaa`,

@@ -1582,7 +1582,8 @@ sessions: step 7.3 (plan rev. 15).
 ## 7.3 `/sessions`
 
 - **Date:** 2026-09-30
-- **Built** (on `dev`):
+- **Result:** passed, with the user.
+- **Built** (on `dev`, `21165b8`):
   - `/sessions` lists the open sessions, one line each, by the name messages use, with what each is
     doing. What needs you comes first:
     - ❓ 📋 🔐 asking you in the chat;
@@ -1618,4 +1619,58 @@ sessions: step 7.3 (plan rev. 15).
     process with the same pid, so it is left as is.
   - A permission prompt answered at the Mac stays 🖥 until the turn stops, because no hook says it was
     answered.
-  - No buttons: a reply to a session's message already goes to it.
+  - No buttons at first; the user asked for them after the live check (7.4).
+- **Going live:**
+  - The live database was backed up at schema 6 (integrity ok):
+    `.state/backups/broker.pre-schema7.2026-09-30T08-07-43Z.db` (0600).
+  - `main` was fast-forwarded to `21165b8`, and the broker restarted on it (pid 79689, schema 7). It
+    set the menu again (`menu.set`).
+- **Evidence:**
+  - The user sent `/sessions` from the phone (08:08:41, `command sessions` in the broker log) and saw
+    the list.
+  - The pids the hooks bring match Claude Code's own `~/.claude/sessions/<pid>.json`: 11654 for this
+    session, on 2.1.284, and 70692 and 49538 for two others, on 2.1.283. So F18 holds on 2.1.284 too.
+  - The sandbox session "Hello.py markdown note" is still open in the database (no SessionEnd came),
+    but no Claude process runs it, so it isn't listed.
+
+## Next
+
+The user asked to pick a session from the list and send it a message that runs there: step 7.4 (plan
+rev. 16).
+
+## 7.4 Write to a session from `/sessions`
+
+- **Date:** 2026-09-30
+- **Built** (on `dev`):
+  - Under the list, a button for each session that can take a message: asking in the chat, waiting
+    for your reply, at the Mac or working. A stopped session gets none: no hook of it waits, so nothing
+    would wake it until it's used at the Mac. The Stop hook waits 12 h (F2).
+  - A tap sends "✏️ Your message for …" with Telegram's reply box open on it (`force_reply`). The
+    question is linked to the session in the outbox, like a notice, and says what the message will do:
+    - go in at once;
+    - answer its question;
+    - change its plan;
+    - deny its permission, with the message as the reason;
+    - or wait for the end of its turn.
+  - What you type is then a reply to that question, and the router takes it to the session (flow 4),
+    with no new routing.
+  - A session that stopped, ended or whose Claude has gone since the list was sent gets a note on the
+    tap. So does a button that can't be read.
+  - The app tests' setup moved to `tests/helpers/app.ts`, so the `/sessions` tests have their own file.
+  - Gate: typecheck exit 0, "Checked 152 files", "640 pass, 0 fail" across 62 files.
+  - Positive controls, 10, each caught by its own tests:
+    - no reply box;
+    - the question not linked;
+    - a stopped session asked for a message;
+    - the tap left unanswered when the send fails;
+    - the placeholder not cut;
+    - one hint for every state;
+    - stopped sessions given buttons;
+    - no buttons at all;
+    - taps not routed;
+    - the gate dropping the buttons.
+- **Decisions (mine, open to change):**
+  - A question with the reply box, not "the next plain message goes to X". The reply box shows which
+    session it's for, and the existing routing takes it, with no state to go stale.
+  - No confirmation once the message has gone in: the session's next ✅ answers it, as after a reply
+    to a ✅.

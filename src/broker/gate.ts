@@ -1,7 +1,7 @@
 import type { Log } from "../shared/log.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
 import type { CallbackQuery, Chat, Update, User } from "../shared/telegram/types.ts";
-import { type CommandName, parseCommand } from "./commands.ts";
+import { type CommandAnswer, type CommandName, parseCommand } from "./commands.ts";
 import type { IncomingReply } from "./inbox.ts";
 import type { Pairing, PairingResult } from "./pairing.ts";
 
@@ -10,7 +10,7 @@ export interface GateDeps {
   readonly pairing: Pairing;
   readonly log: Log;
   /** Carries out a command of the paired user (/status, /away…) and returns the answer. */
-  readonly command: (name: CommandName) => string;
+  readonly command: (name: CommandName) => string | CommandAnswer;
   /** Answers the paired user's press of a button, such as 📄 (plan 2.7). */
   readonly press: (data: string, chat: number, queryId: string) => Promise<void>;
   /** Routes a reply for Claude, which the poller stored before the offset moved on (plan 3.1). */
@@ -85,7 +85,9 @@ async function pressed(query: CallbackQuery, chat: Chat, deps: GateDeps) {
 
 async function answer(update: Known, name: CommandName, chat: Chat, deps: GateDeps) {
   deps.log("command", { update: update.update_id, command: name });
-  await deps.telegram.sendMessage({ chat_id: chat.id, text: deps.command(name) });
+  const answered = deps.command(name);
+  const body = typeof answered === "string" ? { text: answered } : answered;
+  await deps.telegram.sendMessage({ chat_id: chat.id, ...body });
 }
 
 type Known = Exclude<Update, { kind: "other" }>;
