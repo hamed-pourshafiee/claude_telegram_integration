@@ -57,6 +57,17 @@ describe("each call reaches the Bot API with the token and returns a checked ans
       text: "Sent",
     });
   });
+
+  test("setMyCommands: one chat's menu (plan 7.1); an answer other than true is an error", async () => {
+    const params = {
+      commands: [{ command: "status", description: "Where you are" }],
+      scope: { type: "chat" as const, chat_id: chat.id },
+    };
+    fake.answer("setMyCommands", ok(true), ok(false));
+    await client().setMyCommands(params);
+    expect(fake.calls("setMyCommands")[0]?.body).toEqual(params);
+    await expect(client().setMyCommands(params)).rejects.toThrow("setMyCommands");
+  });
 });
 
 describe("sendDocument", () => {

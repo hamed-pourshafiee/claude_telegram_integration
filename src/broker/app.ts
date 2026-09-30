@@ -1,4 +1,5 @@
 import type { Config } from "../shared/config.ts";
+import { messageOf } from "../shared/errors.ts";
 import { type Log, noLog } from "../shared/log.ts";
 import type { StatePaths } from "../shared/paths.ts";
 import type { Secret } from "../shared/secret.ts";
@@ -9,7 +10,7 @@ import { AskChat } from "./ask-chat.ts";
 import { AskMessages } from "./ask-messages.ts";
 import { AskRelay } from "./ask-relay.ts";
 import { type Ask, Asks } from "./asks.ts";
-import { runCommand } from "./commands.ts";
+import { MENU, runCommand } from "./commands.ts";
 import type { BrokerDb } from "./db.ts";
 import { FullTexts } from "./full-texts.ts";
 import { type GateDeps, handleUpdate, replyOf } from "./gate.ts";
@@ -99,7 +100,9 @@ export function createApp(deps: AppDeps): App {
   router
     .recover()
     .catch((error: unknown) => log("router.recover-failed", { error: String(error) }));
-  if (pairing.pairedUser() !== undefined || pairing.pendingUntil() !== undefined) poller.start();
+  const paired = pairing.pairedUser();
+  if (paired !== undefined) setMenu(telegram, paired.id, log);
+  if (paired !== undefined || pairing.pendingUntil() !== undefined) poller.start();
   return { routes, poller, presence, relay, asks: ask.relay };
 }
 
@@ -126,7 +129,19 @@ function gateOf({ telegram, pairing, log, presence, notifier, router, asks }: Ga
       return router.press(data, queryId);
     },
     reply: (updateId) => router.route(updateId),
+    paired: (chat) => setMenu(telegram, chat, log),
   };
+}
+
+/**
+ * The paired chat's menu of commands (plan 7.1), set at every start and on pairing; other chats get
+ * none. A failure is only logged: the next start tries again.
+ */
+function setMenu(telegram: TelegramClient, chat: number, log: Log): void {
+  telegram
+    .setMyCommands({ commands: MENU, scope: { type: "chat", chat_id: chat } })
+    .then(() => log("menu.set", {}))
+    .catch((error: unknown) => log("menu.failed", { error: messageOf(error) }));
 }
 
 interface AskParts {

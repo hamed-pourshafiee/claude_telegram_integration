@@ -3,6 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../../src/broker/app.ts";
+import { MENU } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import type { Reading } from "../../src/broker/ioreg.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
@@ -35,7 +36,11 @@ beforeEach(() => {
   fake.reset();
   // Like long polling: an empty answer after a short wait.
   fake.fallback("getUpdates", { json: { ok: true, result: [] }, delayMs: 30 });
+  fake.fallback("setMyCommands", ok(true));
 });
+
+/** The menu of commands, for the paired chat only (plan 7.1). */
+const menuFor = (chatId: number) => ({ commands: MENU, scope: { type: "chat", chat_id: chatId } });
 
 function app(db?: BrokerDb) {
   files += 1;
@@ -54,6 +59,7 @@ test("before any pairing the broker doesn't poll Telegram at all", async () => {
   await Bun.sleep(100);
   expect(poller.running).toBe(false);
   expect(fake.calls("getUpdates")).toEqual([]);
+  expect(fake.calls("setMyCommands")).toEqual([]);
   expect(asFields(routes.health())).toMatchObject({
     paired: null,
     pairingUntil: null,
@@ -77,6 +83,8 @@ test("ctl pair's route starts polling, and '/pair <code>' from the bot chat pair
     text: expect.stringMatching(/^Paired ✅/),
   });
   expect(asFields(routes.health())).toMatchObject({ paired: "Hamed (@hamed)", pairingUntil: null });
+  expect(await until(() => fake.calls("setMyCommands").length === 1)).toBe(true);
+  expect(fake.calls("setMyCommands")[0]?.body).toEqual(menuFor(you.id));
 });
 
 test("once paired, a restarted broker polls at once", async () => {
@@ -86,6 +94,8 @@ test("once paired, a restarted broker polls at once", async () => {
   const { poller } = app(db);
   expect(poller.running).toBe(true);
   expect(await until(() => fake.calls("getUpdates").length > 0)).toBe(true);
+  // Its chat's menu, again at every start (plan 7.1).
+  expect(fake.calls("setMyCommands").map((call) => call.body)).toEqual([menuFor(you.id)]);
 });
 
 test("/status from the paired user gets where the Mac says you are (plan 2.6)", async () => {

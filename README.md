@@ -89,7 +89,8 @@ Every decision goes to `.state/logs/audit.log`, by a short hash of the operation
 **Plans.** Claude's plan comes to the chat; reply with what to change (or tap Keep planning) and Claude
 plans again. A plan can only be approved at the Mac: tap "🖥 Approve at the Mac", then approve it there.
 
-**Commands** in the bot chat:
+**Commands** in the bot chat: type `/` or tap the chat's Menu button to see them, each with a line on
+what it does.
 
 | Command | Does |
 |---|---|
@@ -98,6 +99,7 @@ plans again. A plan can only be approved at the Mac: tap "🖥 Approve at the Ma
 | `/auto` | Decide from your idle time and the screen lock again |
 | `/off` | Mute everything until `/auto` or `/away` |
 | `/local` | Hand the questions waiting in the chat back to the dialogs at the Mac |
+| `/help` | A short guide: what comes to the chat, how to answer it, and these commands |
 
 ## Commands on the Mac
 

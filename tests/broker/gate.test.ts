@@ -25,6 +25,7 @@ let logged: string[] = [];
 let commands: CommandName[] = [];
 let presses: string[] = [];
 let replies: number[] = [];
+let menus: number[] = [];
 let pairing: Pairing;
 let nextId = 0;
 beforeEach(() => {
@@ -33,6 +34,7 @@ beforeEach(() => {
   commands = [];
   presses = [];
   replies = [];
+  menus = [];
   pairing = new Pairing(BrokerDb.open(join(dir, `gate-${Date.now()}-${nextId}.db`)));
 });
 
@@ -69,8 +71,9 @@ const reply = (updateId: number) => {
   replies.push(updateId);
   return Promise.resolve();
 };
+const paired = (chat: number) => menus.push(chat);
 const handle = (update: Update) =>
-  handleUpdate(update, { telegram, pairing, log, command, press, reply });
+  handleUpdate(update, { telegram, pairing, log, command, press, reply, paired });
 const reasons = () =>
   logged.filter((line) => line.includes("update.dropped")).map((line) => JSON.parse(line).reason);
 
@@ -82,8 +85,10 @@ describe("pairing through /pair", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({
       chat_id: you.id,
-      text: expect.stringMatching(/^Paired ✅/),
+      text: expect.stringMatching(/^Paired ✅[\s\S]*\/help shows how\.$/),
     });
+    // The chat gets its menu of commands (plan 7.1).
+    expect(menus).toEqual([you.id]);
   });
 
   test("a wrong code is refused, with the tries left; too many cancel the pairing", async () => {
@@ -96,6 +101,7 @@ describe("pairing through /pair", () => {
     expect(sent.at(-1)?.text).toStartWith("❌ Too many wrong codes");
     await handle(message(you, privateChat(you.id), `/pair ${code}`));
     expect(pairing.pairedUser()).toBeUndefined();
+    expect(menus).toEqual([]);
   });
 
   test("an expired code, or none pending: no answer, nobody paired", async () => {

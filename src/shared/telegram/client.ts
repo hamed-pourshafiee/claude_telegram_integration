@@ -16,6 +16,7 @@ import {
   parseUser,
   type SendDocumentParams,
   type SendMessageParams,
+  type SetMyCommandsParams,
   type Update,
   type User,
 } from "./types.ts";
@@ -105,6 +106,12 @@ export class TelegramClient {
   async answerCallbackQuery(params: AnswerCallbackQueryParams): Promise<void> {
     const result = await this.#call("answerCallbackQuery", json(params));
     if (result !== true) throw this.#badAnswer("answerCallbackQuery");
+  }
+
+  /** The bot's commands, which Telegram lists when "/" is typed and under the chat's Menu button. */
+  async setMyCommands(params: SetMyCommandsParams): Promise<void> {
+    const result = await this.#call("setMyCommands", json(params));
+    if (result !== true) throw this.#badAnswer("setMyCommands");
   }
 
   sendDocument(params: SendDocumentParams): Promise<Message> {

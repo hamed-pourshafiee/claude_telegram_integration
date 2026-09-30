@@ -15,12 +15,14 @@ export interface GateDeps {
   readonly press: (data: string, chat: number, queryId: string) => Promise<void>;
   /** Routes a reply for Claude, which the poller stored before the offset moved on (plan 3.1). */
   readonly reply: (updateId: number) => Promise<void>;
+  /** Someone just paired from `chat`: its menu of commands (plan 7.1). */
+  readonly paired: (chat: number) => void;
 }
 
 const REPLIES = {
   paired:
     "Paired ✅\nThis chat now gets the bridge's messages from Claude Code on your Mac, " +
-    "and only you can answer them.",
+    "and only you can answer them. /help shows how.",
   cancelled:
     "❌ Too many wrong codes, so this pairing is cancelled. " +
     "Run 'bun run ctl pair' on your Mac to start again.",
@@ -117,6 +119,7 @@ async function pair(update: Known, code: string, from: User, chat: Chat, deps: G
   const reply = replyTo(result);
   // With no pairing in progress, a /pair gets no answer, like any other stranger's message.
   if (reply !== undefined) await deps.telegram.sendMessage({ chat_id: chat.id, text: reply });
+  if (result.outcome === "paired") deps.paired(chat.id);
 }
 
 function replyTo(result: PairingResult): string | undefined {

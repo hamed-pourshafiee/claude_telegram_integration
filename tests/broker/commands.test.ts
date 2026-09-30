@@ -2,14 +2,14 @@ import { afterAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { duration, parseCommand, runCommand } from "../../src/broker/commands.ts";
+import { duration, helpText, MENU, parseCommand, runCommand } from "../../src/broker/commands.ts";
 import { BrokerDb } from "../../src/broker/db.ts";
 import type { Reading } from "../../src/broker/ioreg.ts";
 import { Presence } from "../../src/broker/presence.ts";
 import { DEFAULTS } from "../../src/shared/config.ts";
 import { noLog } from "../../src/shared/log.ts";
 
-// Plan 2.6: /away /auto /off /status, and what /status says.
+// Plan 2.6: /away /auto /off /status, and what /status says; plan 7.1: the menu and /help.
 const dir = mkdtempSync(join(tmpdir(), "tg-commands-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 let files = 0;
@@ -35,13 +35,15 @@ describe("which texts are commands", () => {
     ["/auto", "auto"],
     ["/off", "off"],
     ["/local", "local"],
+    ["/help", "help"],
+    ["/start", "help"],
     ["/status@SomeBot", "status"],
     ["  /AWAY \n", "away"],
   ] as const)("%j: %s", (text, name) => {
     expect(parseCommand(text)).toBe(name);
   });
 
-  test.each([["/status now"], ["/stat"], ["status"], ["/pair ABCD-EFGH"], ["/start"], [""]])(
+  test.each([["/status now"], ["/stat"], ["status"], ["/pair ABCD-EFGH"], ["/constructor"], [""]])(
     "%j: none",
     (text) => {
       expect(parseCommand(text)).toBeUndefined();
@@ -99,4 +101,27 @@ test.each([
   [7830, "2 h 10 min"],
 ])("duration(%d) is %s", (seconds, text) => {
   expect(duration(seconds)).toBe(text);
+});
+
+describe("the menu and the guide (plan 7.1)", () => {
+  test("the menu holds every command the bot knows, each as Telegram allows it", () => {
+    const names = MENU.map((entry) => entry.command);
+    expect(names).toEqual(["status", "away", "auto", "off", "local", "help"]);
+    for (const { command, description } of MENU) {
+      expect(String(parseCommand(`/${command}`))).toBe(command);
+      expect(command).toMatch(/^[a-z0-9_]{1,32}$/);
+      expect(description.length).toBeGreaterThan(0);
+      expect(description.length).toBeLessThanOrEqual(256);
+    }
+  });
+
+  test("/help names each command with what it does, and when you count as away", async () => {
+    const presence = await lookedAt({ idleSeconds: 5, locked: false });
+    const guide = runCommand("help", presence);
+    expect(guide).toBe(helpText(presence.limits));
+    for (const { command, description } of MENU)
+      expect(guide).toContain(`/${command}: ${description}`);
+    expect(guide).toContain("after 3 min without input");
+    expect(presence.mode).toBe("auto");
+  });
 });

@@ -1,6 +1,7 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 15, permission prompts in flow 3 (phase 5, D9) (rev. 14: F20, no hook can approve a plan, so
+Status: rev. 16, the bot's menu of commands and /help (plan 7.1) (rev. 15: permission prompts in flow 3,
+phase 5, D9; rev. 14: F20, no hook can approve a plan, so
 plans are reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built
 in plan 4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake
 fires UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded
@@ -172,7 +173,9 @@ Taken (say so before the step if you disagree):
   persistent "disabled" flag stops every hook, waiter and restart.
 - **D4 Presence** as in flow 3: active < 30 s since your last input (F12); away after 3 min, when the
   screen is locked (F17), or on `/away`. An unreadable idle value counts as present, and `/status` shows
-  it. Commands: `/away`, `/auto`, `/off` (mute), `/status`.
+  it. Commands: `/away`, `/auto`, `/off` (mute), `/status`; `/local` hands questions back to the Mac (plan
+  4.1), and `/help` (also `/start`) is the guide. The paired chat alone gets them as its menu
+  (`setMyCommands`), listed when "/" is typed and under the Menu button (plan 7.1).
 - **D5 Fail safe.** On any error the hook logs it and exits with no decision, so Claude behaves as if the
   hook were not there. Nothing is ever approved or answered because of an error.
 - **D6 The Mac stays awake while you're away.** The display may sleep, the system may not; with the lid

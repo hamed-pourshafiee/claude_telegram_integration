@@ -92,6 +92,18 @@ export interface EditMessageReplyMarkupParams {
   readonly reply_markup?: InlineKeyboardMarkup;
 }
 
+/** One command of the bot's menu (setMyCommands). */
+export interface BotCommand {
+  readonly command: string;
+  readonly description: string;
+}
+
+/** The menu of one chat only (BotCommandScopeChat): other chats don't see it. */
+export interface SetMyCommandsParams {
+  readonly commands: readonly BotCommand[];
+  readonly scope: { readonly type: "chat"; readonly chat_id: number };
+}
+
 export interface AnswerCallbackQueryParams {
   readonly callback_query_id: string;
   readonly text?: string;

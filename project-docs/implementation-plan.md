@@ -1,6 +1,7 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 11 (4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
+Status: rev. 12 (7.1: the bot's menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans
+reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
 on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
 reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
 continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-29 · Repo:
@@ -229,6 +230,16 @@ flows 1–4, decisions (D1–D9, open O3), security, rollback, risks and the rev
   all active, after a settings edit made since install.
 - **6.2** Full gate: `typecheck`, `lint` and `test` with their summary lines, plus the Codex code-review
   checkpoint.
+
+### Phase 7: After the plan (asked for by the user)
+
+- **7.1 The bot's menu and a guide** (asked 2026-09-30). The paired chat gets the commands as its menu
+  (`setMyCommands` with that chat's scope, at every broker start and on pairing): Telegram lists them
+  with a line each when "/" is typed, and under the chat's Menu button. `/help`, and `/start`, which
+  Telegram sends when the bot is first opened, answer with a guide: what comes to the chat, how to answer
+  it, and the commands. **Pass:** tests for the menu (every command, as Telegram allows), the guide, the
+  menu set on pairing and at start for that chat only, and none before pairing; live, "/" and the Menu
+  button list the commands on your phone, and `/help` answers.
 
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.
