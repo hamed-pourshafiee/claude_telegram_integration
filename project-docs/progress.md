@@ -9,7 +9,7 @@ date, the result, the evidence and what we learned. A new session reads this, th
 |---|---|
 | 0.1 Bot created with BotFather | done (2026-09-28); the user keeps the token, it goes into `.env` at 2.1 |
 | 0.2 Telegram two-step verification | on (2026-09-28) |
-| 0.3 O3 git remote | local only for now (2026-09-27) |
+| 0.3 O3 git remote | local only (2026-09-27); GitHub from 2026-09-30 (D10) |
 | 0.3 D6 how the Mac stays awake | Amphetamine (2026-09-28) |
 
 ## 1.1 Scaffold
@@ -1531,8 +1531,8 @@ menu and a guide: step 7.1 (plan rev. 12).
 
 The plan and 7.1 are done. Possible later steps, from the plan: a Telegram topic per session, `/new` to
 start a headless session, resuming ended sessions, steering Claude mid-turn, packaging as a plugin.
-- The user is creating a GitHub repository (O3). Once it exists: add it as the remote, scan the whole
-  history for secrets, and push only when the user says so.
+- O3 is decided: GitHub, as `origin` (D10, 2026-09-30). The user pushed `main` up to `9654bdd`; the
+  later commits went up when they asked, each push after a scan of its commits for secrets.
 - A live uninstall rehearsal stays the user's choice (6.1 tested it with real processes).
 - Both VS Code windows still run Claude Code 2.1.283. Once they reload into 2.1.284, `ctl doctor`'s
   stops line will show whether its stops are read.

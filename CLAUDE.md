@@ -9,7 +9,7 @@ replies come back into the same session.
 Read these completely before doing anything in a new session:
 
 1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F20, architecture
-   and flows 1–4, decisions D1–D9, open question O3, security, rollback, risks.
+   and flows 1–4, decisions D1–D10, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
 3. [project-docs/progress.md](project-docs/progress.md): steps done, their evidence, what we learned and
@@ -55,8 +55,8 @@ Read these completely before doing anything in a new session:
   its own settings file. Afterwards, check the result against the backup.
 - If a doc turns out wrong or a spike fails, stop and propose the change to the docs before working
   around it.
-- When a step passes, commit it locally (no confirmation needed). No git remote until the user chooses one
-  (O3: local only for now).
+- When a step passes, commit it locally (no confirmation needed). The remote is the user's GitHub
+  repository, `origin` (D10): push only when the user asks, after scanning the commits to push for secrets.
 
 ## Commands
 
