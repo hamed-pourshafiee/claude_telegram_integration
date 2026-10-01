@@ -68,18 +68,17 @@ export class Notifier {
 
   /**
    * The chat a notice about `session` goes to now, or why none does. One started from the chat reports
-   * there wherever you are (D11); /off mutes it too.
+   * there wherever you are, and /off doesn't mute it: you asked for it there (D11).
    */
   target(
     session: Pick<Session, "fromChat">,
   ): { readonly chat: number } | { readonly skip: string } {
     const user = this.#deps.pairing.pairedUser();
     if (user === undefined) return { skip: "not paired" };
+    if (session.fromChat) return { chat: user.id };
     const { mode, state } = this.#deps.presence.snapshot();
     if (mode === "off") return { skip: "muted" };
-    if (state !== "away" && !session.fromChat) {
-      return { skip: state === "active" ? "at the Mac" : "in between" };
-    }
+    if (state !== "away") return { skip: state === "active" ? "at the Mac" : "in between" };
     return { chat: user.id };
   }
 

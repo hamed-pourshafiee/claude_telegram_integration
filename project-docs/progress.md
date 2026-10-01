@@ -1912,6 +1912,15 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
   - Tests: the handler, and a real hook as `sdk-cli` with the id and a transcript without the summary.
   - Positive controls, 2, each caught: the stop classified from the transcript, and `main.ts` not
     passing the flag.
+- **Live check, fourth try** (00:57 UTC): session `1c894489` ran and its stop was a finish at once, but
+  the ✅ was skipped as `muted`. The bot was in `/off`, which by D11 muted sessions started from the
+  chat too. The user also still saw no VS Code tab, as D11 says.
+- **Changed** (on `dev`): `/off` no longer mutes a session started from the chat, its notices or its
+  questions; it mutes the rest as before (D11 amended).
+  - Positive controls, 2, each caught: `/off` muting its notices, and sending its questions to the Mac.
+- **Looked into:** `--session-mirror`, which the extension can pass, emits transcript frames for an SDK
+  session store; it doesn't let a tab follow a session that runs elsewhere. A VS Code tab still can't
+  show a `/new` session while it runs.
 
 ## Next
 

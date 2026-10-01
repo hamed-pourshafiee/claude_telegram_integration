@@ -234,11 +234,11 @@ Taken (say so before the step if you disagree):
   (`CLAUDE_TELEGRAM_SESSION`), which is how the hooks know to serve it though Claude Code calls it
   `sdk-cli` (F27), and passes the message on stdin, marked "📨 From … on Telegram". The bridge's hooks run
   it like any session (F25), except that its stop counts as a finish, as its hook can't read the stop's
-  summary in `-p` (F29): its ✅, questions and permission prompts come to the chat whatever your presence,
-  since you started it there (not with `/off`), and your replies continue it. It has no dialog at the
-  Mac, so nothing moves back there, and a prompt the chat can't show is denied. At most 3 run at once.
-  One ends 12 h after its last turn, when its Stop hook stops waiting. Every start goes to the audit log,
-  without the text.
+  summary in `-p` (F29): its ✅, questions and permission prompts come to the chat whatever your presence
+  and even with `/off`, since you started it there (decided after the live check of 2026-10-01, when
+  `/off` hid a session's ✅), and your replies continue it. It has no dialog at the Mac, so nothing moves
+  back there, and a prompt the chat can't show is denied. At most 3 run at once. One ends 12 h after its
+  last turn, when its Stop hook stops waiting. Every start goes to the audit log, without the text.
 
 Open:
 

@@ -36,9 +36,9 @@ async function askedHere(h: AskHarness) {
   return h.idOf("toolu_1");
 }
 
-test("at the Mac, its question comes here, not to a dialog", async () => {
+test("at the Mac, and with /off, its question comes here, not to a dialog", async () => {
   const h = harness();
-  h.be("active");
+  h.be("active", "off");
   const id = await askedHere(h);
   expect(h.asks.get(id)?.state).toBe("remote");
 });

@@ -91,7 +91,7 @@ first folder, with the others added), in the background, not as a tab (Claude Co
 tab working from outside). Its messages come to the chat wherever you are, and your replies continue it;
 its permission prompts come here too, and one the chat can't show is denied, as there is no dialog to
 open at the Mac. `/sessions` lists it as "(started here)". It ends 12 hours after its last turn. At most
-three run at once, and `/off` mutes them too.
+three run at once. `/off` doesn't mute them: you started them to hear from them.
 
 **Permission prompts** (Bash, Edit and Write only). The message shows the whole command and where it
 runs, or the file and the full change, split over several messages or sent as a file if long. Allow

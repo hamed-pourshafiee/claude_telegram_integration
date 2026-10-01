@@ -154,15 +154,16 @@ describe("who gets a notice, and when", () => {
   });
 });
 
-test("a session /new started reports here at the Mac too; /off mutes it (D11, plan 7.7)", async () => {
+test("a session /new started reports here at the Mac too, and even with /off (D11, plan 7.7)", async () => {
   const started = { ...session("sandbox"), fromChat: true };
   snapshot = { ...away, state: "active", because: "input" };
   expect(await notifier.send("finish", started, finish("Done."))).toBe(true);
   snapshot = { ...away, state: "between", because: "idle" };
   expect(await notifier.send("finish", started, finish("Done."))).toBe(true);
   snapshot = { ...away, mode: "off" };
-  expect(await notifier.send("finish", started, finish("Done."))).toBe(false);
-  expect(sent).toHaveLength(2);
+  expect(await notifier.send("finish", started, finish("Done."))).toBe(true);
+  expect(await notifier.send("finish", session("sandbox"), finish("Muted."))).toBe(false);
+  expect(sent).toHaveLength(3);
 });
 
 test("each message sent is linked to its session and generation, for a reply-to (plan 3.2)", async () => {
