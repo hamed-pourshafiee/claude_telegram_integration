@@ -160,7 +160,7 @@ describe("names and length", () => {
   test("a session /new started is marked (plan 7.7)", () => {
     const { sessions, list } = world();
     const ref = { id: "5e7d0000", projectDir: "/work/app", entrypoint: "cli", claudePid: 101 };
-    sessions.startedHere({ ...ref, title: "Fix the tests" });
+    sessions.startedHere({ ...ref, title: "Fix the tests" }, "background");
     expect(list()).toContain("💤 Fix the tests (started here): idle");
   });
 

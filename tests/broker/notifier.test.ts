@@ -41,6 +41,7 @@ const session = (folder: string) => ({
   promptedAt: 0,
   transcript: "",
   fromChat: false,
+  inBackground: false,
 });
 const away: Snapshot = {
   mode: "auto",

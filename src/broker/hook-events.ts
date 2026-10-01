@@ -25,6 +25,11 @@ export interface HookEventsDeps {
    * a session by its title (plan 7.2). Without it, none is kept.
    */
   readonly showsText?: (projectDir: string) => boolean;
+  /**
+   * A session's SessionStart, with its source: the message a tab /new opened starts on, or undefined
+   * for any other session (F30, plan 7.8).
+   */
+  readonly firstMessage?: (ref: SessionRef, source: string) => string | undefined;
 }
 
 /** A session's latest stop, kept in memory for idle_prompt, which may come a minute later (F6). */
@@ -61,9 +66,13 @@ export class HookEvents {
     this.#deps.log("hook.event", { hook: event, session: ref.id });
     const { sessions, relay, asks } = this.#deps;
     switch (event) {
-      case "SessionStart":
+      case "SessionStart": {
         sessions.touch(ref, typeof fields.branch === "string" ? fields.branch : undefined);
-        return ok({ name: firstName(this.#deps.pairing.pairedUser()?.name) });
+        const source = typeof fields.source === "string" ? fields.source : "";
+        const first = this.#deps.firstMessage?.(ref, source);
+        const name = firstName(this.#deps.pairing.pairedUser()?.name);
+        return ok(first === undefined ? { name } : { name, first });
+      }
       case "UserPromptSubmit": {
         sessions.touch(ref);
         asks.moved(ref.id);

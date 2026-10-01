@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { type AskHarness, askHarness, SESSION } from "../helpers/asks.ts";
 import { until } from "../helpers/wait.ts";
 
-// Plan 7.7 (D11): a session /new started runs in the background, with no dialog at the Mac, so its
-// questions come here wherever you are, and stay here.
+// Plans 7.7 and 7.8 (D11): a session /new started reports here wherever you are. One in the background
+// has no dialog at the Mac, so its questions stay here; a tab's can go back to its dialog.
 const dir = mkdtempSync(join(tmpdir(), "tg-from-chat-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 let files = 0;
@@ -20,13 +20,14 @@ const PICK = {
   ],
 };
 
-/** The harness, with its session started from the chat unless `normal`. */
-function harness(normal = false): AskHarness {
+/** The harness, with its session started from the chat, in the background or a tab, or not. */
+function harness(how: "background" | "tab" | "normal" = "background"): AskHarness {
   files += 1;
   const h = askHarness(join(dir, `from-chat-${files}.db`));
-  const ref = { id: SESSION.session_id, projectDir: SESSION.project_dir, entrypoint: "cli" };
-  if (normal) h.sessions.touch(ref);
-  else h.sessions.startedHere(ref);
+  const entrypoint = { background: "sdk-cli", tab: "claude-vscode", normal: "cli" }[how];
+  const ref = { id: SESSION.session_id, projectDir: SESSION.project_dir, entrypoint };
+  if (how === "normal") h.sessions.touch(ref);
+  else h.sessions.startedHere(ref, how);
   return h;
 }
 
@@ -36,11 +37,13 @@ async function askedHere(h: AskHarness) {
   return h.idOf("toolu_1");
 }
 
-test("at the Mac, and with /off, its question comes here, not to a dialog", async () => {
-  const h = harness();
-  h.be("active", "off");
-  const id = await askedHere(h);
-  expect(h.asks.get(id)?.state).toBe("remote");
+test("at the Mac, and with /off, its question comes here, in the background or a tab", async () => {
+  for (const how of ["background", "tab"] as const) {
+    const h = harness(how);
+    h.be("active", "off");
+    const id = await askedHere(h);
+    expect(h.asks.get(id)?.state).toBe("remote");
+  }
 });
 
 test("back at the Mac, /local and its 🖥 button leave it here", async () => {
@@ -53,8 +56,15 @@ test("back at the Mac, /local and its 🖥 button leave it here", async () => {
   expect(h.toasts.at(-1)?.text).toContain("no dialog at the Mac");
 });
 
+test("a tab's question moves to its dialog when you're back at the Mac (plan 7.8)", async () => {
+  const h = harness("tab");
+  const id = await askedHere(h);
+  h.be("active");
+  expect(h.asks.get(id)?.state).toBe("local");
+});
+
 test("another session's question still moves to the Mac when you're back", async () => {
-  const h = harness(true);
+  const h = harness("normal");
   const id = await askedHere(h);
   h.be("active");
   expect(h.asks.get(id)?.state).toBe("local");

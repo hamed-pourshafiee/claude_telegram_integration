@@ -41,10 +41,10 @@ writeFileSync(
 let logged: { event: string; fields: LogFields }[] = [];
 const log = (event: string, fields: LogFields) => logged.push({ event, fields });
 
-test("each open window once: a workspace runs in its first folder, with the others added", () => {
+test("each open window once: a workspace runs in its first folder, with the others added; what each has open", () => {
   expect(openWindows(log, state, () => true)).toEqual([
-    { name: "studio", folder: join(dir, "front"), addDirs: [join(dir, "api")] },
-    { name: "bridge", folder: join(dir, "bridge"), addDirs: [] },
+    { name: "studio", folder: join(dir, "front"), addDirs: [join(dir, "api")], opened: workspace },
+    { name: "bridge", folder: join(dir, "bridge"), addDirs: [], opened: join(dir, "bridge") },
   ]);
   expect(logged).toEqual([]);
 });

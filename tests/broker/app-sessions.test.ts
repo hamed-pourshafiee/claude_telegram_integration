@@ -3,6 +3,7 @@ import { appendFileSync, mkdirSync, realpathSync, writeFileSync } from "node:fs"
 import { join } from "node:path";
 import { BrokerDb } from "../../src/broker/db.ts";
 import { Pairing } from "../../src/broker/pairing.ts";
+import type { VsWindow } from "../../src/broker/vscode-windows.ts";
 import { asFields } from "../../src/shared/json.ts";
 import { appHarness, YOU } from "../helpers/app.ts";
 import { ok } from "../helpers/fake-telegram.ts";
@@ -40,6 +41,13 @@ function from(you: object) {
 const message = (id: number, text: string, extra: object = {}) => ({
   message: { message_id: id, date: 0, chat, from: YOU, text, ...extra },
 });
+
+/** The first button of the bot's message number `at`, counted from 0. */
+function firstButton(at: number) {
+  const markup = asFields(asFields(fake.calls("sendMessage")[at]?.body)?.reply_markup);
+  const rows = markup?.inline_keyboard;
+  return Array.isArray(rows) ? asFields(rows[0]?.[0]) : undefined;
+}
 
 test("/sessions lists the sessions whose Claude runs, and what each is doing (plan 7.3)", async () => {
   const { routes, session } = paired("listed");
@@ -110,34 +118,27 @@ test("a title Claude Code made after the session's last hook is in /sessions (pl
   expect(text).toMatch(/^1 open session:\n⏳ IQ-1572: working for \d+ s\n/);
 });
 
-test("/new: a tap on an open window and a reply start a session in its folder (plan 7.7)", async () => {
-  const launched: unknown[][] = [];
-  const launchSession = (
-    id: string,
-    folder: string,
-    message: string,
-    addDirs: readonly string[],
-  ) => {
-    launched.push([id, folder, message, addDirs]);
-    return { pid: 4321, exited: new Promise<number>(() => undefined) };
+test("/new: a tap on a window and a reply open a tab there, whose SessionStart gets the message (plans 7.7, 7.8)", async () => {
+  const tabs: VsWindow[] = [];
+  const openTab = (window: VsWindow) => {
+    tabs.push(window);
+    return Promise.resolve();
   };
   mkdirSync(join(dir, "sandbox", "api"), { recursive: true });
   const sandbox = realpathSync(join(dir, "sandbox"));
-  const studio = { name: "studio", folder: sandbox, addDirs: [join(sandbox, "api")] };
+  const opened = join(dir, "studio.code-workspace");
+  const studio = { name: "studio", folder: sandbox, addDirs: [join(sandbox, "api")], opened };
   const db = BrokerDb.open(join(dir, "new.db"));
   const pairing = new Pairing(db);
   pairing.attempt(pairing.start().code, { id: YOU.id, name: "Hamed" });
-  app(db, { launchSession, openWindows: () => [studio] });
+  const { routes } = app(db, { openTab, openWindows: () => [studio] });
   fake.answer("sendMessage", ok({ message_id: 71, date: 0, chat, text: "windows" }));
   fake.answer("sendMessage", ok({ message_id: 72, date: 0, chat, text: "✏️" }));
-  fake.fallback("sendMessage", ok({ message_id: 73, date: 0, chat, text: "🚀" }));
+  fake.fallback("sendMessage", ok({ message_id: 73, date: 0, chat, text: "🖥" }));
   fake.fallback("answerCallbackQuery", ok(true));
   from(message(70, "/new"));
   expect(await until(() => fake.calls("sendMessage").length === 1)).toBe(true);
-  const rows = asFields(
-    asFields(fake.calls("sendMessage")[0]?.body)?.reply_markup,
-  )?.inline_keyboard;
-  const button = Array.isArray(rows) ? asFields(rows[0]?.[0]) : undefined;
+  const button = firstButton(0);
   expect(button?.text).toBe("🖥 studio");
   const tap = {
     id: "cbq2",
@@ -148,10 +149,27 @@ test("/new: a tap on an open window and a reply start a session in its folder (p
   from({ callback_query: tap });
   expect(await until(() => fake.calls("sendMessage").length === 2)).toBe(true);
   from(message(74, "Fix the tests", { reply_to_message: { message_id: 72, date: 0, chat } }));
-  expect(await until(() => launched.length === 1)).toBe(true);
-  const first = "📨 From Hamed on Telegram: Fix the tests";
-  expect(launched[0]).toEqual([expect.any(String), sandbox, first, [join(sandbox, "api")]]);
+  expect(await until(() => tabs.length === 1)).toBe(true);
+  expect(tabs[0]).toEqual(studio);
   expect(await until(() => fake.calls("sendMessage").length === 3)).toBe(true);
   const note = String(asFields(fake.calls("sendMessage")[2]?.body)?.text);
-  expect(note).toStartWith("🚀 Starting a session in studio.");
+  expect(note).toStartWith("🖥 Opening a new Claude tab in studio.");
+  // The new tab's SessionStart hook, as it calls the broker.
+  const tab = { project_dir: sandbox, entrypoint: "claude-vscode", claude_pid: process.pid };
+  const answer = await routes.hook("SessionStart", {
+    ...tab,
+    session_id: "7ab0c0de",
+    branch: "",
+    source: "startup",
+  });
+  expect(answer.body).toMatchObject({
+    name: "Hamed",
+    first: "📨 From Hamed on Telegram: Fix the tests",
+  });
+  const again = await routes.hook("SessionStart", {
+    ...tab,
+    session_id: "5ec0d7ab",
+    source: "startup",
+  });
+  expect(again.body).not.toHaveProperty("first");
 });

@@ -24,7 +24,7 @@ export interface AppHarness {
   /** The broker's parts on a new database, or on `db`; /new uses the stand-ins in `extra`, if given. */
   readonly app: (
     db?: BrokerDb,
-    extra?: Pick<AppDeps, "launchSession" | "openWindows">,
+    extra?: Pick<AppDeps, "launchSession" | "openWindows" | "openTab">,
   ) => App & { readonly db: BrokerDb };
 }
 

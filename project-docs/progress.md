@@ -513,6 +513,40 @@ Committed as `c6658db` after the user's go (2026-09-28).
     would hand that one update over again. For pairing that is harmless, because the code is used up.
     3.2 stores each update first, for at-most-once delivery (D7).
 
+## 7.8 `/new` opens a VS Code tab
+
+- **Date:** 2026-10-01 (asked "Build it now (Recommended)" after the spike above; design rev. 28, D11,
+  F30; plan rev. 19).
+- **Built** (on `dev`):
+  - The reply to `/new`'s question opens a new Claude Code tab in the window picked: `open -a` with the
+    window's folder or workspace file brings it forward, then, a second later, the link of F23
+    (`vscode-tab.ts`). Each window now keeps what it has open (`opened`).
+  - The bridge's SessionStart hook sends its `source`. The broker hands the first VS Code tab to start
+    (`startup`, `claude-vscode`) in that folder within 30 s the message, oldest first, and the hook prints
+    it as `initialUserMessage`. Other sessions get nothing; one in another folder is logged
+    (`new.tab-elsewhere`).
+  - With no tab in 30 s, or when opening fails, the session runs in the background as in 7.7
+    (`background-sessions.ts`, split out), and the chat hears "No Claude tab started in …". A window
+    closed since the tap goes to the background at once.
+  - `from_chat` now keeps where the session started: 1 in the background (as 7.7's rows), 2 in a tab.
+    The entrypoint couldn't tell them apart, as every hook call rewrites it. Only background sessions
+    count toward the limit of 3, and only they have no dialog at the Mac: a tab's questions go back to
+    its dialog when you're back, like any session's.
+  - The menu, `/new`'s texts, the README and CLAUDE.md say it opens a tab.
+- **Tests:** 694 pass. New: the commands and their order, VS Code not running, a failing command, the
+  messages waiting (oldest first, the timer, taken ones never late); the claim (resume, terminal, other
+  folder, a second tab, two in order); the fallback after the wait and when the tab can't open; a closed
+  window; tabs not counting toward the limit; the hook printing the message; the broker answering with
+  it, asked with the source; a tab's question moving to its dialog; end to end, `/new`, a tap and a reply
+  opening a stand-in tab whose SessionStart gets the message, once.
+- **Positive controls**, 10, each caught: a resumed session or a terminal session taking the message,
+  the hook dropping it, a tab with no dialog, a tab counted as background, no fallback after the wait or
+  when the tab can't open, tabs counting toward the limit, the window not brought forward, the source
+  not passed on. The tabs-and-limit one passed at first, so the limit test now opens 3 tabs first.
+- **Live check, to come:** from the phone, `/new` in each of the two open windows: a tab opens in that
+  window and works on the message, and its ✅ comes to the chat. Still unknown before it: whether the tab
+  shows that first turn, and whether it opens in the window picked.
+
 ## Next
 
 Committed as `98b9351` after the user's go (2026-09-28).
@@ -1947,8 +1981,7 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
 
 ## Next
 
-- **The user's decision:** `/new` as a VS Code tab started by its SessionStart hook (the spike above),
-  with F24 corrected and the new fact recorded in the design doc first.
+- **7.8's live check** (above).
 - **Live checks still to come:**
   - 7.5: `/sessions` during a new session's first turn shows its title.
   - 7.6's live part: once a hook started after 7.6 has started a broker, its parent is launchd. The

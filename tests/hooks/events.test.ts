@@ -83,7 +83,9 @@ describe("SessionStart", () => {
   test("registers the session and adds the note, with the paired user's name", async () => {
     respond = () => ({ name: "Hamed" });
     await run("SessionStart");
-    expect(calls).toMatchObject([{ name: "SessionStart", body: { ...session, branch: "" } }]);
+    expect(calls).toMatchObject([
+      { name: "SessionStart", body: { ...session, branch: "", source: "" } },
+    ]);
     expect(JSON.parse(printed[0] ?? "")).toEqual({
       hookSpecificOutput: {
         hookEventName: "SessionStart",
@@ -93,6 +95,19 @@ describe("SessionStart", () => {
     expect(sessionNote("Hamed")).toStartWith(
       'Messages that start with "📨 Telegram reply from Hamed:"',
     );
+  });
+
+  test("a tab /new opened: its first message, which starts it working (F30, plan 7.8)", async () => {
+    respond = () => ({ name: "Hamed", first: "📨 From Hamed on Telegram: Fix the tests" });
+    await run("SessionStart", { source: "startup" });
+    expect(calls).toMatchObject([{ name: "SessionStart", body: { source: "startup" } }]);
+    expect(JSON.parse(printed[0] ?? "")).toEqual({
+      hookSpecificOutput: {
+        hookEventName: "SessionStart",
+        additionalContext: sessionNote("Hamed"),
+        initialUserMessage: "📨 From Hamed on Telegram: Fix the tests",
+      },
+    });
   });
 
   test("no broker: still the note, naming no one", async () => {

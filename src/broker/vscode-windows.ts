@@ -14,6 +14,8 @@ export interface VsWindow {
   readonly folder: string;
   /** A workspace's other folders, which its sessions may use too (`--add-dir`). */
   readonly addDirs: readonly string[];
+  /** What it has open: the folder, or the workspace's file. Opened again, it brings the window forward. */
+  readonly opened: string;
 }
 
 /** Where VS Code keeps its windows' state (F28). */
@@ -21,16 +23,22 @@ export const VS_CODE_STATE = join(
   HOME_DIR,
   "Library/Application Support/Code/User/globalStorage/storage.json",
 );
-/** VS Code's main process, not its helpers, which live under Frameworks/. */
-const VS_CODE_MAIN = /\/Visual Studio Code\.app\/Contents\/MacOS\/[^/]+$/;
+/** VS Code's main process, not its helpers, which live under Frameworks/; its app is the first part. */
+const VS_CODE_MAIN = /^(\/.*\/Visual Studio Code\.app)\/Contents\/MacOS\/[^/]+$/;
+
+/** The app of the VS Code that runs, from its main process; undefined while none runs. */
+export function vsCodeApp(): string | undefined {
+  const ps = Bun.spawnSync(["/bin/ps", "-axo", "comm="], { stderr: "ignore" });
+  for (const line of ps.stdout.toString().split("\n")) {
+    const app = VS_CODE_MAIN.exec(line.trim())?.[1];
+    if (app !== undefined) return app;
+  }
+  return undefined;
+}
 
 /** Whether VS Code runs: its window state outlives it, to restore the windows. */
 export function vsCodeRuns(): boolean {
-  const ps = Bun.spawnSync(["/bin/ps", "-axo", "comm="], { stderr: "ignore" });
-  return ps.stdout
-    .toString()
-    .split("\n")
-    .some((line) => VS_CODE_MAIN.test(line.trim()));
+  return vsCodeApp() !== undefined;
 }
 
 /**
@@ -64,7 +72,7 @@ function windowOf(entry: Fields, log: Log): VsWindow | undefined {
   if (typeof entry.folder === "string") {
     const folder = localPath(entry.folder, log);
     return folder !== undefined && isFolder(folder)
-      ? { name: basename(folder), folder, addDirs: [] }
+      ? { name: basename(folder), folder, addDirs: [], opened: folder }
       : undefined;
   }
   const config = asFields(entry.workspaceIdentifier)?.configURIPath;
@@ -72,7 +80,7 @@ function windowOf(entry: Fields, log: Log): VsWindow | undefined {
   if (file === undefined) return undefined;
   const [first, ...rest] = workspaceFolders(file, log);
   if (first === undefined) return undefined;
-  return { name: basename(file, ".code-workspace"), folder: first, addDirs: rest };
+  return { name: basename(file, ".code-workspace"), folder: first, addDirs: rest, opened: file };
 }
 
 /** A workspace's folders that exist, resolved from the file's own folder. */

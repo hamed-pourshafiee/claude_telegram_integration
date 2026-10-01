@@ -86,12 +86,14 @@ the Mac. If you type at the Mac while a reply is on its way, the first one wins:
 your typing isn't used, and if it went in just before, the bot tells you it crossed.
 
 **Starting a session from the phone.** `/new` offers the VS Code windows you have open. Tap one and write
-the first message in the reply box: the Mac starts Claude Code in that window's folder (a workspace's
-first folder, with the others added), in the background, not as a tab (Claude Code has no way to start a
-tab working from outside). Its messages come to the chat wherever you are, and your replies continue it;
-its permission prompts come here too, and one the chat can't show is denied, as there is no dialog to
-open at the Mac. `/sessions` lists it as "(started here)". It ends 12 hours after its last turn. At most
-three run at once. `/off` doesn't mute them: you started them to hear from them.
+the first message in the reply box: the Mac opens a new Claude Code tab in that window, which starts
+working on your message by itself (a workspace's tab runs in its first folder). Its messages come to the
+chat wherever you are, and your replies continue it; at the Mac you see it like any tab, and its
+questions can be answered in its dialog when you're back. `/sessions` lists it as "(started here)".
+`/off` doesn't mute it: you started it to hear from it. If no tab starts within 30 seconds (VS Code busy,
+say), the session runs in the background in that window's folder instead, and the bot says so: its
+permission prompts come here, and one the chat can't show is denied, as there is no dialog to open at the
+Mac. It ends 12 hours after its last turn, and at most three run in the background at once.
 
 **Permission prompts** (Bash, Edit and Write only). The message shows the whole command and where it
 runs, or the file and the full change, split over several messages or sent as a file if long. Allow
@@ -111,7 +113,7 @@ what it does.
 |---|---|
 | `/status` | Where the bridge thinks you are, and why |
 | `/sessions` | Your open sessions, one line each: which ask you something, which wait for your reply, which are working. Only sessions whose Claude still runs are listed, so one left by a crash or a restart isn't. Tap one to write to it. |
-| `/new` | Start a session in one of your folders; see "Starting a session from the phone" above |
+| `/new` | Open a new Claude tab in one of your VS Code windows, started on your message; see "Starting a session from the phone" above |
 | `/away` | Relay everything until `/auto`, even while you're at the Mac |
 | `/auto` | Decide from your idle time and the screen lock again |
 | `/off` | Mute everything until `/auto` or `/away` |

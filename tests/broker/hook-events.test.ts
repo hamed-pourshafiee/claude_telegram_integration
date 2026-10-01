@@ -26,8 +26,10 @@ let goesOut: boolean;
 let user: PairedUser | undefined;
 let events: HookEvents;
 let sessions: Sessions;
+let firstMessage: ((id: string, source: string) => string | undefined) | undefined;
 beforeEach(() => {
   files += 1;
+  firstMessage = undefined;
   sends = [];
   goesOut = true;
   user = { id: 4242, name: "Hamed (@someone)" };
@@ -59,6 +61,7 @@ beforeEach(() => {
     asks: noAskRelay,
     log: noLog,
     showsText,
+    firstMessage: (named, source) => firstMessage?.(named.id, source),
   });
 });
 
@@ -190,6 +193,23 @@ describe("the other events", () => {
     expect(call("SessionStart", { branch: "main" }).body).toMatchObject({ name: "Hamed" });
     user = undefined;
     expect(call("SessionStart").body).toMatchObject({ name: null });
+  });
+
+  test("SessionStart hands a tab /new opened its first message, asked with the source (plan 7.8)", () => {
+    const asked: string[][] = [];
+    firstMessage = (id, source) => {
+      asked.push([id, source]);
+      return source === "startup" ? "📨 From Hamed on Telegram: hi" : undefined;
+    };
+    const body = call("SessionStart", { source: "startup" }).body;
+    expect(body).toMatchObject({ name: "Hamed", first: "📨 From Hamed on Telegram: hi" });
+    expect(call("SessionStart", { source: "resume" }).body).not.toHaveProperty("first");
+    expect(call("SessionStart").body).not.toHaveProperty("first");
+    expect(asked).toEqual([
+      ["b1e81638", "startup"],
+      ["b1e81638", "resume"],
+      ["b1e81638", ""],
+    ]);
   });
 
   test("a permission, a question and an API error each send their notice", async () => {

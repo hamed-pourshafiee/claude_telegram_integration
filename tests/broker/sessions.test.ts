@@ -29,6 +29,7 @@ test("a session is recorded on its first hook, SessionStart or not, and keeps it
     promptedAt: 0,
     transcript: "",
     fromChat: false,
+    inBackground: false,
   });
   expect(all.touch(ref, "main").branch).toBe("main");
   expect(all.touch(ref).branch).toBe("main");

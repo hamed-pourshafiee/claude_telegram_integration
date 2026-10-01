@@ -1,46 +1,35 @@
-import { createHash, randomUUID } from "node:crypto";
-import { statSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { realpathSync, statSync } from "node:fs";
 import { basename, dirname } from "node:path";
 import type { Config } from "../shared/config.ts";
 import { messageOf } from "../shared/errors.ts";
-import type { Log } from "../shared/log.ts";
-import { processAlive } from "../shared/process.ts";
 import { contentModeFor, sessionScope } from "../shared/scope.ts";
 import type { TelegramClient } from "../shared/telegram/client.ts";
+import { type BackgroundDeps, BackgroundSessions, type Started } from "./background-sessions.ts";
 import type { CommandAnswer } from "./commands.ts";
-import type { Launch, Launched } from "./session-launch.ts";
-import type { Sessions } from "./sessions.ts";
+import type { SessionRef } from "./sessions.ts";
 import type { Start, Starts } from "./starts.ts";
+import { type OpenTab, type PendingTab, PendingTabs, TAB_ENTRYPOINT } from "./vscode-tab.ts";
 import type { VsWindow } from "./vscode-windows.ts";
 
-export interface NewSessionsDeps {
-  readonly sessions: Pick<Sessions, "open" | "get" | "startedHere" | "end">;
+export interface NewSessionsDeps extends BackgroundDeps {
   readonly starts: Pick<Starts, "record" | "use">;
   readonly telegram: Pick<TelegramClient, "sendMessage" | "answerCallbackQuery">;
   readonly config: Config;
   /** The windows VS Code has open (F28): /new offers their folders. */
   readonly windows: () => readonly VsWindow[];
-  readonly launch: Launch;
+  /** Opens a new Claude Code tab in a window (plan 7.8). */
+  readonly openTab: OpenTab;
   /** The paired user's first name, for the mark on the first message. */
   readonly senderName: () => string | null;
-  /** Tells the paired user something: a session that stopped with an error. */
-  readonly tell: (text: string) => Promise<void>;
-  readonly log: Log;
-  /** Every start (D11), by session and folder, never the message. */
-  readonly audit: Log;
-  /** Whether a process runs; default: a signal-0 kill. */
-  readonly alive?: (pid: number) => boolean;
-  readonly newId?: () => string;
+  /** How long a message waits for its tab, in ms; 30 s unless a test says otherwise. */
+  readonly tabMs?: number;
 }
 
-/** What a reply to a /new question did: the note for the chat, and whether a session started. */
-export interface Started {
-  readonly started: boolean;
-  readonly text: string;
-}
+export type { Started } from "./background-sessions.ts";
 
-/** The most sessions started from the chat that run at once (D11). */
-export const MOST_RUNNING = 3;
+/** How long a message waits for its tab before the session runs in the background (D11). */
+const TAB_MS = 30_000;
 /** The most windows /new offers. */
 const MOST_WINDOWS = 8;
 /** The most characters of the reply box's placeholder. */
@@ -49,33 +38,35 @@ const BUTTON = /^new:([0-9a-f]{16})$/;
 
 const TEXTS = {
   which:
-    "🖥 A new session: in which VS Code window?\nIt runs in that window's folder on the Mac, in the background, and reports here. Claude Code can't start a tab from outside.",
+    "🖥 A new session: in which VS Code window?\nIt opens there as a new Claude tab, starts on your first message and reports here.",
   none: "No VS Code window is open whose folder the bridge serves, so there's nowhere to start a session.",
   gone: "That window isn't open any more.",
-  full: `${MOST_RUNNING} sessions started here still run. Wait for one to end.`,
   expired: "That question has expired, so nothing was started. Send /new again.",
   taken: "A session was already started from that question.",
   failed: "The reply box didn't open. Try again.",
   ask: (name: string) =>
     `✏️ Your first message for a new session in ${name}\nThe session starts when you send it.`,
-  started: (name: string) =>
-    `🚀 Starting a session in ${name}. Its messages come here, and your replies go to it.`,
-  notStarted: (name: string, why: string) => `⚠️ The session in ${name} didn't start: ${why}`,
-  stopped: (name: string, code: number) =>
-    `⚠️ The session in ${name} stopped with an error (exit code ${code}). .state/logs/sessions.log on the Mac may say why.`,
+  opening: (name: string) =>
+    `🖥 Opening a new Claude tab in ${name}. It starts on your message; its messages come here, and your replies go to it.`,
+  noTab: (name: string) =>
+    `⚠️ No Claude tab started in ${name}, so the session runs in the background instead. Its messages still come here.`,
 } as const;
 
 /**
- * /new (D11, plan 7.7). No hook can start a VS Code tab working (F24), so the bridge starts the session
- * itself: you pick one of the windows VS Code has open, write the first message in the reply box, and
- * the broker runs `claude -p` in that window's folder. Its hooks send its messages here like any
- * session's, and your replies continue it (F25).
+ * /new (D11, plans 7.7 and 7.8): you pick one of the windows VS Code has open and write the first
+ * message in the reply box. The broker opens a new Claude Code tab in that window, and the tab's
+ * SessionStart hook gets the message, which starts it working (F30). With no tab in 30 s, the broker runs
+ * `claude -p` in the window's folder instead. Either way the session's hooks send its messages here like
+ * any session's, and your replies continue it.
  */
 export class NewSessions {
   readonly #deps: NewSessionsDeps;
+  readonly #tabs = new PendingTabs();
+  readonly #background: BackgroundSessions;
 
   constructor(deps: NewSessionsDeps) {
     this.#deps = deps;
+    this.#background = new BackgroundSessions(deps);
   }
 
   /** The answer to /new: a button for each window whose folder is offered. */
@@ -101,7 +92,6 @@ export class NewSessions {
         ...(text === undefined ? {} : { text }),
       });
     if (window === undefined) return toast(TEXTS.gone);
-    if (this.#running() >= MOST_RUNNING) return toast(TEXTS.full);
     const name = windowNames(windows)[at] ?? window.name;
     try {
       const placeholder = Array.from(`First message for ${name}`).slice(0, PLACEHOLDER_CHARS);
@@ -120,8 +110,8 @@ export class NewSessions {
   }
 
   /**
-   * A reply to a /new question: a session starts in its window's folder, with the reply as its first
-   * message, and the workspace's other folders if the window is still open.
+   * A reply to a /new question: a new tab opens in its window, to start on the reply (plan 7.8). A
+   * window closed since gets the session in the background, in its folder (plan 7.7).
    */
   start(text: string, start: Start): Started {
     const window = this.#deps.windows().find((open) => open.folder === start.projectDir);
@@ -131,34 +121,70 @@ export class NewSessions {
       return { started: false, text: taken === "expired" ? TEXTS.expired : TEXTS.taken };
     }
     if (!this.#offers(start.projectDir)) return { started: false, text: TEXTS.gone };
-    if (this.#running() >= MOST_RUNNING) return { started: false, text: TEXTS.full };
-    const id = this.#deps.newId?.() ?? randomUUID();
     const message = `📨 From ${this.#deps.senderName() ?? "the user"} on Telegram: ${text}`;
-    this.#deps.sessions.startedHere({ id, projectDir: start.projectDir, entrypoint: "sdk-cli" });
-    let launched: Launched;
-    try {
-      launched = this.#deps.launch(id, start.projectDir, message, window?.addDirs ?? []);
-    } catch (error) {
-      this.#deps.sessions.end(id);
-      this.#deps.log("new.failed", { session: id, error: messageOf(error) });
-      return { started: false, text: TEXTS.notStarted(name, messageOf(error)) };
+    if (window === undefined) {
+      return this.#background.start({ folder: start.projectDir, name, message, addDirs: [] });
     }
-    this.#watch(id, name, launched);
-    this.#deps.audit("session.started", { session: id, folder: start.projectDir, by: "chat" });
-    this.#deps.log("new.started", { session: id, claude: launched.pid });
-    return { started: true, text: TEXTS.started(name) };
+    this.#openTab({ window, folder: this.#resolved(window.folder), name, message });
+    return { started: true, text: TEXTS.opening(name) };
   }
 
-  /** When the session's process ends: ended here too, and you hear of an error. */
-  #watch(id: string, name: string, launched: Launched): void {
-    const { sessions, tell, log } = this.#deps;
-    launched.exited
-      .then(async (code) => {
-        log("new.exited", { session: id, code });
-        if (sessions.get(id)?.ended === false) sessions.end(id);
-        if (code !== 0) await tell(TEXTS.stopped(name, code));
-      })
-      .catch((error: unknown) => log("new.watch-failed", { session: id, error: messageOf(error) }));
+  /**
+   * A session's SessionStart (F30): a new VS Code tab in a folder where a message waits takes the one
+   * that has waited longest, and is recorded as started from the chat. Any other session gets nothing.
+   */
+  claim(ref: SessionRef, source: string): string | undefined {
+    if (this.#tabs.size === 0 || source !== "startup" || ref.entrypoint !== TAB_ENTRYPOINT) {
+      return undefined;
+    }
+    const tab = this.#tabs.take(ref.projectDir);
+    if (tab === undefined) {
+      this.#deps.log("new.tab-elsewhere", { session: ref.id, folder: ref.projectDir });
+      return undefined;
+    }
+    this.#deps.sessions.startedHere(ref, "tab");
+    this.#deps.audit("session.started", {
+      session: ref.id,
+      folder: tab.window.folder,
+      by: "chat",
+      in: "tab",
+    });
+    this.#deps.log("new.tab-started", { session: ref.id });
+    return tab.message;
+  }
+
+  /** Opens the tab; with none in time, or when it can't open, the session runs in the background. */
+  #openTab(tab: PendingTab): void {
+    const { log, openTab, tabMs } = this.#deps;
+    this.#tabs.add(tab, tabMs ?? TAB_MS, (late) => this.#noTab(late, "no tab started"));
+    openTab(tab.window).then(
+      () => log("new.tab-opened", {}),
+      (error: unknown) => {
+        log("new.tab-failed", { error: messageOf(error) });
+        if (this.#tabs.remove(tab)) this.#noTab(tab, "the tab didn't open");
+      },
+    );
+  }
+
+  /** No tab took the message: the session runs in the background instead, and you hear of it. */
+  #noTab(tab: PendingTab, why: string): void {
+    this.#deps.log("new.no-tab", { why });
+    const { window, name, message } = tab;
+    let started: Started;
+    try {
+      started = this.#background.start({
+        folder: window.folder,
+        name,
+        message,
+        addDirs: window.addDirs,
+      });
+    } catch (error) {
+      this.#deps.log("new.background-failed", { error: messageOf(error) });
+      started = this.#background.failed(name, error);
+    }
+    this.#deps.tell(started.started ? TEXTS.noTab(name) : started.text).catch((error: unknown) => {
+      this.#deps.log("new.tell-failed", { error: messageOf(error) });
+    });
   }
 
   #windows(): VsWindow[] {
@@ -180,14 +206,14 @@ export class NewSessions {
     return statSync(dir, { throwIfNoEntry: false })?.isDirectory() === true;
   }
 
-  /** Sessions started here that still run, or haven't reported yet. */
-  #running(): number {
-    const alive = this.#deps.alive ?? processAlive;
-    return this.#deps.sessions
-      .open()
-      .filter(
-        (session) => session.fromChat && (session.claudePid === 0 || alive(session.claudePid)),
-      ).length;
+  /** A folder as the hooks name it (resolved, F15); as it is, logged, when it can't be resolved. */
+  #resolved(dir: string): string {
+    try {
+      return realpathSync(dir);
+    } catch (error) {
+      this.#deps.log("new.unresolved", { error: messageOf(error) });
+      return dir;
+    }
   }
 }
 

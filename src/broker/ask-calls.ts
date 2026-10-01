@@ -35,7 +35,7 @@ export function askWhere(deps: {
     const user = deps.pairing.pairedUser();
     if (user === undefined) return { local: "not paired" };
     if (contentModeFor(deps.config, session.projectDir) !== "full") return { local: "ping-only" };
-    // A session started from the chat has no dialog at the Mac, and /off doesn't mute it (D11).
+    // A session started from the chat reports there wherever you are, and /off doesn't mute it (D11).
     if (session.fromChat) return { chat: user.id };
     const { mode, state } = deps.presence.snapshot();
     if (mode === "off") return { local: "muted" };

@@ -134,9 +134,12 @@ export class AskChat {
     }
   }
 
-  /** Whether the call's session has a dialog at the Mac to hand it to: not one started here (D11). */
+  /**
+   * Whether the call's session has a dialog at the Mac to hand it to: not one /new runs in the
+   * background (D11); a tab /new opened has one (plan 7.8).
+   */
   #hasDialog(ask: Ask): boolean {
-    return this.#deps.sessions.get(ask.sessionId)?.fromChat !== true;
+    return this.#deps.sessions.get(ask.sessionId)?.inBackground !== true;
   }
 
   /** A call that went to the Mac at once: while you're away (a ping-only folder), you hear of it now. */

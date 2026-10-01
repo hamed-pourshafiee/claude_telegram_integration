@@ -8,7 +8,7 @@ replies come back into the same session.
 
 Read these completely before doing anything in a new session:
 
-1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F29, architecture
+1. [project-docs/design.md](project-docs/design.md): what and why. Platform facts F1–F30, architecture
    and flows 1–4, decisions D1–D11, security, rollback, risks.
 2. [project-docs/implementation-plan.md](project-docs/implementation-plan.md): the order of work, with a
    pass check for every step.
@@ -78,11 +78,11 @@ bun scripts/record-stops.ts [claude]  # re-records tests/fixtures/transcripts/ (
 
 In the bot chat (design D4): `/status` says where the bridge thinks you are and why, `/sessions` lists
 the open sessions whose Claude still runs and what each is doing, with a button to write to each (plans
-7.3, 7.4), `/new` starts a session in one of your folders, run in the background (plan 7.7, D11), `/away`
-relays everything until `/auto`, `/auto` decides from the idle time and the screen lock, `/off` mutes,
-`/local` hands Claude's questions waiting in the chat back to the dialog at the Mac (plan 4.1), and
-`/help` (or `/start`) is the guide. The paired chat has them as its menu: "/" or the Menu button (plan
-7.1).
+7.3, 7.4), `/new` opens a new Claude tab in one of your VS Code windows, started on your message, or runs
+it in the background when no tab starts (plans 7.7, 7.8, D11), `/away` relays everything until `/auto`,
+`/auto` decides from the idle time and the screen lock, `/off` mutes, `/local` hands Claude's questions
+waiting in the chat back to the dialog at the Mac (plan 4.1), and `/help` (or `/start`) is the guide. The
+paired chat has them as its menu: "/" or the Menu button (plan 7.1).
 
 Tests that need a real broker, hook or ctl process run them in a throwaway copy of the repo
 (`tests/helpers/repo-copy.ts`), never against this repo's `.state/` or `.env`.

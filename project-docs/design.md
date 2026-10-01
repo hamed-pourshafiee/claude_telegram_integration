@@ -1,21 +1,23 @@
 # Claude Code ↔ Telegram: Design
 
-Status: rev. 27, F29: in -p a Stop hook can't read its stop's summary, so a /new session's stop is a
-finish (rev. 26: D11, /new offers the open VS Code windows, and its sessions are served by their id, F27,
-F28; rev. 25: F26 and O4, Bun's userInfo() reads $SHELL and $HOME; rev. 24: D11, /new starts a session
-the broker runs, F25; rev. 23: F24, no hook can start a new session working; rev. 22: F23, a Claude Code
-tab can be opened from outside, but its prompt isn't sent; rev. 21: F22: Claude Code kills a hook's whole
-process tree, so the broker starts through a launcher (D3, plan 7.6); F21: a title can come during the
-first turn, so `/sessions` reads titles as it lists, plan 7.5; rev. 20: D4, a tap on a session under
-`/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists the open sessions, whose Claude still runs
-by F18, plan 7.3; rev. 18: F21, messages name a session by its title, plan 7.2; rev. 17: D10, the git
-remote is GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev. 15: permission
-prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are reviewed from the
-phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan 4.1, F4 and F19 from
-2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires UserPromptSubmit; rev. 9:
-F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops; rev. 7: F17 the screen
-lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8; rev. 4: spikes S1–S3; rev.
-3: F14; rev. 2: Codex review) · 2026-09-30 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 28, F30: a SessionStart hook can start a new session working, so `/new` opens a VS Code tab
+(D11, plan 7.8; F24 corrected) (rev. 27: F29, in -p a Stop hook can't read its stop's summary, so a /new
+session's stop is a finish; rev. 26: D11, /new offers the open VS Code windows, and its sessions are
+served by their id, F27, F28; rev. 25: F26 and O4, Bun's userInfo() reads $SHELL and $HOME; rev. 24: D11,
+/new starts a session the broker runs, F25; rev. 23: F24, no hook can start a new session working; rev.
+22: F23, a Claude Code tab can be opened from outside, but its prompt isn't sent; rev. 21: F22: Claude
+Code kills a hook's whole process tree, so the broker starts through a launcher (D3, plan 7.6); F21: a
+title can come during the first turn, so `/sessions` reads titles as it lists, plan 7.5; rev. 20: D4, a
+tap on a session under `/sessions` writes to it, plan 7.4; rev. 19: `/sessions` lists the open sessions,
+whose Claude still runs by F18, plan 7.3; rev. 18: F21, messages name a session by its title, plan 7.2;
+rev. 17: D10, the git remote is GitHub, O3; rev. 16: the bot's menu of commands and /help, plan 7.1; rev.
+15: permission prompts in flow 3, phase 5, D9; rev. 14: F20, no hook can approve a plan, so plans are
+reviewed from the phone; rev. 13: O2 decided as D9, plans in flow 3; rev. 12: flow 3 as built in plan
+4.1, F4 and F19 from 2.1.284; rev. 11: D8, Markdown shown as formatting; rev. 10: F2, a wake fires
+UserPromptSubmit; rev. 9: F18 the hook's parent; rev. 8: F16 and flow 1 from plan 2.8's recorded stops;
+rev. 7: F17 the screen lock; rev. 6: O1 decided as D8; rev. 5: Codex review of the spike changes, §8;
+rev. 4: spikes S1–S3; rev. 3: F14; rev. 2: Codex review) · 2026-10-01 · Repo:
+`/Users/hamed/src/bc/claude_telegram_integration`
 
 The steps that build this are in [implementation-plan.md](implementation-plan.md).
 
@@ -65,12 +67,13 @@ Mac (CLI 2.1.274, VS Code extension 2.1.283); details in [spike-findings.md](spi
 | F21 | Claude Code writes a session's title into its transcript, and again every few turns: `{"type":"custom-title","customTitle":…}` for one you gave it, `{"type":"ai-title","aiTitle":…}` for the one it made; it shows `customTitle || aiTitle`. The made title can come a second after the first prompt, or only after the first turn; a hook sees it only when the session's next hook runs, often at the end of the turn. | 2.1.284 binary; transcripts, 2026-09-30 (plans 7.2, 7.5); undocumented |
 | F22 | When Claude Code stops a hook (its `timeout`, likely a closed panel too), it kills the hook's whole process tree, found by parent pid (`ps -A -o pid= -o ppid=`), whatever session each process is in: a process the hook started that is still its child dies with it, even after `setsid`. One whose parent has exited, adopted by launchd, is outside the tree. | 2.1.283 live, 2026-09-30 08:25:12: the broker got SIGTERM 6 ms after a Stop hook reached its 12 h timeout; `killProcessTree` in the 2.1.284 binary (plan 7.6); undocumented |
 | F23 | The Claude Code extension handles `vscode://anthropic.claude-code/open`, with an optional `session=<id>` and `prompt=<text>`. VS Code sends it to the window used last; without a session the extension opens a new Claude Code tab there, and its new session starts at once (SessionStart). The prompt is only typed into the input box (`setInputText`), not sent. | 2.1.284 `extension.js` and `webview/index.js`; tried 2026-09-30 16:50: the tab opened in this repo's window 16 s later, and the prompt ran only when sent at the Mac; undocumented |
-| F24 | A SessionStart hook runs to completion before the session answers anything, `asyncRewake` or not, and its exit 2 wakes nothing: no hook can start a new session working. A Stop hook's `asyncRewake` does wake it (F2), in the SDK's stream-json mode too, which the VS Code tab uses. | 2.1.284, tried 2026-09-30 21:17 to 21:19 with the SDK's launch flags: `initialize` answered only after a 6 s SessionStart hook, no turn from its exit 2; after a first turn, a Stop hook's exit 2 started one with no input |
+| F24 | A SessionStart hook runs to completion before the session answers anything, `asyncRewake` or not, and its exit 2 wakes nothing. Its output can still start the session working (F30). A Stop hook's `asyncRewake` does wake it (F2), in the SDK's stream-json mode too, which the VS Code tab uses. | 2.1.284, tried 2026-09-30 21:17 to 21:19 with the SDK's launch flags: `initialize` answered only after a 6 s SessionStart hook, no turn from its exit 2; after a first turn, a Stop hook's exit 2 started one with no input. Its first wording, that no hook can start a new session working, was wrong (F30, 2026-10-01) |
 | F25 | In `claude -p` (no streaming input) hooks block, `asyncRewake` or not: a Stop hook keeps the process alive while it waits, and its exit 2 continues the session with its stderr as the next user message ("Stop hook feedback: [command]: …"). A PermissionRequest hook's allow applies there too. | 2.1.274, tried 2026-09-30 23:05 with throwaway hooks outside `~`: a reply-like exit 2 after 3 s, then an allowed `touch` (plan 7.7) |
 | F26 | Bun's `os.userInfo()` takes `shell` from `$SHELL` ("unknown" without it, as in the broker) and `homedir` from `$HOME` (the user database only without it). The user database has both: `dscl . -read /Users/<name> UserShell NFSHomeDirectory`, about 12 ms. | Bun 1.4.1, 2026-09-30: the first `/new` failed with `Executable not found in $PATH: "unknown"` (plan 7.7) |
 | F27 | In `-p` mode Claude Code calls the session `sdk-cli` (`CLAUDE_CODE_ENTRYPOINT`, and the transcript's `entrypoint`), whatever its environment set, so hooks that serve only `cli` and `claude-vscode` skip it. | 2.1.274, 2026-09-30 20:38: the first `/new` session ran with `cli` in its environment and was recorded `sdk-cli` 25 times, and no hook reached the broker (plan 7.7) |
 | F28 | VS Code keeps its windows in `~/Library/Application Support/Code/User/globalStorage/storage.json`, `windowsState`: `openedWindows` and `lastActiveWindow`, each a `folder` URI or a workspace's `configURIPath`. They stay there after VS Code quits, to restore them. A multi-root workspace's Claude sessions run in its first folder. | VS Code on this Mac, 2026-10-01: the two windows the user has open, one the workspace `insureq-studio` of 20 folders, whose sessions run in `agent-panel-frontend`; undocumented |
 | F29 | In `-p`, the `stop_hook_summary` entry that F16 reads is written only after the Stop hooks end, and there they block, so a Stop hook can't classify its own stop from the transcript: it would wait for an entry that comes after it. | 2.1.274, 2026-10-01: two `/new` sessions' stops came out `unknown` after the 30 s wait, their transcripts ending at the assistant's text (plan 7.7) |
+| F30 | A SessionStart hook's output can carry `hookSpecificOutput.initialUserMessage`. In the SDK's mode (stream-json input, which the VS Code tab uses) Claude Code puts it before any other input, so a new session takes its first turn on it with nothing else sent. The stream shows the answer, not the message. | 2.1.285's binary (`prependUserMessage`; 2.1.284's has it too); tried 2026-10-01 12:49 UTC with the SDK's launch flags and only `initialize` sent: the hook ran at 5.5 s and the session answered at 8.3 s (plan 7.8) |
 
 ## 3. Architecture
 
@@ -224,21 +227,29 @@ Taken (say so before the step if you disagree):
   operation shown; every decision in an audit log (phase 5).
 - **D10 Git remote: GitHub** (O3, decided by you on 2026-09-30, after the plan): `origin` is your
   repository there. A push happens only when you ask, after the commits to push are scanned for secrets.
-- **D11 Sessions started from the chat** (asked 2026-09-30; plan 7.7): no hook can start a VS Code tab
-  working (F23, F24), so `/new` starts a session the broker runs itself. You pick one of the windows VS
-  Code has open (F28), whose folder is served and shows Claude's text; a workspace's session runs in its
-  first folder, with its other folders added (`--add-dir`), as in its window. Then you write the first
-  message in the reply box. The broker starts `claude -p` there through your login shell, whose
-  environment is the one VS Code gives a panel, in a session of its own (setsid) so it outlives a broker
-  restart. It chooses the session id and puts it in the session's environment
-  (`CLAUDE_TELEGRAM_SESSION`), which is how the hooks know to serve it though Claude Code calls it
-  `sdk-cli` (F27), and passes the message on stdin, marked "📨 From … on Telegram". The bridge's hooks run
-  it like any session (F25), except that its stop counts as a finish, as its hook can't read the stop's
-  summary in `-p` (F29): its ✅, questions and permission prompts come to the chat whatever your presence
-  and even with `/off`, since you started it there (decided after the live check of 2026-10-01, when
-  `/off` hid a session's ✅), and your replies continue it. It has no dialog at the Mac, so nothing moves
-  back there, and a prompt the chat can't show is denied. At most 3 run at once. One ends 12 h after its
-  last turn, when its Stop hook stops waiting. Every start goes to the audit log, without the text.
+- **D11 Sessions started from the chat** (asked 2026-09-30; plans 7.7 and 7.8): `/new` offers the
+  windows VS Code has open (F28) whose folder is served and shows Claude's text. You pick one and write
+  the first message in the reply box.
+  - **In a tab** (plan 7.8, decided with you on 2026-10-01 after F30): the broker opens a new Claude Code
+    tab in that window. It brings the window forward (`open -a` with the window's folder or workspace
+    file: VS Code focuses the window that has it open), then opens the link of F23, which goes to the
+    window used last. The first VS Code tab to start in that folder within 30 s gets your message from
+    the bridge's SessionStart hook as its `initialUserMessage` (F30), marked "📨 From … on Telegram", and
+    is recorded as started from the chat. It has its dialog at the Mac, so its questions can go back there
+    like any session's.
+  - **In the background**, when no tab takes the message within 30 s, or the window has closed since
+    (plan 7.7): the broker starts `claude -p` in the window's folder (a workspace's first folder, with its
+    other folders added, `--add-dir`) through your login shell, whose environment is the one VS Code
+    gives a panel, in a session of its own (setsid) so it outlives a broker restart. It chooses the
+    session id and puts it in the session's environment (`CLAUDE_TELEGRAM_SESSION`), which is how the
+    hooks know to serve it though Claude Code calls it `sdk-cli` (F27), and passes the message on stdin.
+    Its stop counts as a finish, as its hook can't read the stop's summary in `-p` (F29). It has no
+    dialog at the Mac, so nothing moves back there, and a prompt the chat can't show is denied. At most 3
+    run at once. One ends 12 h after its last turn, when its Stop hook stops waiting.
+  - Either way the bridge's hooks run the session like any other. Its ✅, questions and permission
+    prompts come to the chat whatever your presence and even with `/off`, since you started it there
+    (decided after the live check of 2026-10-01, when `/off` hid a session's ✅), and your replies
+    continue it. Every start goes to the audit log, without the text.
 
 Open:
 

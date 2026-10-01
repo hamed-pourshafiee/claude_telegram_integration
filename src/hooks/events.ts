@@ -94,7 +94,10 @@ export function sessionNote(name: string): string {
   );
 }
 
-/** Registers the session with its branch and adds the note to Claude's context. */
+/**
+ * Registers the session with its branch and adds the note to Claude's context. A tab /new opened gets
+ * its first message here, which starts it working (F30, plan 7.8).
+ */
 async function sessionStart(context: HookContext): Promise<void> {
   let branch: string | undefined;
   try {
@@ -102,12 +105,18 @@ async function sessionStart(context: HookContext): Promise<void> {
   } catch (error) {
     context.log("hook.branch-unreadable", { error: errorCode(error) });
   }
-  const answer = (await context.ensureBroker())
-    ? await context.call("SessionStart", { ...context.session, branch: branch ?? "" })
-    : undefined;
-  const name = asFields(answer)?.name;
+  const body = { ...context.session, branch: branch ?? "", source: context.input.source ?? "" };
+  const answer = asFields(
+    (await context.ensureBroker()) ? await context.call("SessionStart", body) : undefined,
+  );
+  const name = answer?.name;
   const additionalContext = sessionNote(typeof name === "string" && name ? name : "the user");
-  const output = { hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } };
+  const first = typeof answer?.first === "string" && answer.first !== "" ? answer.first : undefined;
+  if (first !== undefined) context.log("hook.first-message", { chars: first.length });
+  const initial = first === undefined ? {} : { initialUserMessage: first };
+  const output = {
+    hookSpecificOutput: { hookEventName: "SessionStart", additionalContext, ...initial },
+  };
   context.print(JSON.stringify(output));
 }
 

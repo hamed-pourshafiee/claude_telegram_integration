@@ -25,8 +25,9 @@ import type { Relay } from "./relay.ts";
 import type { Router } from "./router.ts";
 import type { Routes } from "./server.ts";
 import type { Launch } from "./session-launch.ts";
-import { type Session, Sessions } from "./sessions.ts";
+import { type Session, type SessionRef, Sessions } from "./sessions.ts";
 import { sessionsParts } from "./sessions-command.ts";
+import type { OpenTab } from "./vscode-tab.ts";
 import type { VsWindow } from "./vscode-windows.ts";
 
 export interface AppDeps {
@@ -44,9 +45,13 @@ export interface AppDeps {
   readonly apiBase?: string;
   /** …and look at a stand-in Mac… */
   readonly readPresence?: () => Promise<Reading>;
-  /** …and start a stand-in for the sessions /new starts, in stand-in VS Code windows (plan 7.7). */
+  /**
+   * …and start stand-ins for the tabs /new opens and the sessions it runs in the background, in
+   * stand-in VS Code windows (plans 7.7, 7.8).
+   */
   readonly launchSession?: Launch;
   readonly openWindows?: () => readonly VsWindow[];
+  readonly openTab?: OpenTab;
 }
 
 export interface App {
@@ -82,8 +87,9 @@ export function createApp(deps: AppDeps): App {
   const ask = askParts({ db, sessions, telegram, pairing, presence, config, log, audit, notifier });
   const parts = { db, sessions, telegram, pairing, log, outbox, notifier, asks: ask.chat };
   const { relay, router, waiters, fresh } = replyParts(parts, deps);
+  const firstMessage = (ref: SessionRef, source: string) => fresh.claim(ref, source);
   const hookEvents = hookEventsOf(
-    { sessions, notifier, pairing, relay, asks: ask.relay, log },
+    { sessions, notifier, pairing, relay, asks: ask.relay, log, firstMessage },
     config,
   );
   const listing = sessionsParts(
@@ -140,7 +146,7 @@ interface GateParts {
   readonly list: () => CommandAnswer;
   /** …and a tap on one of its sessions (plan 7.4). */
   readonly write: (data: string, chat: number, queryId: string) => Promise<void>;
-  /** /new and its folder buttons (plan 7.7). */
+  /** /new and its window buttons (plans 7.7, 7.8). */
   readonly fresh: NewSessions;
 }
 

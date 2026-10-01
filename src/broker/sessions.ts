@@ -30,9 +30,16 @@ export interface Session extends SessionRef {
   readonly promptedAt: number;
   /** "" until a hook brings it. */
   readonly transcript: string;
-  /** Started with /new: it runs in the background, with no dialog at the Mac (D11, plan 7.7). */
+  /** Started with /new (D11): in a VS Code tab (plan 7.8), or in the background (plan 7.7). */
   readonly fromChat: boolean;
+  /** Started with /new in the background, in `claude -p`: it has no dialog at the Mac. */
+  readonly inBackground: boolean;
 }
+
+/** Where /new started a session (D11). */
+export type StartedIn = "background" | "tab";
+/** How the sessions table keeps it, in from_chat; 0 is a session started at the Mac. */
+const FROM_CHAT: Readonly<Record<StartedIn, number>> = { background: 1, tab: 2 };
 
 interface Row {
   readonly id: string;
@@ -51,6 +58,8 @@ interface Row {
 
 /** The most of a title the chat shows, in characters. */
 const TITLE_CHARS = 60;
+/** How Claude Code names a session in `claude -p` (F27), as /new runs one in the background. */
+export const BACKGROUND_ENTRYPOINT = "sdk-cli";
 
 /**
  * The sessions the hooks report (design §3). Each has a generation: every Stop starts a new one, and so
@@ -120,6 +129,7 @@ export class Sessions {
         promptedAt: 0,
         transcript: ref.transcript ?? "",
         fromChat: false,
+        inBackground: false,
       }
     );
   }
@@ -151,13 +161,13 @@ export class Sessions {
   }
 
   /**
-   * A session /new is about to start (D11): recorded before its first hook, as started from the chat,
-   * which its hooks' calls never change.
+   * A session /new started (D11), in the background or a tab: recorded as started from the chat, which
+   * its hooks' calls never change.
    */
-  startedHere(ref: SessionRef): Session {
+  startedHere(ref: SessionRef, startedIn: StartedIn): Session {
     const session = this.touch(ref);
-    this.#db.run("UPDATE sessions SET from_chat = 1 WHERE id = ?", ref.id);
-    return { ...session, fromChat: true };
+    this.#db.run("UPDATE sessions SET from_chat = ? WHERE id = ?", FROM_CHAT[startedIn], ref.id);
+    return { ...session, fromChat: true, inBackground: startedIn === "background" };
   }
 
   /** A prompt started a turn at `at` (UserPromptSubmit): the session is at work (plan 7.3). */
@@ -240,6 +250,7 @@ function fromRow(row: Row): Session {
     claudePid: row.claude_pid,
     promptedAt: row.prompted_at,
     transcript: row.transcript,
-    fromChat: row.from_chat === 1,
+    fromChat: row.from_chat !== 0,
+    inBackground: row.from_chat === FROM_CHAT.background,
   };
 }

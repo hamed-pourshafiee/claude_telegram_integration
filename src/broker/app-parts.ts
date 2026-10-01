@@ -20,6 +20,7 @@ import { Router } from "./router.ts";
 import { launchSession, loginShell } from "./session-launch.ts";
 import type { Sessions } from "./sessions.ts";
 import { type Start, Starts } from "./starts.ts";
+import { openTab } from "./vscode-tab.ts";
 import { openWindows } from "./vscode-windows.ts";
 import { type Waiter, Waiters } from "./waiters.ts";
 
@@ -99,13 +100,18 @@ interface NewParts {
   readonly log: Log;
 }
 
-/** /new (plan 7.7): the questions it asks, and the sessions a reply to one starts. */
+/**
+ * /new (plans 7.7 and 7.8): the questions it asks, the tabs a reply to one opens, and the sessions it
+ * runs in the background when no tab starts.
+ */
 function newParts(parts: NewParts, deps: AppDeps) {
   const starts = new Starts(parts.db);
   starts.prune();
   const launch = deps.launchSession ?? launchSession(deps.paths.logs, loginShell());
   const audit = deps.audit ?? noLog;
   const windows = deps.openWindows ?? (() => openWindows(parts.log));
-  const fresh = new NewSessions({ ...parts, starts, config: deps.config, windows, launch, audit });
+  const tab = deps.openTab ?? openTab();
+  const config = deps.config;
+  const fresh = new NewSessions({ ...parts, starts, config, windows, openTab: tab, launch, audit });
   return { starts, fresh };
 }

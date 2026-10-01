@@ -33,6 +33,8 @@ export interface HookInput {
   readonly error: string | undefined;
   /** SessionEnd's reason, such as other or prompt_input_exit. */
   readonly reason: string | undefined;
+  /** SessionStart's source: startup, resume, clear or compact. */
+  readonly source: string | undefined;
 }
 
 /** The input's fields, or undefined when it has no session_id. */
@@ -55,6 +57,7 @@ export function parseHookInput(value: unknown): HookInput | undefined {
     toolUseId: text(fields.tool_use_id) || undefined,
     error: text(fields.error),
     reason: text(fields.reason),
+    source: text(fields.source),
   };
 }
 

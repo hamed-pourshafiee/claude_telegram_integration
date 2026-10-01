@@ -1,14 +1,14 @@
 # Claude Code ↔ Telegram: Implementation Plan
 
-Status: rev. 18 (7.7: /new, a session started from the chat, D11; rev. 17: 7.5: titles in /sessions as
-they are now, F21; 7.6: a broker no hook can take down, F22; rev. 16: 7.4, write to a session from
-/sessions; rev. 15: 7.3, /sessions lists the open sessions; rev. 14: 7.2, sessions named by their titles;
-rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's menu of commands and /help, asked for after the
-plan; rev. 11: 4.2: plans reviewed from the phone, approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5
-on, O2 decided as D9; rev. 9: 3.4, Markdown in the chat; rev. 8, §1: steps follow on their own, Codex
-reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex review of rev. 5, finish detection by the stop's
-continuation entries, proven in 2.8, SIGTERM per waiter) · 2026-09-30 · Repo:
-`/Users/hamed/src/bc/claude_telegram_integration`
+Status: rev. 19 (7.8: /new opens a VS Code tab, F30, D11; rev. 18: 7.7: /new, a session started from the
+chat, D11; rev. 17: 7.5: titles in /sessions as they are now, F21; 7.6: a broker no hook can take down,
+F22; rev. 16: 7.4, write to a session from /sessions; rev. 15: 7.3, /sessions lists the open sessions;
+rev. 14: 7.2, sessions named by their titles; rev. 13: O3 decided, D10, GitHub; rev. 12: 7.1, the bot's
+menu of commands and /help, asked for after the plan; rev. 11: 4.2: plans reviewed from the phone,
+approved at the Mac, F20; rev. 10: 4.2 chosen, phase 5 on, O2 decided as D9; rev. 9: 3.4, Markdown in the
+chat; rev. 8, §1: steps follow on their own, Codex reviews paused; rev. 7: O1 decided: D8; rev. 6: Codex
+review of rev. 5, finish detection by the stop's continuation entries, proven in 2.8, SIGTERM per waiter)
+· 2026-10-01 · Repo: `/Users/hamed/src/bc/claude_telegram_integration`
 
 What we build and why is in [design.md](design.md): the goal, platform facts (F1–F29), architecture and
 flows 1–4, decisions (D1–D11), security, rollback, risks and the review log. References such as
@@ -305,5 +305,18 @@ flows 1–4, decisions (D1–D11), security, rollback, risks and the review log.
   handed back to the Mac, and end to end, `/new`, a tap and a reply starting a stand-in `claude`; live,
   from the phone, `/new` in the sandbox, its ✅ in the chat, and a reply that continues it.
 
+- **7.8 `/new` opens a VS Code tab** (asked 2026-10-01, after the spike F30; design D11). The reply to
+  `/new`'s question opens a new Claude Code tab in the window picked: the window brought forward, then
+  the link of F23. The bridge's SessionStart hook asks the broker, with the event's `source`; the first
+  VS Code tab to start in that folder within 30 s gets the message as its `initialUserMessage` (F30) and
+  is recorded as started from the chat. Without one, the session runs in the background as in 7.7. A tab
+  started from the chat keeps its dialog at the Mac; only background sessions count toward the limit of
+  3. **Pass:** tests for the commands that open the tab (the window, then the link), the claim (a VS Code
+  tab's startup in that folder; not a resume, another folder, a terminal session or a second tab), the
+  hook printing the message, the fallback to the background after the wait and when opening fails, a
+  tab's questions going back to the Mac, the limit counting background sessions only, and end to end,
+  `/new`, a tap and a reply opening a stand-in tab whose SessionStart gets the message; live, from the
+  phone, `/new` in each of the two open windows: a tab opens in that window and works on the message, and
+  its ✅ comes to the chat.
 Later, if wanted: a Telegram topic per session, `/new <repo> <prompt>` to start a headless session,
 resuming ended sessions, steering Claude mid-turn, packaging as a Claude Code plugin.
