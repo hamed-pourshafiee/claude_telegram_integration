@@ -1921,9 +1921,34 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
 - **Looked into:** `--session-mirror`, which the extension can pass, emits transcript frames for an SDK
   session store; it doesn't let a tab follow a session that runs elsewhere. A VS Code tab still can't
   show a `/new` session while it runs.
+- **Live check, fifth try, passed** (12:25 UTC, broker 35230, bot in `/off`): `/new` in
+  `claude_telegram_integration`, "list the files here". Session `c40d2df5` started at 12:25:45, its stop
+  was a finish at 12:26:02 and the ✅ with the list was sent at 12:26:04 (`notice.sent`, mode full).
+  The user saw no tab on the Mac, and still wants one.
+
+## Spike: a new tab started working by its SessionStart hook (2026-10-01)
+
+- **Found** in 2.1.285's binary (2.1.284's has it too): a SessionStart hook's output can carry
+  `hookSpecificOutput.initialUserMessage`. In the SDK's mode, which the VS Code tab uses, Claude Code
+  puts it before any other input (`prependUserMessage`). F24 tried only exit 2 and `asyncRewake`.
+- **Tried** at 12:49 UTC, headless: 2.1.285 started the way the extension starts it, in the scratchpad
+  (outside `~`), with only a throwaway settings file whose SessionStart hook printed the message. Nothing
+  else was sent but `initialize`.
+  - The hook ran at 5.5 s, the session answered "pong-init" at 8.3 s, and its Stop hook ran: one turn,
+    with no input.
+  - The stream showed no user message for it, only the answer.
+- **So:** F24's conclusion, that no hook can start a new session working, is wrong. A tab opened with
+  `vscode://anthropic.claude-code/open` could start working on the first message from the chat, given
+  by the bridge's own SessionStart hook.
+- **Not yet known**, for a live test: whether the tab shows that turn, and whether it opens in the
+  window you picked (F23: the window used last).
+  - A test tab with a throwaway hook in this repo's `.claude/settings.local.json` was blocked: auto mode
+    doesn't let Claude write Claude Code's settings files. The user decides how to go on.
 
 ## Next
 
+- **The user's decision:** `/new` as a VS Code tab started by its SessionStart hook (the spike above),
+  with F24 corrected and the new fact recorded in the design doc first.
 - **Live checks still to come:**
   - 7.5: `/sessions` during a new session's first turn shows its title.
   - 7.6's live part: once a hook started after 7.6 has started a broker, its parent is launchd. The
