@@ -560,13 +560,23 @@ Committed as `c6658db` after the user's go (2026-09-28).
   `claude_telegram_integration`, "Reply with just the word pong". The tab started 1.2 s after the
   commands ran (`new.tab-started`, session `667c7fa0`), its first message in the transcript is the text
   as typed, it answered "pong", and the ✅ went out at 14:33:56.7. The user: "It works as I wanted."
-- **Not checked live:** a tab in a workspace window (`insureq-studio`). Its window is brought forward by
-  its `.code-workspace` file; if the tab opened elsewhere, the session would run in the background after
-  30 s, and the log would say `new.tab-elsewhere`.
+- **A third run** (14:38 UTC) opened its tab in this repo's window, where the user had wanted
+  `insureq-studio`. The bot had recorded the tap as 🖥 claude_telegram_integration, and its question and
+  reply named that window. The buttons rebuilt from the live config were right: each window's button
+  carries its own folder. The retry below went where it was meant to, so no fix was made.
+- **Live check, workspace window, passed** (14:48 UTC, broker 53447): `/new`, 🖥 insureq-studio (a
+  workspace of 20 folders, this repo among them), "Reply with just the word pong".
+  - The question was recorded for `agent-panel-frontend`, the workspace's first folder (F28). The
+    commands ran by 14:48:19.8; the window came forward by its `.code-workspace` file, and the new tab's
+    SessionStart came 1.0 s later in that folder and took the message (`new.tab-started`, session
+    `8db509aa`, `from_chat` 2).
+  - Its stop was a finish at 14:48:28 and the ✅ went out at 14:48:29.8. The user: "It worked."
+- **7.8 passed**: both kinds of window, live.
 - **README** (asked with the push): the intro, the presence list, `/off` and the Security list say that
   sessions started with `/new` report to the chat wherever you are; the tested extension versions go to
   2.1.285; Troubleshooting lists `sessions.log` and what "no Claude tab started" means.
-- **Pushed** to `origin` on 2026-10-01 at the user's request, after a scan of the commits.
+- **Pushed** to `origin` on 2026-10-01 at the user's request, after a scan of the commits, and again
+  after the workspace check.
 
 ## Next
 
@@ -2002,7 +2012,6 @@ rev. 21: F21 refined, F22, D3; plan rev. 17).
 
 ## Next
 
-- **7.8's live check in a workspace window** (above), when the user wants it.
 - **Live checks still to come:**
   - 7.5: `/sessions` during a new session's first turn shows its title.
   - 7.6's live part: once a hook started after 7.6 has started a broker, its parent is launchd. The
