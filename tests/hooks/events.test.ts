@@ -2,7 +2,7 @@ import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { HANDLERS, type HookContext, sessionNote } from "../../src/hooks/events.ts";
+import { HANDLERS, type HookContext, sessionNote, startedNote } from "../../src/hooks/events.ts";
 import { parseHookInput } from "../../src/shared/hook-input.ts";
 import { type Log, type LogFields, noLog } from "../../src/shared/log.ts";
 import type { Pending } from "../../src/shared/pending.ts";
@@ -97,17 +97,19 @@ describe("SessionStart", () => {
     );
   });
 
-  test("a tab /new opened: its first message, which starts it working (F30, plan 7.8)", async () => {
-    respond = () => ({ name: "Hamed", first: "📨 From Hamed on Telegram: Fix the tests" });
+  test("a tab /new opened: its first message as typed, which starts it working (F30, plan 7.8)", async () => {
+    respond = () => ({ name: "Hamed", first: "Fix the tests" });
     await run("SessionStart", { source: "startup" });
     expect(calls).toMatchObject([{ name: "SessionStart", body: { source: "startup" } }]);
     expect(JSON.parse(printed[0] ?? "")).toEqual({
       hookSpecificOutput: {
         hookEventName: "SessionStart",
-        additionalContext: sessionNote("Hamed"),
-        initialUserMessage: "📨 From Hamed on Telegram: Fix the tests",
+        additionalContext: `${sessionNote("Hamed")} ${startedNote("Hamed")}`,
+        initialUserMessage: "Fix the tests",
       },
     });
+    expect(startedNote("Hamed")).toStartWith("Hamed started this session from Telegram");
+    expect(startedNote("the user")).toStartWith("The user started");
   });
 
   test("no broker: still the note, naming no one", async () => {

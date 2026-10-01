@@ -543,9 +543,21 @@ Committed as `c6658db` after the user's go (2026-09-28).
   the hook dropping it, a tab with no dialog, a tab counted as background, no fallback after the wait or
   when the tab can't open, tabs counting toward the limit, the window not brought forward, the source
   not passed on. The tabs-and-limit one passed at first, so the limit test now opens 3 tabs first.
-- **Live check, to come:** from the phone, `/new` in each of the two open windows: a tab opens in that
-  window and works on the message, and its ✅ comes to the chat. Still unknown before it: whether the tab
-  shows that first turn, and whether it opens in the window picked.
+- **Live check, first window, passed** (14:13 to 14:14 UTC, broker 50219, bot in `/off`): `/new`,
+  🖥 claude_telegram_integration, "Reply with just the word pong".
+  - The commands ran by 14:14:09.7 (`new.tab-opened`). The new tab's SessionStart came 2.2 s later, in
+    this window's folder, and took the message (`new.tab-started`, session `b112de68`).
+  - The tab showed the message and answered "pong"; its stop was a finish at 14:14:18 and the ✅ with
+    "pong" went out at 14:14:19.7.
+  - The user saw the message in the tab as "📨 From Hamed on Telegram: Reply with just the word pong",
+    with the mark meant for Claude.
+- **Changed** (on `dev`): a tab gets its first message as you wrote it, and the hook adds a line to
+  Claude's context that you started the session from Telegram and read its answers there. A message run
+  in the background keeps its mark, as there's no tab to show it (D11).
+  - Positive controls, 3, each caught: the tab given the marked message, the fallback run unmarked, the
+    hook dropping the line.
+- **Live check, to come:** `/new` in the other window, `insureq-studio` (a workspace): the tab opens in
+  that window, shows the message as typed and works on it.
 
 ## Next
 

@@ -125,7 +125,8 @@ function newSessions(): NewSessions {
 const buttons = () =>
   (fresh.answer().reply_markup?.inline_keyboard ?? []).flat().map((b) => [b.text, b.callback_data]);
 const dataFor = (name: string) => buttons().find(([text]) => text === `🖥 ${name}`)?.[1] ?? "";
-const first = (text: string) => `📨 From Hamed on Telegram: ${text}`;
+/** A first message as it goes to a session in the background; a tab gets it as you wrote it. */
+const marked = (text: string) => `📨 From Hamed on Telegram: ${text}`;
 
 /** Taps the window and replies to the question with `text`. */
 async function startIn(name: string, text: string) {
@@ -183,7 +184,7 @@ describe("a tap on a window, then the reply", () => {
 
   test("the tab's SessionStart gets the message, and the session counts as started here", async () => {
     await startIn("studio", "Fix the failing test");
-    expect(tabStarts("t-1", at("front"))).toBe(first("Fix the failing test"));
+    expect(tabStarts("t-1", at("front"))).toBe("Fix the failing test");
     expect(sessions.get("t-1")).toMatchObject({ fromChat: true, inBackground: false });
     const fields = { session: "t-1", folder: at("front"), by: "chat", in: "tab" };
     expect(audited).toEqual([{ event: "session.started", fields }]);
@@ -197,8 +198,8 @@ describe("a tap on a window, then the reply", () => {
     expect(tabStarts("r-1", at("bridge"), "resume")).toBeUndefined();
     expect(tabStarts("c-1", at("bridge"), "startup", "cli")).toBeUndefined();
     expect(tabStarts("o-1", at("front"))).toBeUndefined();
-    expect(tabStarts("t-1", at("bridge"))).toBe(first("one"));
-    expect(tabStarts("t-2", at("bridge"))).toBe(first("two"));
+    expect(tabStarts("t-1", at("bridge"))).toBe("one");
+    expect(tabStarts("t-2", at("bridge"))).toBe("two");
     expect(tabStarts("t-3", at("bridge"))).toBeUndefined();
     expect(["r-1", "c-1", "o-1"].some((id) => sessions.get(id))).toBe(false);
   });
@@ -213,7 +214,7 @@ describe("a tap on a window, then the reply", () => {
     expect(late && fresh.start("hello", late)?.text).toBe("That window isn't open any more.");
     mkdirSync(at("front"));
     expect(tabs).toEqual([BRIDGE]);
-    expect(tabStarts("t-1", at("bridge"))).toBe(first("first"));
+    expect(tabStarts("t-1", at("bridge"))).toBe("first");
   });
 });
 
@@ -221,7 +222,7 @@ describe("no tab: the session runs in the background (plan 7.7)", () => {
   test("none in time: `claude -p` in the window's folder, and you hear of it", async () => {
     await startIn("studio", "Fix the failing test");
     expect(await until(() => launched.length === 1)).toBe(true);
-    const message = first("Fix the failing test");
+    const message = marked("Fix the failing test");
     expect(launched).toEqual([{ id: "s-1", folder: at("front"), message, addDirs: [at("api")] }]);
     expect(sessions.get("s-1")).toMatchObject({ fromChat: true, inBackground: true });
     expect(told).toEqual([
@@ -252,7 +253,7 @@ describe("no tab: the session runs in the background (plan 7.7)", () => {
     });
     expect(tabs).toEqual([]);
     expect(launched).toEqual([
-      { id: "s-1", folder: at("bridge"), message: first("go"), addDirs: [] },
+      { id: "s-1", folder: at("bridge"), message: marked("go"), addDirs: [] },
     ]);
   });
 });
@@ -274,7 +275,7 @@ describe("limits and failures", () => {
     expect(launched).toHaveLength(MOST_RUNNING);
     tabFails = false;
     await startIn("bridge", "in a tab");
-    expect(tabStarts("t-4", at("bridge"))).toBe(first("in a tab"));
+    expect(tabStarts("t-4", at("bridge"))).toBe("in a tab");
   });
 
   test("an unknown button, or a question the reply box can't open for", async () => {

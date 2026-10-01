@@ -199,10 +199,10 @@ describe("the other events", () => {
     const asked: string[][] = [];
     firstMessage = (id, source) => {
       asked.push([id, source]);
-      return source === "startup" ? "📨 From Hamed on Telegram: hi" : undefined;
+      return source === "startup" ? "hi" : undefined;
     };
     const body = call("SessionStart", { source: "startup" }).body;
-    expect(body).toMatchObject({ name: "Hamed", first: "📨 From Hamed on Telegram: hi" });
+    expect(body).toMatchObject({ name: "Hamed", first: "hi" });
     expect(call("SessionStart", { source: "resume" }).body).not.toHaveProperty("first");
     expect(call("SessionStart").body).not.toHaveProperty("first");
     expect(asked).toEqual([

@@ -164,7 +164,7 @@ test("/new: a tap on a window and a reply open a tab there, whose SessionStart g
   });
   expect(answer.body).toMatchObject({
     name: "Hamed",
-    first: "📨 From Hamed on Telegram: Fix the tests",
+    first: "Fix the tests",
   });
   const again = await routes.hook("SessionStart", {
     ...tab,

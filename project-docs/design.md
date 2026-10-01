@@ -234,15 +234,17 @@ Taken (say so before the step if you disagree):
     tab in that window. It brings the window forward (`open -a` with the window's folder or workspace
     file: VS Code focuses the window that has it open), then opens the link of F23, which goes to the
     window used last. The first VS Code tab to start in that folder within 30 s gets your message from
-    the bridge's SessionStart hook as its `initialUserMessage` (F30), marked "📨 From … on Telegram", and
-    is recorded as started from the chat. It has its dialog at the Mac, so its questions can go back there
-    like any session's.
+    the bridge's SessionStart hook as its `initialUserMessage` (F30), and is recorded as started from the
+    chat. The tab shows the message, so it goes as you wrote it, and a line in Claude's context says it
+    came from Telegram (decided after the live check of 2026-10-01, when the tab showed the mark below).
+    It has its dialog at the Mac, so its questions can go back there like any session's.
   - **In the background**, when no tab takes the message within 30 s, or the window has closed since
     (plan 7.7): the broker starts `claude -p` in the window's folder (a workspace's first folder, with its
     other folders added, `--add-dir`) through your login shell, whose environment is the one VS Code
     gives a panel, in a session of its own (setsid) so it outlives a broker restart. It chooses the
     session id and puts it in the session's environment (`CLAUDE_TELEGRAM_SESSION`), which is how the
-    hooks know to serve it though Claude Code calls it `sdk-cli` (F27), and passes the message on stdin.
+    hooks know to serve it though Claude Code calls it `sdk-cli` (F27), and passes the message on stdin,
+    marked "📨 From … on Telegram".
     Its stop counts as a finish, as its hook can't read the stop's summary in `-p` (F29). It has no
     dialog at the Mac, so nothing moves back there, and a prompt the chat can't show is denied. At most 3
     run at once. One ends 12 h after its last turn, when its Stop hook stops waiting.

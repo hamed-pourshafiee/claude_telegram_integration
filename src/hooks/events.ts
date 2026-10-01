@@ -95,8 +95,18 @@ export function sessionNote(name: string): string {
 }
 
 /**
+ * What Claude learns of a tab /new opened (plan 7.8): its first message, shown as you typed it, came
+ * from Telegram.
+ */
+export function startedNote(name: string): string {
+  const who = `${name.charAt(0).toUpperCase()}${name.slice(1)}`;
+  return `${who} started this session from Telegram, with its first message, and reads your answers there.`;
+}
+
+/**
  * Registers the session with its branch and adds the note to Claude's context. A tab /new opened gets
- * its first message here, which starts it working (F30, plan 7.8).
+ * its first message here, which starts it working (F30, plan 7.8): as you wrote it, since the tab shows
+ * it, with a line in Claude's context that it came from Telegram.
  */
 async function sessionStart(context: HookContext): Promise<void> {
   let branch: string | undefined;
@@ -109,10 +119,12 @@ async function sessionStart(context: HookContext): Promise<void> {
   const answer = asFields(
     (await context.ensureBroker()) ? await context.call("SessionStart", body) : undefined,
   );
-  const name = answer?.name;
-  const additionalContext = sessionNote(typeof name === "string" && name ? name : "the user");
+  const named = answer?.name;
+  const name = typeof named === "string" && named ? named : "the user";
   const first = typeof answer?.first === "string" && answer.first !== "" ? answer.first : undefined;
   if (first !== undefined) context.log("hook.first-message", { chars: first.length });
+  const note = sessionNote(name);
+  const additionalContext = first === undefined ? note : `${note} ${startedNote(name)}`;
   const initial = first === undefined ? {} : { initialUserMessage: first };
   const output = {
     hookSpecificOutput: { hookEventName: "SessionStart", additionalContext, ...initial },

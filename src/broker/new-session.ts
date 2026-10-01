@@ -20,7 +20,7 @@ export interface NewSessionsDeps extends BackgroundDeps {
   readonly windows: () => readonly VsWindow[];
   /** Opens a new Claude Code tab in a window (plan 7.8). */
   readonly openTab: OpenTab;
-  /** The paired user's first name, for the mark on the first message. */
+  /** The paired user's first name, for the mark on a first message run in the background. */
   readonly senderName: () => string | null;
   /** How long a message waits for its tab, in ms; 30 s unless a test says otherwise. */
   readonly tabMs?: number;
@@ -121,11 +121,12 @@ export class NewSessions {
       return { started: false, text: taken === "expired" ? TEXTS.expired : TEXTS.taken };
     }
     if (!this.#offers(start.projectDir)) return { started: false, text: TEXTS.gone };
-    const message = `📨 From ${this.#deps.senderName() ?? "the user"} on Telegram: ${text}`;
     if (window === undefined) {
+      const message = this.#marked(text);
       return this.#background.start({ folder: start.projectDir, name, message, addDirs: [] });
     }
-    this.#openTab({ window, folder: this.#resolved(window.folder), name, message });
+    // The tab shows its first message as yours: as you wrote it (plan 7.8).
+    this.#openTab({ window, folder: this.#resolved(window.folder), name, message: text });
     return { started: true, text: TEXTS.opening(name) };
   }
 
@@ -169,7 +170,8 @@ export class NewSessions {
   /** No tab took the message: the session runs in the background instead, and you hear of it. */
   #noTab(tab: PendingTab, why: string): void {
     this.#deps.log("new.no-tab", { why });
-    const { window, name, message } = tab;
+    const { window, name } = tab;
+    const message = this.#marked(tab.message);
     let started: Started;
     try {
       started = this.#background.start({
@@ -204,6 +206,11 @@ export class NewSessions {
       return false;
     if (contentModeFor(config, dir) !== "full") return false;
     return statSync(dir, { throwIfNoEntry: false })?.isDirectory() === true;
+  }
+
+  /** A first message run in the background, marked so that Claude knows it came from the chat (D11). */
+  #marked(text: string): string {
+    return `📨 From ${this.#deps.senderName() ?? "the user"} on Telegram: ${text}`;
   }
 
   /** A folder as the hooks name it (resolved, F15); as it is, logged, when it can't be resolved. */
