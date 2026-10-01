@@ -12,16 +12,20 @@ for the VS Code panel and for `claude` in a terminal, in any repo you choose to 
 | Claude wants to run a command or edit a file | 🔐 and the whole command or change | Allow once, Deny, or reply to deny with your reason |
 | Claude stops on an API error | ⚠️ | — |
 
-Nothing is sent while you're at the Mac, unless you ask for it with `/away`. The bridge consists of
-hooks in `~/.claude/settings.json` and one small local process, the broker, that talks to Telegram. No
-Remote Control, no cloud service in between, no open port.
+You can also start a session from the phone: `/new` opens a new Claude tab in one of your VS Code
+windows, which starts working on the message you send.
+
+Nothing is sent while you're at the Mac, unless you ask for it with `/away` or started the session with
+`/new`. The bridge consists of hooks in `~/.claude/settings.json` and one small local process, the
+broker, that talks to Telegram. No Remote Control, no cloud service in between, no open port.
 
 ## Requirements
 
 - macOS (the bridge reads your idle time and screen lock from `ioreg`).
 - [Bun](https://bun.sh) 1.4 or later.
-- Claude Code: tested with the CLI 2.1.274 and the VS Code extension 2.1.283 and 2.1.284. Newer versions
+- Claude Code: tested with the CLI 2.1.274 and the VS Code extension 2.1.283 to 2.1.285. Newer versions
   usually work; `bun run ctl doctor` tells you if the stops stop being read (see Troubleshooting).
+- VS Code, for `/new`: it opens its tabs in the VS Code windows you have open.
 - A Telegram account with **two-step verification on** (Settings → Privacy and Security). Whoever takes
   over your Telegram can drive Claude on this Mac through the bot.
 
@@ -65,6 +69,7 @@ Remote Control, no cloud service in between, no open port.
 **Where you are.** The bridge decides from your keyboard and mouse and the screen lock:
 
 - **Active** (input in the last 30 s): nothing goes to Telegram; questions and prompts open at the Mac.
+  Sessions you started with `/new` are the exception: they report to the chat wherever you are.
 - **Away** (no input for 3 min, the screen locked, or `/away`): everything goes to Telegram.
 - **In between**: finished turns aren't sent. A question, plan or permission prompt goes to Telegram,
   and moves to its dialog at the Mac the moment you touch the keyboard or mouse; the spinner says so.
@@ -116,7 +121,7 @@ what it does.
 | `/new` | Open a new Claude tab in one of your VS Code windows, started on your message; see "Starting a session from the phone" above |
 | `/away` | Relay everything until `/auto`, even while you're at the Mac |
 | `/auto` | Decide from your idle time and the screen lock again |
-| `/off` | Mute everything until `/auto` or `/away` |
+| `/off` | Mute everything until `/auto` or `/away`, except the sessions you start with `/new` |
 | `/local` | Hand the questions waiting in the chat back to the dialogs at the Mac |
 | `/help` | A short guide: what comes to the chat, how to answer it, and these commands |
 
@@ -158,12 +163,14 @@ mutes everything, and `bun run ctl disable` turns the bridge off until `enable`.
 - Claude's text is redacted for things that look like secrets before it's sent, and long text is cut.
   The logs hold ids, sizes and timings, not message text.
 - A reply from Telegram reaches Claude marked "📨 Telegram reply from …", so it knows where it came from.
+  The first message of a tab `/new` opened shows as you typed it; a line in Claude's context says it came
+  from Telegram.
 
 ## Troubleshooting
 
 Start with `bun run ctl doctor` and `bun run ctl status`, or send `/status` to the bot. The logs are in
-`.state/logs/`: `broker.log`, `hooks.log`, `ctl.log` and `audit.log`. Past 5 MB a log is rotated to
-`.1`, and three copies are kept.
+`.state/logs/`: `broker.log`, `hooks.log`, `ctl.log`, `audit.log`, and `sessions.log` for the sessions
+`/new` runs in the background. Past 5 MB a log is rotated to `.1`, and three copies are kept.
 
 - **No ✅ after a turn.** Were you away (`/status`)? Did the session start inside a served folder, and is
   its kind in `entrypoints` (`ctl doctor` lists both)?
@@ -174,6 +181,10 @@ Start with `bun run ctl doctor` and `bun run ctl status`, or send `/status` to t
   `bun run ctl install --dry-run`, then install again.
 - **The broker runs with another token** (`ctl status`): you changed `.env`; `bun run ctl stop`, and
   the next hook starts it with the new one.
+- **`/new` says no Claude tab started.** VS Code didn't open a tab in that window within 30 seconds, so
+  the session ran in the background instead. The tab opens in the window VS Code used last, after the
+  bridge brings the one you picked forward; if a tab opened in another window, `broker.log` has
+  `new.tab-elsewhere`, and that tab is an ordinary empty one you can close.
 
 ## How it's built
 
